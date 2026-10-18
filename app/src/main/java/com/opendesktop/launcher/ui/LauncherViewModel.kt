@@ -243,19 +243,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         return info?.configure != null
     }
 
-    fun configureWidget(item: DesktopItem) {
+    fun configureWidget(activity: android.app.Activity, item: DesktopItem) {
         if (item.type != ItemType.Widget || item.widgetId < 0) return
         val info = awm.installedProviders.firstOrNull { it.provider.flattenToString() == item.provider } ?: return
         if (info.configure == null) return
-
         runCatching {
-            widgetHost.startAppWidgetConfigureActivityForResult(
-                getApplication<LauncherApp>().mainActivity ?: return,
-                item.widgetId,
-                0,
-                5102, // REQ_RECONFIGURE
-                null
-            )
+            widgetHost.startAppWidgetConfigureActivityForResult(activity, item.widgetId, 0, 5102, null)
         }
     }
 

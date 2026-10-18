@@ -23,7 +23,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -56,6 +61,7 @@ import com.opendesktop.launcher.data.Config
 import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.data.ItemType
 import com.opendesktop.launcher.data.Page
+import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.FolderIcon
 import com.opendesktop.launcher.ui.components.iconSizeFor
@@ -271,6 +277,28 @@ private fun DesktopItemSlot(
             }
             ItemType.Clock -> ClockWidget(Modifier.fillMaxSize().then(gestures))
             ItemType.Search -> SearchWidget(Modifier.fillMaxSize().then(gestures), aiEnabled)
+            ItemType.Action -> {
+                val size = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true)
+                Box(Modifier.fillMaxSize().then(gestures), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.size(size).clip(CircleShape).background(Color.White.copy(alpha = if (pressed) 0.32f else 0.2f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = when (item.systemAction) {
+                                SystemAction.OpenDrawer -> Icons.Rounded.Apps
+                                SystemAction.OpenSearch -> Icons.Rounded.Search
+                                SystemAction.OpenNotifications -> Icons.Rounded.Notifications
+                                SystemAction.OpenQuickSettings -> Icons.Rounded.Tune
+                                SystemAction.OpenSettings, null -> Icons.Rounded.Settings
+                            },
+                            contentDescription = item.label,
+                            tint = Color.White,
+                            modifier = Modifier.size(size * 0.5f),
+                        )
+                    }
+                }
+            }
         }
         if (editMode && selected) {
             ResizeHandle(

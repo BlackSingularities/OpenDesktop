@@ -411,7 +411,7 @@ fun LauncherScreen(
                     actions = listOfNotNull(
                         resize,
                         if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
-                            MenuAction("Skonfiguruj", Icons.Rounded.Settings) { vm.configureWidget(item) }
+                            MenuAction("Skonfiguruj", Icons.Rounded.Settings) { ctx.findActivity()?.let { vm.configureWidget(it, item) } }
                         } else null,
                         MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) }
                     ),

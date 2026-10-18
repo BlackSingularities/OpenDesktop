@@ -21,6 +21,14 @@ object SystemActions {
         }
     }
 
+    @SuppressLint("WrongConstant")
+    fun openQuickSettings(context: Context) {
+        runCatching {
+            val service = context.getSystemService("statusbar")
+            Class.forName("android.app.StatusBarManager").getMethod("expandSettingsPanel").invoke(service)
+        }
+    }
+
     fun openWallpaperPicker(context: Context) {
         runCatching {
             context.startActivity(

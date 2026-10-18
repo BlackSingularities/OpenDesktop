@@ -38,35 +38,34 @@ import com.opendesktop.launcher.R
 import com.opendesktop.launcher.data.*
 import com.opendesktop.launcher.ui.LauncherViewModel
 
+private data class ChoiceState<T>(
+    val title: String,
+    val options: List<T>,
+    val current: T,
+    val label: (T) -> String,
+    val desc: ((T) -> String)? = null,
+    val onPick: (T) -> Unit,
+)
+
 @Composable
 fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories: () -> Unit = {}) {
     val ctx = LocalContext.current
     val cfg by vm.config.collectAsStateWithLifecycle()
     fun set(t: (Config) -> Config) = vm.updateConfig(t)
 
-    var choice by remember { mutableStateOf<ChoiceState<*>?>(null) }
-
-    data class ChoiceState<T>(
-        val title: String,
-        val options: List<T>,
-        val current: T,
-        val label: (T) -> String,
-        val desc: ((T) -> String)? = null,
-        val onPick: (T) -> Unit,
-    )
+    var choice by remember { mutableStateOf<ChoiceState<Any?>?>(null) }
 
     fun <T> pick(title: String, options: List<T>, current: T, label: (T) -> String, desc: ((T) -> String)? = null, onPick: (T) -> Unit) {
-        choice = ChoiceState(title, options, current, label, desc, onPick)
+        @Suppress("UNCHECKED_CAST")
+        choice = ChoiceState(title, options, current, label, desc, onPick) as ChoiceState<Any?>
     }
 
-    choice?.let { c ->
-        @Suppress("UNCHECKED_CAST")
-        val c2 = c as ChoiceState<Any>
+    choice?.let { c2 ->
         ChoiceDialog(
             title = c2.title,
             options = c2.options.map(c2.label),
             selected = c2.options.indexOf(c2.current),
-            descriptions = c2.desc?.let { d: (Any) -> String -> c2.options.map(d) },
+            descriptions = c2.desc?.let { d -> c2.options.map(d) },
             onDismiss = { choice = null },
             onSelect = { c2.onPick(c2.options[it]) },
         )

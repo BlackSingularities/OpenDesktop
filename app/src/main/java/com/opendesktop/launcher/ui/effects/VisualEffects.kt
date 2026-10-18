@@ -172,8 +172,8 @@ fun SparkleEffect(
     LaunchedEffect(triggered) {
         if (triggered) {
             animatables.forEachIndexed { index, anim ->
-                kotlinx.coroutines.launch {
-                    kotlinx.coroutines.delay(index * 30L)
+                launch {
+                    delay(index * 30L)
                     anim.snapTo(0f)
                     anim.animateTo(1f, tween(500))
                 }

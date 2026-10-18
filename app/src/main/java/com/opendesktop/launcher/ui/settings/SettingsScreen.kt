@@ -351,7 +351,7 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                         Text("Google Drive", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
 
                         // Status połączenia
-                        val driveConnected = false // TODO: vm.isDriveConnected
+                        val driveConnected = cfg.cloudAutoSync
                         Row(
                             Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -371,7 +371,7 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                         }
 
                         if (!driveConnected) {
-                            Button(onClick = { /* TODO: vm.connectGoogleDrive() */ }) {
+                            Button(onClick = { vm.connectGoogleDrive() }) {
                                 Text("Połącz z Google Drive")
                             }
                             Text(
@@ -381,14 +381,17 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                                 modifier = Modifier.padding(top = 4.dp),
                             )
                         } else {
-                            SwitchRow("Auto-synchronizacja", "Automatyczny sync co 5 minut", false) { /* TODO */ }
-                            ChoiceRow("Interwał synchronizacji", "Co 5 minut") { /* TODO */ }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                                OutlinedButton(onClick = { /* TODO: vm.syncNow() */ }) { Text("Synchronizuj teraz") }
-                                OutlinedButton(onClick = { /* TODO: vm.createBackup() */ }) { Text("Utwórz backup") }
+                            SwitchRow("Auto-synchronizacja", "Automatyczny sync co ${cfg.cloudSyncInterval} minut", cfg.cloudAutoSync) { v ->
+                                set { it.copy(cloudAutoSync = v) }
                             }
-                            ChoiceRow("Historia backupów", "Zobacz wszystkie backupy") { /* TODO */ }
-                            TextButton(onClick = { /* TODO: vm.disconnectDrive() */ }) {
+                            SliderRow("Interwał synchronizacji", cfg.cloudSyncInterval.toFloat(), 1f..30f, 28, format = { "${it.toInt()} min" }) { v ->
+                                set { it.copy(cloudSyncInterval = v.toInt()) }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                                OutlinedButton(onClick = { vm.syncNow() }) { Text("Synchronizuj teraz") }
+                                OutlinedButton(onClick = { vm.createBackup() }) { Text("Utwórz backup") }
+                            }
+                            TextButton(onClick = { vm.disconnectDrive() }) {
                                 Text("Odłącz Google Drive", color = MaterialTheme.colorScheme.error)
                             }
                         }

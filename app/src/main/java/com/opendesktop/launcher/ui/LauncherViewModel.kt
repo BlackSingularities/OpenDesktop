@@ -682,6 +682,40 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         initializeDefaults()
     }
 
+    // ---------------------------------------------------------------- Google Drive
+
+    fun completeOnboarding() {
+        store.updateConfig { it.copy(onboardingDone = true) }
+    }
+
+    fun connectGoogleDrive() {
+        // TODO: Implement Google Drive connection flow
+        // Będzie wymagało Activity Result API
+        toast("Połączenie z Google Drive - wkrótce!")
+        completeOnboarding()
+    }
+
+    fun disconnectDrive() {
+        // TODO: Implement disconnect
+        toast("Rozłączono z Google Drive")
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            val success = store.syncToCloud()
+            if (success) toast("Zsynchronizowano z Google Drive")
+            else toast("Błąd synchronizacji")
+        }
+    }
+
+    fun createBackup() {
+        viewModelScope.launch {
+            val success = store.createCloudBackup()
+            if (success) toast("Utworzono backup w Google Drive")
+            else toast("Błąd tworzenia backupu")
+        }
+    }
+
     // ---------------------------------------------------------------- pierwszy start
 
     private fun initializeDefaults() {

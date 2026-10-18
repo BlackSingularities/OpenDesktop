@@ -530,7 +530,7 @@ fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks) {
         ) {
             for (i in 0 until minOf(3, apps.size - currentIndex)) {
                 val app = apps.getOrNull(currentIndex + i) ?: continue
-                val offset = i * 12.dp
+                val offset = (i * 12).dp
                 val scale = 1f - i * 0.05f
 
                 Box(

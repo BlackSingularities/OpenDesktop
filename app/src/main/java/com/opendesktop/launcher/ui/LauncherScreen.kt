@@ -393,7 +393,7 @@ fun LauncherScreen(
                         MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
                         MenuAction(
                             if (item.primaryApp != null) "Zmień główną aplikację" else "Ustaw główną aplikację",
-                            Icons.Rounded.TouchApp
+                            Icons.Rounded.Star
                         ) { primaryAppPicker = pageId to item.id },
                         resize,
                         MenuAction("Rozgrupuj", Icons.Rounded.CallSplit) { vm.ungroup(pageId, item.id) },

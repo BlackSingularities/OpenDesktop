@@ -410,7 +410,7 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
-                        horizontalAlignment = Arrangement.Center,
+                        horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(

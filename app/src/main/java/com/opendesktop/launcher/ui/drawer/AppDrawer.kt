@@ -191,7 +191,10 @@ fun AppDrawer(
                         .weight(1f)
                         .height(48.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.12f))
+                        .then(
+                            if (cfg.drawerHeaderBackground) Modifier.background(Color.White.copy(alpha = 0.12f))
+                            else Modifier
+                        )
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -317,11 +320,20 @@ fun AppDrawer(
                     DrawerCategoryTabs(tabs, cfg.drawerColumns, cb, padding)
                 }
                 DrawerStyle.Tiles -> DrawerTiles(visible, ws.usage, cb, padding)
+                DrawerStyle.Compact -> DrawerCompact(visible, cfg.drawerColumns.coerceAtLeast(6), cb, padding)
+                DrawerStyle.SearchBar -> DrawerSearchBar(visible, cfg.drawerColumns, cb, padding)
+                DrawerStyle.Material -> DrawerMaterial(visible, cb, padding)
+                DrawerStyle.iOS -> DraweriOS(visible, cfg.drawerColumns, cb, padding)
+                DrawerStyle.Horizontal -> DrawerHorizontal(visible, 4, cb)
+                DrawerStyle.Flow -> DrawerFlow(visible, ws.usage, cb, padding)
                 DrawerStyle.Carousel -> DrawerCarousel(visible, cb)
                 DrawerStyle.Helix -> DrawerHelix(visible, cb)
                 DrawerStyle.Sphere -> DrawerSphere(visible, cb)
                 DrawerStyle.Wheel -> DrawerWheel(visible, cb)
                 DrawerStyle.Bubbles -> DrawerBubbles(visible, cb)
+                DrawerStyle.Cylinder -> DrawerCylinder(visible, cb)
+                DrawerStyle.Wave -> DrawerWave(visible, cb, padding)
+                DrawerStyle.Stack -> DrawerStack(visible, cb)
             }
         }
     }

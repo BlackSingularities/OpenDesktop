@@ -133,6 +133,7 @@ import com.opendesktop.launcher.ui.desktop.PageIndicator
 import com.opendesktop.launcher.ui.desktop.WidgetPicker
 import com.opendesktop.launcher.ui.desktop.pageTransition
 import com.opendesktop.launcher.ui.drawer.AppDrawer
+import com.opendesktop.launcher.ui.onboarding.OnboardingScreen
 import com.opendesktop.launcher.ui.settings.SettingsScreen
 import com.opendesktop.launcher.ui.settings.UpdateDialog
 import kotlinx.coroutines.Dispatchers
@@ -161,6 +162,16 @@ fun LauncherScreen(
     val apps by vm.apps.collectAsStateWithLifecycle()
     val loaded by vm.appsLoaded.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
+
+    // Pokaż onboarding przy pierwszym uruchomieniu
+    if (!cfg.onboardingDone) {
+        OnboardingScreen(
+            onComplete = { vm.completeOnboarding() },
+            onConnectDrive = { vm.connectGoogleDrive() },
+        )
+        return
+    }
+
     val appMap = remember(apps) { apps.associateBy { it.key } }
     val ctx = LocalContext.current
     val view = LocalView.current
@@ -669,7 +680,10 @@ fun LauncherScreen(
                             }
                         }
                     }
-                    .background(Color(0xFF070A12).copy(alpha = cfg.drawerOpacity)),
+                    .then(
+                        if (cfg.drawerBackground) Modifier.background(Color(0xFF070A12).copy(alpha = cfg.drawerOpacity))
+                        else Modifier
+                    ),
             ) {
                 AppDrawer(
                     vm = vm,

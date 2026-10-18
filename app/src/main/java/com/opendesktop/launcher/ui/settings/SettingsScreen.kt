@@ -3,6 +3,7 @@ package com.opendesktop.launcher.ui.settings
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -120,19 +121,51 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
         }
     }
 
-    Surface(color = Color(0xFA0E121C), modifier = Modifier.fillMaxSize()) {
+    Surface(color = Color(0xFF0A0E1A), modifier = Modifier.fillMaxSize()) {
+        Box {
+            // Gradient tło jak w OpenPDF
+            Canvas(Modifier.fillMaxSize()) {
+                drawRect(
+                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF1A1F3A),
+                            Color(0xFF0A0E1A),
+                            Color(0xFF0A0E1A),
+                        ),
+                    ),
+                )
+            }
+
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Row(Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Nagłówek z gradientem
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                            ),
+                        ),
+                    )
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
+            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Wstecz", tint = Color.White) }
                 Image(
                     painter = painterResource(R.drawable.opendesktop_mark),
                     contentDescription = null,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(40.dp),
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("Ustawienia OpenDesktop", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Ustawienia", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("OpenDesktop", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                }
             }
-            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            }
+            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (!SystemActions.isDefaultLauncher(ctx)) {
                     item {
                         Card {
@@ -159,8 +192,12 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
 
                 item {
                     Section("Ikony") {
-                        SliderRow("Rozmiar ikon", cfg.iconScale, 0.6f..1.5f, 17, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(iconScale = v) } }
+                        Text("Pulpit", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                        SliderRow("Rozmiar ikon na pulpicie", cfg.desktopIconScale, 0.8f..1.8f, 19, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(desktopIconScale = v) } }
                         SwitchRow("Podpisy na pulpicie", null, cfg.showLabels) { v -> set { it.copy(showLabels = v) } }
+                        Spacer(Modifier.height(8.dp))
+                        Text("Szuflada i dok", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        SliderRow("Rozmiar ikon", cfg.iconScale, 0.6f..1.5f, 17, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(iconScale = v) } }
                         SliderRow("Wielkość podpisów", cfg.labelSize, 9f..16f, 6, format = { "${it.toInt()} sp" }) { v -> set { it.copy(labelSize = v) } }
                         ChoiceRow("Kształt ikon", cfg.iconShape.label) {
                             pick("Kształt ikon", IconShape.entries, cfg.iconShape, { it.label }) { s -> set { it.copy(iconShape = s) } }
@@ -172,7 +209,10 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                     Section("Dok") {
                         SwitchRow("Pokaż dok", null, cfg.dockEnabled) { v -> set { it.copy(dockEnabled = v) } }
                         SliderRow("Miejsca w doku", cfg.dockCount.toFloat(), 3f..7f, 3) { v -> set { it.copy(dockCount = v.toInt()) } }
-                        SliderRow("Przezroczystość tła", cfg.dockOpacity, 0f..0.6f, 11, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(dockOpacity = v) } }
+                        SwitchRow("Tło doku", null, cfg.dockBackground) { v -> set { it.copy(dockBackground = v) } }
+                        if (cfg.dockBackground) {
+                            SliderRow("Przezroczystość tła", cfg.dockOpacity, 0f..0.6f, 11, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(dockOpacity = v) } }
+                        }
                         SwitchRow("Podpisy w doku", null, cfg.dockLabels) { v -> set { it.copy(dockLabels = v) } }
                     }
                 }
@@ -189,7 +229,11 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                             pick("Animacja otwierania", DrawerAnimation.entries, cfg.drawerAnimation, { it.label }) { s -> set { it.copy(drawerAnimation = s) } }
                         }
                         SliderRow("Kolumny", cfg.drawerColumns.toFloat(), 3f..8f, 4) { v -> set { it.copy(drawerColumns = v.toInt()) } }
-                        SliderRow("Krycie tła", cfg.drawerOpacity, 0.3f..1f, 13, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(drawerOpacity = v) } }
+                        SwitchRow("Tło szuflady", null, cfg.drawerBackground) { v -> set { it.copy(drawerBackground = v) } }
+                        if (cfg.drawerBackground) {
+                            SliderRow("Krycie tła", cfg.drawerOpacity, 0.3f..1f, 13, format = { "${(it * 100).toInt()}%" }) { v -> set { it.copy(drawerOpacity = v) } }
+                        }
+                        SwitchRow("Tło paska wyszukiwania", null, cfg.drawerHeaderBackground) { v -> set { it.copy(drawerHeaderBackground = v) } }
                         if (Build.VERSION.SDK_INT >= 31) SwitchRow("Rozmycie pulpitu", null, cfg.blurBehindDrawer) { v -> set { it.copy(blurBehindDrawer = v) } }
                         SwitchRow("Filtr kategorii (chipy)", null, cfg.drawerCategoryChips) { v -> set { it.copy(drawerCategoryChips = v) } }
                         SwitchRow("Podpisy ikon", null, cfg.drawerLabels) { v -> set { it.copy(drawerLabels = v) } }
@@ -228,7 +272,20 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                                 }
                             }
                         }
+                        SwitchRow("Automatyczny motyw dzień/noc", "Ciemny motyw od 20:00 do 7:00", cfg.autoTheme) { v -> set { it.copy(autoTheme = v) } }
                         ChoiceRow("Tapeta", "Systemowy wybór tapety") { SystemActions.openWallpaperPicker(ctx) }
+                    }
+                }
+
+                item {
+                    Section("Efekty i Animacje") {
+                        SwitchRow("Efekt naciśnięcia ikon", "Ikony kurczą się przy dotknięciu", cfg.iconPressEffect) { v -> set { it.copy(iconPressEffect = v) } }
+                        SwitchRow("Wiggle przy przytrzymaniu", "Ikony się trzęsą w trybie edycji", cfg.iconWiggleOnLongPress) { v -> set { it.copy(iconWiggleOnLongPress = v) } }
+                        SwitchRow("Cząsteczki w tle", "Animowane cząsteczki poruszające się po ekranie", cfg.particleEffects) { v -> set { it.copy(particleEffects = v) } }
+                        SwitchRow("Animacja odbijania", "Ikony odbijają się przy uruchomieniu", cfg.iconBounceAnimation) { v -> set { it.copy(iconBounceAnimation = v) } }
+                        SwitchRow("Animacja folderów", "Płynne otwieranie i zamykanie folderów", cfg.folderOpenAnimation) { v -> set { it.copy(folderOpenAnimation = v) } }
+                        SwitchRow("Ślady przy przeciąganiu", "Wizualne ślady podczas drag & drop", cfg.swipeTrails) { v -> set { it.copy(swipeTrails = v) } }
+                        SwitchRow("Efekt parallax", "Tapeta przesuwa się z większym opóźnieniem", cfg.parallaxEffect) { v -> set { it.copy(parallaxEffect = v) } }
                     }
                 }
 
@@ -290,35 +347,101 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                 }
 
                 item {
-                    Section("Kopia zapasowa") {
+                    Section("Backup i Synchronizacja") {
+                        Text("Google Drive", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+
+                        // Status połączenia
+                        val driveConnected = false // TODO: vm.isDriveConnected
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(if (driveConnected) Color(0xFF4CAF50) else Color(0xFF757575)),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                if (driveConnected) "Połączono z Google Drive" else "Nie połączono",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                            )
+                        }
+
+                        if (!driveConnected) {
+                            Button(onClick = { /* TODO: vm.connectGoogleDrive() */ }) {
+                                Text("Połącz z Google Drive")
+                            }
+                            Text(
+                                "Dane będą automatycznie synchronizowane z Twoim kontem Google",
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        } else {
+                            SwitchRow("Auto-synchronizacja", "Automatyczny sync co 5 minut", false) { /* TODO */ }
+                            ChoiceRow("Interwał synchronizacji", "Co 5 minut") { /* TODO */ }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                                OutlinedButton(onClick = { /* TODO: vm.syncNow() */ }) { Text("Synchronizuj teraz") }
+                                OutlinedButton(onClick = { /* TODO: vm.createBackup() */ }) { Text("Utwórz backup") }
+                            }
+                            ChoiceRow("Historia backupów", "Zobacz wszystkie backupy") { /* TODO */ }
+                            TextButton(onClick = { /* TODO: vm.disconnectDrive() */ }) {
+                                Text("Odłącz Google Drive", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Text("Lokalny backup", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(onClick = { exportLauncher.launch("opendesktop-${LocalDate.now()}.json") }) { Text("Eksportuj układ") }
+                            FilledTonalButton(onClick = { exportLauncher.launch("opendesktop-${LocalDate.now()}.json") }) { Text("Eksportuj") }
                             FilledTonalButton(onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }) { Text("Importuj") }
                         }
                         Spacer(Modifier.height(6.dp))
-                        TextButton(onClick = { confirmReset = true }) { Text("Przywróć domyślny układ pulpitu", color = MaterialTheme.colorScheme.error) }
+                        TextButton(onClick = { confirmReset = true }) { Text("Przywróć domyślny układ", color = MaterialTheme.colorScheme.error) }
                     }
                 }
 
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                        horizontalAlignment = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Image(
-                            painter = painterResource(R.drawable.opendesktop_mark),
-                            contentDescription = null,
-                            modifier = Modifier.size(44.dp),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            "OpenDesktop ${BuildConfig.VERSION_NAME} · otwarty launcher na Androida",
-                            color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp,
-                        )
+                        Box(
+                            Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                .padding(8.dp),
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.opendesktop_mark),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "OpenDesktop ${BuildConfig.VERSION_NAME}",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                "Otwarty launcher na Androida",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 13.sp,
+                            )
+                        }
                     }
                 }
             }
         }
+    }
     }
 
     choice?.invoke()
@@ -341,9 +464,17 @@ private fun Card(content: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
-            .padding(16.dp),
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    ),
+                ),
+            )
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(28.dp))
+            .padding(18.dp),
     ) { content() }
 }
 
@@ -352,11 +483,28 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.08f),
+                        Color.White.copy(alpha = 0.04f),
+                    ),
+                ),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
-        Text(title, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.padding(bottom = 6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(title, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 0.5.sp)
+        }
         content()
     }
 }

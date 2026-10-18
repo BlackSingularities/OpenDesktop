@@ -225,8 +225,9 @@ fun DrawScope.drawAppIcon(img: ImageBitmap, center: Offset, sizePx: Float, alpha
 }
 
 /** Rozmiar ikony mieszczący się w komórce o podanych wymiarach. */
-fun iconSizeFor(cellW: Dp, cellH: Dp, scale: Float, withLabel: Boolean): Dp {
+fun iconSizeFor(cellW: Dp, cellH: Dp, scale: Float, withLabel: Boolean, desktopMode: Boolean = false): Dp {
     val labelSpace = if (withLabel) 22.dp else 0.dp
     val base = minOf(cellW, cellH - labelSpace)
-    return (base * 0.72f * scale).coerceIn(24.dp, 112.dp)
+    val baseScale = if (desktopMode) 0.92f else 0.72f
+    return (base * baseScale * scale).coerceIn(24.dp, 140.dp)
 }

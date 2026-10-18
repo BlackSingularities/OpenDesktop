@@ -29,11 +29,20 @@ enum class DrawerStyle(val label: String, val description: String) {
     Alphabet("Alfabet", "Lista z literami i szybkim przewijaniem"),
     Categories("Zakładki kategorii", "Każda kategoria to osobna karta — przesuwaj w bok"),
     Tiles("Kafelki", "Kolorowe kafelki, najczęściej używane są większe"),
+    Compact("Kompaktowy", "Gęsta siatka małych ikon bez odstępów"),
+    SearchBar("Pasek wyszukiwania", "Siatka z górnym paskiem wyszukiwania i ikonami"),
+    Material("Material Design", "Nowoczesny styl z kartami i akcjami szybkimi"),
+    iOS("iOS Style", "Styl przypominający szufladę iPhone"),
+    Horizontal("Pozioma siatka", "Przewijanie w bok, wiersze z góry na dół"),
+    Flow("Przepływ", "Dynamicznie rozmieszczone ikony różnych rozmiarów"),
     Carousel("Karuzela 3D", "Okładki obracające się w przestrzeni"),
     Helix("Helisa 4D", "Spirala aplikacji, kręci się przy przewijaniu"),
     Sphere("Kula 3D", "Aplikacje na obracającej się kuli"),
     Wheel("Koło", "Pokrętło pod kciukiem, do obsługi jedną ręką"),
     Bubbles("Bąbelki", "Plaster miodu z efektem soczewki jak w zegarku"),
+    Cylinder("Cylinder 3D", "Aplikacje na obracającym się cylindrze"),
+    Wave("Fala", "Ikony układające się w falę przy przewijaniu"),
+    Stack("Stos", "Karty układające się jedna na drugiej"),
 }
 
 @Serializable
@@ -42,6 +51,19 @@ enum class DrawerSort(val label: String) {
     Category("Kategoria"),
     Usage("Najczęściej używane"),
     Installed("Ostatnio zainstalowane"),
+    Size("Rozmiar (największe)"),
+    UpdateDate("Ostatnio aktualizowane"),
+}
+
+@Serializable
+enum class AppFilter(val label: String) {
+    All("Wszystkie"),
+    LastWeek("Zainstalowane w tym tygodniu"),
+    LastMonth("Zainstalowane w tym miesiącu"),
+    Large("Duże aplikacje (>100MB)"),
+    Small("Małe aplikacje (<10MB)"),
+    System("Systemowe"),
+    UserInstalled("Zainstalowane przez użytkownika"),
 }
 
 @Serializable
@@ -132,14 +154,17 @@ data class Config(
     val editGridLines: Boolean = true,
     // Ikony
     val iconScale: Float = 1f,
+    val desktopIconScale: Float = 1.2f,
     val showLabels: Boolean = true,
     val labelSize: Float = 12f,
     val iconShape: IconShape = IconShape.Squircle,
+    val iconPadding: Float = 0.85f,
     // Dok
     val dockEnabled: Boolean = true,
     val dockCount: Int = 5,
     val dockOpacity: Float = 0.16f,
     val dockLabels: Boolean = false,
+    val dockBackground: Boolean = true,
     // Szuflada
     val drawerStyle: DrawerStyle = DrawerStyle.Grid,
     val drawerSort: DrawerSort = DrawerSort.Name,
@@ -150,6 +175,8 @@ data class Config(
     val drawerLabels: Boolean = true,
     val blurBehindDrawer: Boolean = true,
     val searchAutoFocus: Boolean = false,
+    val drawerBackground: Boolean = true,
+    val drawerHeaderBackground: Boolean = true,
     // Gesty
     val swipeUp: GestureAction = GestureAction.Drawer,
     val swipeDown: GestureAction = GestureAction.Notifications,
@@ -158,6 +185,17 @@ data class Config(
     // Wygląd
     val accent: Long = 0xFF8AB4FF,
     val dynamicColor: Boolean = true,
+    val autoTheme: Boolean = false,
+    val darkModeStartHour: Int = 20,
+    val darkModeEndHour: Int = 7,
+    // Efekty i animacje
+    val iconPressEffect: Boolean = true,
+    val iconWiggleOnLongPress: Boolean = true,
+    val parallaxEffect: Boolean = true,
+    val particleEffects: Boolean = false,
+    val iconBounceAnimation: Boolean = true,
+    val folderOpenAnimation: Boolean = true,
+    val swipeTrails: Boolean = false,
     // AI (OpenRouter)
     val openRouterKey: String = "",
     val aiModel: String = "",
@@ -167,6 +205,9 @@ data class Config(
     val autoUpdate: Boolean = true,
     val skippedVersion: Int = 0,
     val onboardingDone: Boolean = false,
+    // Google Drive
+    val cloudAutoSync: Boolean = false,
+    val cloudSyncInterval: Int = 5, // minuty
 ) {
     companion object {
         const val DEFAULT_REPO = "BlackSingularities/OpenDesktop"

@@ -5,10 +5,14 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,9 +20,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,11 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +63,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opendesktop.launcher.data.AppInfo
+import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.LabelShadow
 import com.opendesktop.launcher.ui.components.canvasGestures
 import com.opendesktop.launcher.ui.components.drawAppIcon
@@ -277,9 +290,9 @@ fun DrawerSphere(apps: List<AppInfo>, cb: DrawerCallbacks) {
             ),
     ) {
         val minSide = with(density) { minOf(maxWidth, maxHeight).toPx() }
-        val radius = minSide * 0.42f
-        val baseIcon = (radius * 3.0f / sqrt(apps.size.coerceAtLeast(1).toFloat())).coerceIn(
-            with(density) { 26.dp.toPx() }, with(density) { 66.dp.toPx() },
+        val radius = minSide * 0.48f
+        val baseIcon = (radius * 3.2f / sqrt(apps.size.coerceAtLeast(1).toFloat())).coerceIn(
+            with(density) { 28.dp.toPx() }, with(density) { 70.dp.toPx() },
         )
         val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
         Canvas(Modifier.fillMaxSize()) {
@@ -387,7 +400,219 @@ fun DrawerWheel(apps: List<AppInfo>, cb: DrawerCallbacks) {
     }
 }
 
-// ------------------------------------------------------------------------- Bąbelki
+// ------------------------------------------------------------------------- Cylinder
+
+@Composable
+fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
+    val scroll = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val holder = remember { HitHolder() }
+    var anchor by remember { mutableStateOf<Pair<AppInfo, Offset>?>(null) }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val layouts = remember(apps) { HashMap<String, TextLayoutResult>() }
+    val stepDeg = 18f
+    LaunchedEffect(apps.size) { scroll.updateBounds(0f, (apps.size - 1).coerceAtLeast(0).toFloat()) }
+
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .rootPosition { origin = it }
+            .canvasGestures(
+                onTap = { p -> holder.hit(p)?.let { h -> cb.onTap(h.app, Rect(Offset(h.x - h.size / 2, h.y - h.size / 2) + origin, androidx.compose.ui.geometry.Size(h.size, h.size))) } },
+                onLongPress = { p -> holder.hit(p)?.let { h -> anchor = h.app to (Offset(h.x, h.y) + origin); cb.onLongPress(h.app) } },
+                onDrag = { d -> scope.launch { scroll.snapTo(scroll.value - d.y / 60f) } },
+                onFling = { v ->
+                    scope.launch {
+                        scroll.animateDecay(-v.y / 60f, exponentialDecay(frictionMultiplier = 1.5f))
+                        scroll.animateTo(scroll.value.roundToInt().toFloat(), spring(dampingRatio = 0.8f))
+                    }
+                },
+            ),
+    ) {
+        val wPx = with(density) { maxWidth.toPx() }
+        val hPx = with(density) { maxHeight.toPx() }
+        val radius = wPx * 0.35f
+        val iconPx = with(density) { 54.dp.toPx() }
+        val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
+
+        Canvas(Modifier.fillMaxSize()) {
+            val s = scroll.value
+            val cx = size.width / 2
+            val cy = size.height / 2
+            val visible = 8
+            val from = (s.toInt() - visible).coerceAtLeast(0)
+            val to = (s.toInt() + visible).coerceAtMost(apps.lastIndex)
+            val list = ArrayList<Projected>()
+
+            for (i in from..to) {
+                val d = i - s
+                val theta = d * stepDeg * PI.toFloat() / 180f
+                val z = cos(theta)
+                val y = cy + d * 70f
+                val x = cx + sin(theta) * radius
+                val k = 0.6f + 0.4f * (z + 1) / 2
+                val fade = (1f - abs(d) / (visible + 1)).coerceIn(0f, 1f)
+                list += Projected(apps[i], x, y, iconPx * k, z, (0.3f + 0.7f * (z + 1) / 2) * fade)
+            }
+            list.sortBy { it.depth }
+            holder.items = list.filter { it.depth > -0.3f }
+            for (p in list) {
+                drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                if (p.depth > 0.7f && cb.showLabels) {
+                    labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (iconPx * 2.2f).toInt())) }, p, cb.label(p.app), p.alpha)
+                }
+            }
+        }
+        CanvasMenuAnchor(anchor, cb, origin)
+    }
+}
+
+// ------------------------------------------------------------------------- Wave
+
+@Composable
+fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
+    val scrollState = rememberLazyListState()
+    LazyColumn(
+        state = scrollState,
+        contentPadding = padding,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+    ) {
+        items(apps, key = { it.key }) { app ->
+            val index = apps.indexOf(app)
+            val offset = remember { Animatable(0f) }
+
+            LaunchedEffect(scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset) {
+                val visible = scrollState.firstVisibleItemIndex
+                val distance = abs(index - visible)
+                val targetOffset = sin(distance * 0.5f) * 20f
+                offset.animateTo(targetOffset, spring(dampingRatio = 0.7f))
+            }
+
+            DrawerTouchable(app, cb, Modifier.fillMaxWidth().offset(x = offset.value.dp)) { pressed ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White.copy(alpha = if (pressed) 0.14f else 0.06f))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppIcon(app.icon, "", 48.dp, cb.shape, false, pressed = pressed)
+                    Spacer(Modifier.width(14.dp))
+                    if (cb.showLabels) {
+                        Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------- Stack
+
+@Composable
+fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks) {
+    var currentIndex by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cardHeight = 400.dp
+        val cardWidth = minOf(maxWidth - 48.dp, 360.dp)
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            for (i in 0 until minOf(3, apps.size - currentIndex)) {
+                val app = apps.getOrNull(currentIndex + i) ?: continue
+                val offset = i * 12.dp
+                val scale = 1f - i * 0.05f
+
+                Box(
+                    Modifier
+                        .width(cardWidth)
+                        .height(cardHeight)
+                        .offset(y = offset)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = 1f - i * 0.2f
+                        }
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(Color.White.copy(alpha = 0.1f - i * 0.02f))
+                        .then(
+                            if (i == 0) Modifier.pointerInput(Unit) {
+                                detectTapGestures(
+                                    onTap = {
+                                        val bounds = Rect(Offset.Zero, androidx.compose.ui.geometry.Size(cardWidth.toPx(), cardHeight.toPx()))
+                                        cb.onTap(app, bounds)
+                                    },
+                                    onLongPress = { cb.onLongPress(app) },
+                                )
+                            } else Modifier
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        AppIcon(app.icon, "", 120.dp, cb.shape, false)
+                        if (cb.showLabels) {
+                            Spacer(Modifier.height(24.dp))
+                            Text(
+                                cb.label(app),
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                textAlign = TextAlign.Center,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (currentIndex > 0) {
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .clickable { currentIndex-- },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("←", color = Color.White, fontSize = 24.sp)
+                    }
+                }
+                if (currentIndex < apps.size - 1) {
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .clickable { currentIndex++ },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("→", color = Color.White, fontSize = 24.sp)
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {

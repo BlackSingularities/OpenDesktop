@@ -241,7 +241,7 @@ private fun DesktopItemSlot(
                 AppIcon(
                     icon = app?.icon,
                     label = app?.let(labelOf) ?: "",
-                    iconSize = iconSizeFor(cellW, cellH, cfg.iconScale, cfg.showLabels),
+                    iconSize = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
                     shape = cfg.iconShape,
                     showLabel = cfg.showLabels,
                     labelSize = cfg.labelSize,
@@ -253,7 +253,7 @@ private fun DesktopItemSlot(
                 FolderIcon(
                     icons = item.apps.take(4).map { apps[it]?.icon },
                     label = item.label,
-                    iconSize = iconSizeFor(cellW, cellH, cfg.iconScale, cfg.showLabels),
+                    iconSize = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
                     shape = cfg.iconShape,
                     showLabel = cfg.showLabels,
                     labelSize = cfg.labelSize,
@@ -347,8 +347,12 @@ fun Dock(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .onGloballyPositioned { drag.dockBounds = it.boundsInRoot() }
-            .clip(RoundedCornerShape(30.dp))
-            .background(Color.White.copy(alpha = cfg.dockOpacity))
+            .then(
+                if (cfg.dockBackground) Modifier
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(Color.White.copy(alpha = cfg.dockOpacity))
+                else Modifier
+            )
             .padding(vertical = 10.dp, horizontal = 4.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -438,11 +442,11 @@ fun DragPreview(
         when (item.type) {
             ItemType.App -> {
                 val app = apps[item.app]
-                AppIcon(app?.icon, "", iconSizeFor(wDp / item.w.coerceAtLeast(1), hDp / item.h.coerceAtLeast(1), cfg.iconScale, cfg.showLabels), cfg.iconShape, false, Modifier.fillMaxSize())
+                AppIcon(app?.icon, "", iconSizeFor(wDp / item.w.coerceAtLeast(1), hDp / item.h.coerceAtLeast(1), cfg.desktopIconScale, cfg.showLabels, desktopMode = true), cfg.iconShape, false, Modifier.fillMaxSize())
             }
             ItemType.Folder -> FolderIcon(
                 item.apps.take(4).map { apps[it]?.icon }, item.label,
-                iconSizeFor(wDp / item.w, hDp / item.h, cfg.iconScale, cfg.showLabels), cfg.iconShape, false, Modifier.fillMaxSize(),
+                iconSizeFor(wDp / item.w, hDp / item.h, cfg.desktopIconScale, cfg.showLabels, desktopMode = true), cfg.iconShape, false, Modifier.fillMaxSize(),
             )
             else -> Box(
                 Modifier

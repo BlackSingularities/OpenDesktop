@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,6 +38,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +66,8 @@ import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.LabelShadow
 import com.opendesktop.launcher.ui.components.itemGestures
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.sin
 
 data class DrawerSection(val key: String, val title: String?, val apps: List<AppInfo>)
 
@@ -357,16 +361,173 @@ fun DrawerTiles(apps: List<AppInfo>, usage: Map<String, Int>, cb: DrawerCallback
                         .padding(10.dp),
                 ) {
                     AppIcon(app.icon, "", if (wide) 48.dp else 40.dp, cb.shape, false, pressed = pressed, modifier = Modifier.align(if (wide) Alignment.CenterStart else Alignment.TopCenter))
-                    Text(
-                        cb.label(app),
-                        color = Color.White,
-                        fontSize = if (wide) 15.sp else 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter)
-                            .then(if (wide) Modifier.offset(x = 0.dp) else Modifier),
-                    )
+                    if (cb.showLabels) {
+                        Text(
+                            cb.label(app),
+                            color = Color.White,
+                            fontSize = if (wide) 15.sp else 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter)
+                                .then(if (wide) Modifier.offset(x = 0.dp) else Modifier),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DrawerCompact(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+    LazyVerticalGrid(
+        GridCells.Fixed(columns),
+        contentPadding = padding,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        items(apps, key = { it.key }) { app ->
+            DrawerCell(app, cb, 42.dp, Modifier.padding(4.dp))
+        }
+    }
+}
+
+@Composable
+fun DrawerSearchBar(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+    LazyVerticalGrid(
+        GridCells.Fixed(columns),
+        contentPadding = padding,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+    ) {
+        items(apps, key = { it.key }) { app ->
+            DrawerCell(app, cb, 52.dp, Modifier.padding(vertical = 6.dp))
+        }
+    }
+}
+
+@Composable
+fun DrawerMaterial(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
+    LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        items(apps, key = { it.key }) { app ->
+            DrawerTouchable(app, cb, Modifier.fillMaxWidth()) { pressed ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (pressed) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.08f))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppIcon(app.icon, "", 52.dp, cb.shape, false, pressed = pressed)
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val cats = cb.categoriesOf(app)
+                        if (cats.isNotEmpty()) {
+                            Text(
+                                cats.joinToString("  ") { (it.emoji + " " + it.name).trim() },
+                                color = Color.White.copy(alpha = 0.65f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DraweriOS(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+    LazyVerticalGrid(
+        GridCells.Fixed(columns),
+        contentPadding = padding,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+    ) {
+        items(apps, key = { it.key }) { app ->
+            DrawerCell(app, cb, 60.dp, Modifier.padding(vertical = 8.dp))
+        }
+    }
+}
+
+@Composable
+fun DrawerHorizontal(apps: List<AppInfo>, rows: Int, cb: DrawerCallbacks) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val columns = ((maxWidth - 32.dp) / 80.dp).toInt().coerceAtLeast(3)
+        val perScreen = rows * columns
+        val screens = remember(apps, perScreen) { apps.chunked(perScreen) }
+
+        HorizontalPager(
+            state = rememberPagerState { screens.size },
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
+        ) { page ->
+            val screenApps = screens[page]
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+                for (row in 0 until rows) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        for (col in 0 until columns) {
+                            val app = screenApps.getOrNull(row * columns + col)
+                            Box(Modifier.weight(1f).height(100.dp), contentAlignment = Alignment.Center) {
+                                if (app != null) key(app.key) { DrawerCell(app, cb, 56.dp) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DrawerFlow(apps: List<AppInfo>, usage: Map<String, Int>, cb: DrawerCallbacks, padding: PaddingValues) {
+    val sizes = remember(apps, usage) {
+        apps.map { app ->
+            val u = usage[app.key] ?: 0
+            when {
+                u > 50 -> 2
+                u > 20 -> 1
+                else -> 1
+            }
+        }
+    }
+
+    LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+        items(apps.chunked(3).size) { rowIndex ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val startIdx = rowIndex * 3
+                for (i in 0 until 3) {
+                    val idx = startIdx + i
+                    if (idx < apps.size) {
+                        val app = apps[idx]
+                        val size = sizes[idx]
+                        Box(
+                            Modifier.weight(size.toFloat()).height((60 + size * 20).dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            DrawerTouchable(app, cb, Modifier.fillMaxSize()) { pressed ->
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color.White.copy(alpha = if (pressed) 0.16f else 0.08f))
+                                        .padding(8.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    AppIcon(app.icon, if (cb.showLabels) cb.label(app) else "", (36 + size * 12).dp, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize)
+                                }
+                            }
+                        }
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }

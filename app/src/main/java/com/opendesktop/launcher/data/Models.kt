@@ -94,7 +94,16 @@ enum class GestureAction(val label: String) {
 }
 
 @Serializable
-enum class ItemType { App, Folder, Widget, Clock, Search }
+enum class ItemType { App, Folder, Widget, Clock, Search, Action }
+
+@Serializable
+enum class SystemAction {
+    OpenDrawer,
+    OpenSearch,
+    OpenNotifications,
+    OpenQuickSettings,
+    OpenSettings
+}
 
 @Serializable
 data class DesktopItem(
@@ -111,6 +120,10 @@ data class DesktopItem(
     val label: String = "",
     val widgetId: Int = -1,
     val provider: String? = null,
+    /** Akcja systemowa dla [ItemType.Action]. */
+    val systemAction: SystemAction? = null,
+    /** Główna aplikacja folderu - uruchamia się po kliknięciu. */
+    val primaryApp: String? = null,
 )
 
 @Serializable

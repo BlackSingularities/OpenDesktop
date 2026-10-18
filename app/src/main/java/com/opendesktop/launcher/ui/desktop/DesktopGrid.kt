@@ -232,6 +232,9 @@ private fun DesktopItemSlot(
             onLongPress = { callbacks.onItemLongPress(pageId, item) },
             onDragStart = { callbacks.onDragStart(pageId, item, bounds) },
             onDragEnd = { callbacks.onDragEnd() },
+            onSwipeUp = if (item.type == ItemType.Folder) {
+                { callbacks.onItemLongPress(pageId, item) } // Swipe w górę na folderze otwiera folder
+            } else null,
         )
         val cellW = cw * resize.width
         val cellH = ch * resize.height

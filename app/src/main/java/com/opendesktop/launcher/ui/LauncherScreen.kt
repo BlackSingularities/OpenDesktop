@@ -190,6 +190,7 @@ fun LauncherScreen(
     var openFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
     var folderPicker by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var primaryAppPicker by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var assignFor by remember { mutableStateOf<AppInfo?>(null) }
     var renameApp by remember { mutableStateOf<AppInfo?>(null) }
     var dockPicker by remember { mutableStateOf(false) }
@@ -367,11 +368,11 @@ fun LauncherScreen(
             title = labelOf(app),
             onDismiss = { menu = null },
             shortcuts = shortcuts.map { s -> MenuShortcut(s.label, s.icon) { vm.startShortcut(s) } },
-            actions = extra + listOf(
+            actions = extra + listOfNotNull(
                 MenuAction("Kategorie…", Icons.Rounded.Category) { assignFor = app },
                 MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameApp = app },
                 MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { vm.openDetails(app) },
-                MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) },
+                if (!app.isSystem) MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) } else null,
             ),
         )
     }
@@ -390,6 +391,10 @@ fun LauncherScreen(
                     actions = listOf(
                         MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameFolder = pageId to item.id },
                         MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
+                        MenuAction(
+                            if (item.primaryApp != null) "Zmień główną aplikację" else "Ustaw główną aplikację",
+                            Icons.Rounded.TouchApp
+                        ) { primaryAppPicker = pageId to item.id },
                         resize,
                         MenuAction("Rozgrupuj", Icons.Rounded.CallSplit) { vm.ungroup(pageId, item.id) },
                         MenuAction("Usuń folder", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) },
@@ -402,7 +407,13 @@ fun LauncherScreen(
                         else -> "Widżet"
                     },
                     onDismiss = { menu = null },
-                    actions = listOf(resize, MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) }),
+                    actions = listOfNotNull(
+                        resize,
+                        if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
+                            MenuAction("Skonfiguruj", Icons.Rounded.Settings) { vm.configureWidget(item) }
+                        } else null,
+                        MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) }
+                    ),
                 )
             }
         }
@@ -435,10 +446,27 @@ fun LauncherScreen(
             }
             when (item.type) {
                 ItemType.App -> appMap[item.app]?.let { launch(it, bounds) }
-                ItemType.Folder -> openFolder = pageId to item.id
+                ItemType.Folder -> {
+                    // Jeśli folder ma primaryApp, uruchom ją, inaczej otwórz folder
+                    if (item.primaryApp != null) {
+                        appMap[item.primaryApp]?.let { launch(it, bounds) }
+                    } else {
+                        openFolder = pageId to item.id
+                    }
+                }
                 ItemType.Clock -> SystemActions.openClock(ctx)
                 ItemType.Search -> openDrawer(focus = true)
                 ItemType.Widget -> Unit
+                ItemType.Action -> {
+                    when (item.systemAction) {
+                        SystemAction.OpenDrawer -> openDrawer()
+                        SystemAction.OpenSearch -> openDrawer(focus = true)
+                        SystemAction.OpenNotifications -> SystemActions.expandNotifications(ctx)
+                        SystemAction.OpenQuickSettings -> SystemActions.openQuickSettings(ctx)
+                        SystemAction.OpenSettings -> overlay = Overlay.Settings
+                        null -> Unit
+                    }
+                }
             }
         }
 
@@ -768,6 +796,25 @@ fun LauncherScreen(
                 },
             )
         } else folderPicker = null
+    }
+
+    primaryAppPicker?.let { (pageId, folderId) ->
+        val folder = ws.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == folderId }
+        if (folder != null) {
+            AppPickerDialog(
+                title = "Główna aplikacja folderu",
+                apps = folder.apps.mapNotNull { appMap[it] },
+                labelOf = labelOf,
+                initial = setOfNotNull(folder.primaryApp),
+                shape = cfg.iconShape,
+                single = true,
+                onDismiss = { primaryAppPicker = null },
+                onConfirm = { keys ->
+                    vm.setFolderPrimaryApp(pageId, folderId, keys.firstOrNull())
+                    primaryAppPicker = null
+                },
+            )
+        } else primaryAppPicker = null
     }
 
     renameFolder?.let { (pageId, folderId) ->

@@ -237,6 +237,28 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         um.userProfiles.flatMap { awm.getInstalledProvidersForProfile(it) }
     }.getOrElse { awm.installedProviders }
 
+    fun widgetHasConfiguration(item: DesktopItem): Boolean {
+        if (item.type != ItemType.Widget || item.provider == null) return false
+        val info = awm.installedProviders.firstOrNull { it.provider.flattenToString() == item.provider }
+        return info?.configure != null
+    }
+
+    fun configureWidget(item: DesktopItem) {
+        if (item.type != ItemType.Widget || item.widgetId < 0) return
+        val info = awm.installedProviders.firstOrNull { it.provider.flattenToString() == item.provider } ?: return
+        if (info.configure == null) return
+
+        runCatching {
+            widgetHost.startAppWidgetConfigureActivityForResult(
+                getApplication<LauncherApp>().mainActivity ?: return,
+                item.widgetId,
+                0,
+                5102, // REQ_RECONFIGURE
+                null
+            )
+        }
+    }
+
     fun removeItem(pageId: String, itemId: String) {
         val item = workspace.value.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
         if (item?.type == ItemType.Widget && item.widgetId >= 0) runCatching { widgetHost.deleteAppWidgetId(item.widgetId) }
@@ -379,6 +401,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun ungroup(pageId: String, folderId: String) {
         val folder = workspace.value.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == folderId } ?: return
         folder.apps.drop(1).forEach { removeFromFolder(pageId, folderId, it, toDesktop = true) }
+    }
+
+    fun setFolderPrimaryApp(pageId: String, folderId: String, appKey: String?) = store.updateWorkspace { ws ->
+        ws.updatePage(pageId) { pg ->
+            pg.copy(items = pg.items.map { if (it.id == folderId) it.copy(primaryApp = appKey) else it })
+        }
     }
 
     // ---------------------------------------------------------------- dok

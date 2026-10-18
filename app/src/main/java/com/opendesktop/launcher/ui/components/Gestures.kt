@@ -24,32 +24,47 @@ fun Modifier.itemGestures(
     onLongPress: () -> Unit,
     onDragStart: () -> Unit = {},
     onDragEnd: () -> Unit = {},
+    onSwipeUp: (() -> Unit)? = null,
 ): Modifier {
     val press by rememberUpdatedState(onPress)
     val tap by rememberUpdatedState(onTap)
     val long by rememberUpdatedState(onLongPress)
     val dragStart by rememberUpdatedState(onDragStart)
     val dragEnd by rememberUpdatedState(onDragEnd)
+    val swipeUp by rememberUpdatedState(onSwipeUp)
     if (!enabled) return this
     return this.pointerInput(key) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             press(true)
             val slop = viewConfiguration.touchSlop
-            // 0 = przytrzymanie, 1 = tap, 2 = ruch/anulowanie
+            // 0 = przytrzymanie, 1 = tap, 2 = ruch/anulowanie, 3 = swipe up
             var outcome = 0
+            var swipeDetected = false
             withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                 while (outcome == 0) {
                     val ev = awaitPointerEvent()
                     val c = ev.changes.firstOrNull { it.id == down.id }
+                    val delta = c?.position?.minus(down.position)
                     outcome = when {
                         c == null -> 2
                         !c.pressed -> if (c.isConsumed) 2 else 1
                         c.isConsumed -> 2
-                        (c.position - down.position).getDistance() > slop -> 2
+                        delta != null && delta.getDistance() > slop -> {
+                            // Wykryj swipe w górę: ruch pionowy > poziomy i kierunek w górę
+                            if (swipeUp != null && -delta.y > kotlin.math.abs(delta.x) && -delta.y > slop * 2) {
+                                swipeDetected = true
+                                3
+                            } else 2
+                        }
                         else -> 0
                     }
                 }
+            }
+            if (outcome == 3 && swipeDetected) {
+                press(false)
+                swipeUp?.invoke()
+                return@awaitEachGesture
             }
             if (outcome != 0) {
                 press(false)

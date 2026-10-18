@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -64,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.opendesktop.launcher.BuildConfig
+import com.opendesktop.launcher.R
 import com.opendesktop.launcher.data.Config
 import com.opendesktop.launcher.data.DrawerAnimation
 import com.opendesktop.launcher.data.DrawerSort
@@ -121,6 +124,12 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Wstecz", tint = Color.White) }
+                Image(
+                    painter = painterResource(R.drawable.opendesktop_mark),
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp),
+                )
+                Spacer(Modifier.width(8.dp))
                 Text("Ustawienia OpenDesktop", style = MaterialTheme.typography.titleLarge, color = Color.White)
             }
             LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -292,11 +301,21 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                 }
 
                 item {
-                    Text(
-                        "OpenDesktop ${BuildConfig.VERSION_NAME} · otwarty launcher na Androida",
-                        color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp,
+                    Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.opendesktop_mark),
+                            contentDescription = null,
+                            modifier = Modifier.size(44.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "OpenDesktop ${BuildConfig.VERSION_NAME} · otwarty launcher na Androida",
+                            color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp,
+                        )
+                    }
                 }
             }
         }

@@ -43,6 +43,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Manifestowy motyw pokazuje znak podczas zimnego startu. Po utworzeniu
+        // aktywności wracamy do przezroczystego motywu launchera z tapetą.
+        setTheme(R.style.Theme_OpenDesktop)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Jednokolorowy odpowiednik znaku dla ikon tematycznych Androida 13+. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,32h17a4,4 0,0 1,4 4v17a4,4 0,0 1,-4 4H34a4,4 0,0 1,-4 -4V36a4,4 0,0 1,4 -4zM59,32h17a4,4 0,0 1,4 4v17a4,4 0,0 1,-4 4H59a4,4 0,0 1,-4 -4V36a4,4 0,0 1,4 -4zM34,61h17a4,4 0,0 1,4 4v17a4,4 0,0 1,-4 4H34a4,4 0,0 1,-4 -4V65a4,4 0,0 1,4 -4zM63,61h13a4,4 0,0 1,4 4v3h-6v-1H65v13h9v-2h6v4a4,4 0,0 1,-4 4H63a4,4 0,0 1,-4 -4V65a4,4 0,0 1,4 -4zM71,70l9,6 -9,6z" />
+</vector>

@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -94,6 +95,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -101,6 +103,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.appwidget.AppWidgetProviderInfo
+import com.opendesktop.launcher.R
 import com.opendesktop.launcher.data.AppInfo
 import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.data.DrawerAnimation
@@ -829,7 +832,17 @@ fun LauncherScreen(
     if (showOnboarding) {
         AlertDialog(
             onDismissRequest = { showOnboarding = false; vm.updateConfig { it.copy(onboardingDone = true) } },
-            title = { Text("Witaj w OpenDesktop") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(R.drawable.opendesktop_mark),
+                        contentDescription = null,
+                        modifier = Modifier.size(52.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text("Witaj w OpenDesktop")
+                }
+            },
             text = {
                 Text(
                     "Ustaw OpenDesktop jako domyślny ekran główny, aby działały przycisk Home, skróty aplikacji i widżety.\n\n" +

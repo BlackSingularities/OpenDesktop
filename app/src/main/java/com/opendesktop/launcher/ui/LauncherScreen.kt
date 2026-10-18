@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -947,7 +948,7 @@ private fun ToolButton(icon: ImageVector, label: String, enabled: Boolean = true
             .padding(horizontal = 3.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.3f))
-            .then(if (enabled) Modifier.pointerInput(Unit) { androidx.compose.foundation.gestures.detectTapGestures { onClick() } } else Modifier)
+            .then(if (enabled) Modifier.pointerInput(Unit) { detectTapGestures { onClick() } } else Modifier)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -963,7 +964,7 @@ private fun BigToolButton(icon: ImageVector, label: String, onClick: () -> Unit)
         Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(Color.Black.copy(alpha = 0.35f))
-            .pointerInput(Unit) { androidx.compose.foundation.gestures.detectTapGestures { onClick() } }
+            .pointerInput(Unit) { detectTapGestures { onClick() } }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

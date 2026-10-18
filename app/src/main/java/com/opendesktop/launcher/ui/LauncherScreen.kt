@@ -110,6 +110,7 @@ import com.opendesktop.launcher.data.DrawerAnimation
 import com.opendesktop.launcher.data.GestureAction
 import com.opendesktop.launcher.data.ItemType
 import com.opendesktop.launcher.data.ShortcutEntry
+import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.SystemActions
 import com.opendesktop.launcher.data.findActivity
 import com.opendesktop.launcher.ui.categories.AssignCategoriesDialog
@@ -393,7 +394,7 @@ fun LauncherScreen(
                         MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
                         MenuAction(
                             if (item.primaryApp != null) "Zmień główną aplikację" else "Ustaw główną aplikację",
-                            Icons.Rounded.Star
+                            Icons.Rounded.Settings
                         ) { primaryAppPicker = pageId to item.id },
                         resize,
                         MenuAction("Rozgrupuj", Icons.Rounded.CallSplit) { vm.ungroup(pageId, item.id) },

@@ -66,7 +66,7 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
             title = c2.title,
             options = c2.options.map(c2.label),
             selected = c2.options.indexOf(c2.current),
-            descriptions = c2.desc?.let { d -> c2.options.map(d) },
+            descriptions = c2.desc?.let { d: (Any) -> String -> c2.options.map(d) },
             onDismiss = { choice = null },
             onSelect = { c2.onPick(c2.options[it]) },
         )
@@ -382,7 +382,7 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
                             )
                             if (Build.VERSION.SDK_INT >= 31) {
                                 SettingTile(
-                                    icon = Icons.Rounded.Blur,
+                                    icon = Icons.Rounded.BlurOn,
                                     label = "Rozmycie pulpitu",
                                     value = cfg.blurBehindDrawer,
                                     onChange = { v -> set { it.copy(blurBehindDrawer = v) } }

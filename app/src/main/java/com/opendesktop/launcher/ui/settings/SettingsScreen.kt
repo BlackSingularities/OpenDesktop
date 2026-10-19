@@ -233,6 +233,10 @@ private fun DockSection(cfg: Config, set: Setter) {
             SliderRow(Icons.Rounded.Opacity, "Przezroczystość tła", cfg.dockOpacity, 0f..0.6f, 11, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(dockOpacity = v) } }
         }
         SwitchRow(Icons.Rounded.Label, "Podpisy w doku", null, cfg.dockLabels) { v -> set { it.copy(dockLabels = v) } }
+        SwitchRow(
+            Icons.Rounded.Flip, "Odbicia ikon", if (cfg.dockLabels) "Niedostępne przy włączonych podpisach" else "Lustrzane odbicie pod każdą ikoną",
+            cfg.dockReflection, enabled = !cfg.dockLabels,
+        ) { v -> set { it.copy(dockReflection = v) } }
     }
     Text(
         "Skróty akcji (szuflada, wyszukiwanie, powiadomienia…) dodasz do doku w trybie edycji pulpitu: przycisk „Akcje”.",

@@ -41,8 +41,15 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import com.opendesktop.launcher.ui.components.iconShapeOf
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -408,18 +415,23 @@ fun Dock(
                 val entry = visible.getOrNull(i)
                 val app = entry?.let { apps[it] }
                 val action = entry?.let { SystemAction.fromDockKey(it) }
-                Box(Modifier.weight(1f).height(if (cfg.dockLabels) 78.dp else 60.dp), contentAlignment = Alignment.Center) {
+                val iconSize = (52.dp * cfg.iconScale).coerceIn(36.dp, 64.dp)
+                val areaH = if (cfg.dockLabels) 78.dp else 60.dp
+                // Odbicia tylko bez podpisów — podpis stałby między ikoną a odbiciem
+                val reflect = cfg.dockReflection && !cfg.dockLabels
+                Box(Modifier.weight(1f).height(areaH + if (reflect) iconSize * 0.45f else 0.dp), contentAlignment = Alignment.TopCenter) {
                     if (action != null) key(entry) {
                         var pressed by remember { mutableStateOf(false) }
                         ActionIcon(
                             action = action,
                             label = action.label,
-                            iconSize = (52.dp * cfg.iconScale).coerceIn(36.dp, 64.dp),
+                            iconSize = iconSize,
                             showLabel = cfg.dockLabels,
                             labelSize = cfg.labelSize,
                             pressed = pressed,
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .height(areaH)
                                 .itemGestures(
                                     key = entry,
                                     onPress = { pressed = it },
@@ -436,13 +448,14 @@ fun Dock(
                         AppIcon(
                             icon = app.icon,
                             label = labelOf(app),
-                            iconSize = (52.dp * cfg.iconScale).coerceIn(36.dp, 64.dp),
+                            iconSize = iconSize,
                             shape = cfg.iconShape,
                             showLabel = cfg.dockLabels,
                             labelSize = cfg.labelSize,
                             pressed = pressed,
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .height(areaH)
                                 .graphicsLayer { alpha = if (dragKey == app.key) 0.25f else 1f }
                                 .onGloballyPositioned { bounds = it.boundsInRoot() }
                                 .itemGestures(
@@ -454,10 +467,33 @@ fun Dock(
                                     onDragEnd = onDragEnd,
                                 ),
                         )
+                        if (reflect && dragKey != app.key) {
+                            // Odbicie: dolna część ikony odwrócona w pionie i zanikająca ku dołowi
+                            val shape = iconShapeOf(cfg.iconShape)
+                            Image(
+                                bitmap = app.icon,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                alignment = Alignment.BottomCenter,
+                                modifier = Modifier
+                                    .offset(y = areaH / 2 + iconSize / 2 + 2.dp)
+                                    .size(iconSize, iconSize * 0.45f)
+                                    .graphicsLayer { scaleY = -1f; compositingStrategy = CompositingStrategy.Offscreen }
+                                    .then(if (shape != null) Modifier.clip(shape) else Modifier)
+                                    .drawWithContent {
+                                        drawContent()
+                                        drawRect(
+                                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.4f))),
+                                            blendMode = BlendMode.DstIn,
+                                        )
+                                    },
+                            )
+                        }
                         if (menuKey == app.key) Box(Modifier.align(Alignment.Center)) { menu(app) }
                     } else if (editMode && i == visible.size) {
                         Box(
                             Modifier
+                                .padding(top = (areaH - 46.dp) / 2)
                                 .size(46.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.18f))

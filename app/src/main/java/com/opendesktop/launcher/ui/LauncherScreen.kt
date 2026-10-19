@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1053,12 +1054,14 @@ private fun EditToolbar(
     onRemovePage: () -> Unit,
     onSettings: () -> Unit,
 ) {
+    // Jedna wspólna belka, przyciski dzielą szerokość po równo — bez przewijania
     Row(
         Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
         BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets)
         BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions)
@@ -1087,17 +1090,17 @@ private fun ToolButton(icon: ImageVector, label: String, enabled: Boolean = true
 }
 
 @Composable
-private fun BigToolButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun RowScope.BigToolButton(icon: ImageVector, label: String, onClick: () -> Unit) {
     Column(
         Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.Black.copy(alpha = 0.35f))
+            .weight(1f)
+            .clip(RoundedCornerShape(18.dp))
             .pointerInput(Unit) { detectTapGestures { onClick() } }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, label, tint = Color.White)
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = Color.White, fontSize = 12.sp, maxLines = 1)
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(3.dp))
+        Text(label, color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }

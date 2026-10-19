@@ -160,51 +160,39 @@ fun DrawerPerspective(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, pa
     val rows = remember(apps, columns) { apps.chunked(columns) }
     val state = rememberLazyListState()
     val iconSize = if (columns >= 6) 50.dp else 58.dp
-    LazyColumn(
-        state = state,
-        contentPadding = PaddingValues(top = 24.dp, bottom = padding.calculateBottomPadding()),
-        modifier = Modifier.fillMaxSize(),
-    ) {
+    // Bez marginesów: lista od krawędzi do krawędzi
+    LazyColumn(state = state, modifier = Modifier.fillMaxSize()) {
         itemsIndexed(rows, key = { _, r -> r.first().key }) { _, row ->
             val rowKey = row.first().key
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
                     .graphicsLayer {
+                        // Bez obrotu: rzędy przy krawędziach tylko maleją i spłaszczają się, dosuwając do siebie
                         val info = state.layoutInfo
                         val item = info.visibleItemsInfo.firstOrNull { it.key == rowKey } ?: return@graphicsLayer
                         val h = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1).toFloat()
                         val top = (item.offset - info.viewportStartOffset).toFloat()
                         val center = (top + item.size / 2f) / h
                         val zone = 0.2f
-                        cameraDistance = 7f * density
-                        when {
-                            center > 1f - zone -> {
-                                // Dół: rząd kładzie się w głąb (górna krawędź ucieka do tyłu)
-                                val t = ((center - (1f - zone)) / zone).coerceIn(0f, 1.6f)
-                                transformOrigin = TransformOrigin(0.5f, 0f)
-                                rotationX = 62f * t.coerceAtMost(1f)
-                                val s = 1f - 0.32f * t.coerceAtMost(1.3f)
-                                scaleX = s; scaleY = s
-                                translationY = -item.size * 0.55f * t * t
-                                alpha = (1.2f - 0.6f * t).coerceIn(0f, 1f)
-                            }
-                            center < zone -> {
-                                val t = ((zone - center) / zone).coerceIn(0f, 1.6f)
-                                transformOrigin = TransformOrigin(0.5f, 1f)
-                                rotationX = -62f * t.coerceAtMost(1f)
-                                val s = 1f - 0.32f * t.coerceAtMost(1.3f)
-                                scaleX = s; scaleY = s
-                                translationY = item.size * 0.55f * t * t
-                                alpha = (1.2f - 0.6f * t).coerceIn(0f, 1f)
-                            }
+                        val t = when {
+                            center > 1f - zone -> (center - (1f - zone)) / zone
+                            center < zone -> (zone - center) / zone
+                            else -> 0f
+                        }.coerceIn(0f, 1.5f)
+                        if (t > 0f) {
+                            val down = center > 0.5f
+                            transformOrigin = TransformOrigin(0.5f, if (down) 0f else 1f)
+                            scaleX = 1f - 0.3f * t.coerceAtMost(1.2f)
+                            scaleY = (1f - 0.55f * t).coerceAtLeast(0.2f)
+                            translationY = (if (down) -1f else 1f) * item.size * 0.5f * t * t
+                            alpha = (1.2f - 0.6f * t).coerceIn(0f, 1f)
                         }
                     },
             ) {
                 for (c in 0 until columns) {
                     val app = row.getOrNull(c)
-                    Box(Modifier.weight(1f).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                         if (app != null) key(app.key) { DrawerCell(app, cb, iconSize) }
                     }
                 }

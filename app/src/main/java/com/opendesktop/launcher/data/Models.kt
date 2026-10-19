@@ -189,6 +189,8 @@ data class Config(
     val dockOpacity: Float = 0.16f,
     val dockLabels: Boolean = false,
     val dockBackground: Boolean = true,
+    /** Odbicia ikon aplikacji pod dokiem. */
+    val dockReflection: Boolean = false,
     // Szuflada
     val drawerStyle: DrawerStyle = DrawerStyle.Grid,
     val drawerSort: DrawerSort = DrawerSort.Name,

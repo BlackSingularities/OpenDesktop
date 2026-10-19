@@ -524,7 +524,7 @@ fun Dock(
             .padding(vertical = 6.dp),
     ) {
         // Ikona jak największa: ok. 80% miejsca na jedno pole
-        val iconSize = (maxWidth / slots * 0.8f * cfg.iconScale).coerceIn(40.dp, 76.dp)
+        val iconSize = (maxWidth / slots * 0.8f * cfg.dockIconScale).coerceIn(40.dp, 76.dp)
         val slotW = if (cfg.dockLabels) (maxWidth / slots).coerceAtLeast(iconSize) else iconSize
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
             // Wpisy doku: aplikacje albo skróty akcji systemowych

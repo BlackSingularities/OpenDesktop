@@ -56,12 +56,11 @@ import java.time.LocalDate
 
 /** Sekcje ustawień – każda ma własny widok. */
 private enum class Section(val title: String, val icon: ImageVector, val summary: String) {
-    Desktop("Pulpit", Icons.Rounded.Home, "Siatka, przejścia, wskaźnik ekranów"),
-    Icons_("Ikony", Icons.Rounded.Apps, "Rozmiar, kształt, podpisy"),
-    Dock("Dok", Icons.Rounded.Dashboard, "Miejsca, tło, podpisy"),
-    Drawer("Szuflada aplikacji", Icons.Rounded.GridView, "Układ, sortowanie, kolumny i wiersze"),
+    Desktop("Pulpit", Icons.Rounded.Home, "Siatka, ikony, przejścia, wskaźnik ekranów"),
+    Dock("Dok", Icons.Rounded.Dashboard, "Miejsca, rozmiar ikon, tło, podpisy"),
+    Drawer("Szuflada aplikacji", Icons.Rounded.GridView, "Układ, ikony, sortowanie, kolumny i wiersze"),
     Gestures("Gesty", Icons.Rounded.Gesture, "Przesunięcia, dotknięcia, wibracje"),
-    Look("Wygląd", Icons.Rounded.Palette, "Kolory, motyw, tapeta"),
+    Look("Wygląd", Icons.Rounded.Palette, "Kolory, kształt ikon, menu, tapeta"),
     Effects("Efekty i animacje", Icons.Rounded.Animation, "Naciśnięcia, cząsteczki, parallax"),
     Ai("Sztuczna inteligencja", Icons.Rounded.AutoAwesome, "Klucz OpenRouter i model"),
     Updates("Aktualizacje", Icons.Rounded.SystemUpdate, "Repozytorium i sprawdzanie"),
@@ -104,11 +103,10 @@ fun SettingsScreen(vm: LauncherViewModel, onClose: () -> Unit, onOpenCategories:
             SettingsPage(s.title, onBack = { section = null }) {
                 when (s) {
                     Section.Desktop -> DesktopSection(vm, cfg, set, pick)
-                    Section.Icons_ -> IconsSection(cfg, set, pick)
                     Section.Dock -> DockSection(cfg, set)
                     Section.Drawer -> DrawerSection(cfg, set, pick)
                     Section.Gestures -> GesturesSection(cfg, set, pick)
-                    Section.Look -> LookSection(cfg, set)
+                    Section.Look -> LookSection(cfg, set, pick)
                     Section.Effects -> EffectsSection(cfg, set)
                     Section.Ai -> AiSection(vm, cfg, set)
                     Section.Updates -> UpdatesSection(vm, cfg, set)
@@ -156,7 +154,7 @@ private fun SettingsHome(onClose: () -> Unit, onOpenCategories: () -> Unit, onOp
             }
         }
         Group("Ekran główny") {
-            listOf(Section.Desktop, Section.Icons_, Section.Dock, Section.Drawer, Section.Gestures).forEach { s ->
+            listOf(Section.Desktop, Section.Dock, Section.Drawer, Section.Gestures).forEach { s ->
                 ActionRow(s.icon, s.title, s.summary, chevron = true) { onOpen(s) }
             }
             ActionRow(Icons.Rounded.Category, "Kategorie aplikacji", "Grupy w szufladzie i filtry", chevron = true, onClick = onOpenCategories)
@@ -194,6 +192,11 @@ private fun DesktopSection(vm: LauncherViewModel, cfg: Config, set: Setter, pick
         SliderRow(Icons.Rounded.TableRows, "Wiersze", cfg.rows.toFloat(), 3f..16f, 12) { vm.setGrid(cfg.columns, it.toInt()) }
         SwitchRow(Icons.Rounded.ViewModule, "Nakładanie się elementów", "Widżety i ikony mogą zachodzić na siebie", cfg.allowOverlap) { vm.setOverlap(it) }
     }
+    Group("Ikony") {
+        SliderRow(Icons.Rounded.PhotoSizeSelectLarge, "Rozmiar ikon", cfg.desktopIconScale.coerceAtMost(1f), 0.5f..1f, 9, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(desktopIconScale = v) } }
+        SwitchRow(Icons.Rounded.Label, "Podpisy", null, cfg.showLabels) { v -> set { it.copy(showLabels = v) } }
+        SliderRow(Icons.Rounded.TextFields, "Wielkość podpisów", cfg.labelSize, 9f..16f, 6, { "${it.toInt()} sp" }) { v -> set { it.copy(labelSize = v) } }
+    }
     Group("Ekrany") {
         ActionRow(Icons.Rounded.SwapHoriz, "Przejście między ekranami", cfg.transition.label, chevron = true) {
             pick.choose("Przejście między ekranami", PageTransition.entries, cfg.transition, { it.label }) { t -> set { it.copy(transition = t) } }
@@ -210,25 +213,11 @@ private fun DesktopSection(vm: LauncherViewModel, cfg: Config, set: Setter, pick
 }
 
 @Composable
-private fun IconsSection(cfg: Config, set: Setter, pick: Picker) {
-    Group("Pulpit") {
-        SliderRow(Icons.Rounded.PhotoSizeSelectLarge, "Rozmiar ikon na pulpicie", cfg.desktopIconScale, 0.8f..1.8f, 19, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(desktopIconScale = v) } }
-        SwitchRow(Icons.Rounded.Label, "Podpisy na pulpicie", null, cfg.showLabels) { v -> set { it.copy(showLabels = v) } }
-    }
-    Group("Szuflada i dok") {
-        SliderRow(Icons.Rounded.PhotoSizeSelectSmall, "Rozmiar ikon", cfg.iconScale, 0.6f..1.5f, 17, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(iconScale = v) } }
-        SliderRow(Icons.Rounded.TextFields, "Wielkość podpisów", cfg.labelSize, 9f..16f, 6, { "${it.toInt()} sp" }) { v -> set { it.copy(labelSize = v) } }
-        ActionRow(Icons.Rounded.Crop, "Kształt ikon", cfg.iconShape.label, chevron = true) {
-            pick.choose("Kształt ikon", IconShape.entries, cfg.iconShape, { it.label }) { s -> set { it.copy(iconShape = s) } }
-        }
-    }
-}
-
-@Composable
 private fun DockSection(cfg: Config, set: Setter) {
     Group {
         SwitchRow(Icons.Rounded.ViewCarousel, "Pokaż dok", null, cfg.dockEnabled) { v -> set { it.copy(dockEnabled = v) } }
         SliderRow(Icons.Rounded.ViewWeek, "Miejsca w doku", cfg.dockCount.toFloat(), 3f..7f, 3) { v -> set { it.copy(dockCount = v.toInt()) } }
+        SliderRow(Icons.Rounded.PhotoSizeSelectLarge, "Rozmiar ikon", cfg.dockIconScale, 0.6f..1.3f, 13, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(dockIconScale = v) } }
     }
     Group("Wygląd") {
         SwitchRow(Icons.Rounded.Square, "Tło doku", null, cfg.dockBackground) { v -> set { it.copy(dockBackground = v) } }
@@ -260,6 +249,7 @@ private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
             pick.choose("Animacja otwierania", DrawerAnimation.entries, cfg.drawerAnimation, { it.label }) { s -> set { it.copy(drawerAnimation = s) } }
         }
         SliderRow(Icons.Rounded.ViewColumn, "Kolumny", cfg.drawerColumns.toFloat(), 2f..12f, 9) { v -> set { it.copy(drawerColumns = v.toInt()) } }
+        SliderRow(Icons.Rounded.PhotoSizeSelectSmall, "Rozmiar ikon", cfg.iconScale, 0.6f..1.5f, 17, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(iconScale = v) } }
         SliderRow(
             Icons.Rounded.TableRows, "Wiersze na ekranie", cfg.drawerRows.toFloat(), 0f..20f, 19,
             { if (it.toInt() == 0) "Auto" else it.toInt().toString() },
@@ -384,7 +374,7 @@ private fun PanelColorRow(
 }
 
 @Composable
-private fun LookSection(cfg: Config, set: Setter) {
+private fun LookSection(cfg: Config, set: Setter, pick: Picker) {
     val ctx = LocalContext.current
     Group("Kolory") {
         if (Build.VERSION.SDK_INT >= 31) {
@@ -413,6 +403,11 @@ private fun LookSection(cfg: Config, set: Setter) {
                     }
                 }
             }
+        }
+    }
+    Group("Ikony") {
+        ActionRow(Icons.Rounded.Crop, "Kształt ikon", cfg.iconShape.label, chevron = true) {
+            pick.choose("Kształt ikon", IconShape.entries, cfg.iconShape, { it.label }) { s -> set { it.copy(iconShape = s) } }
         }
     }
     Group("Menu i foldery") {

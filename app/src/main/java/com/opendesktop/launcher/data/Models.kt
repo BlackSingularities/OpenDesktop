@@ -195,7 +195,9 @@ data class Config(
     val editGridLines: Boolean = true,
     // Ikony
     val iconScale: Float = 1f,
-    val desktopIconScale: Float = 1.2f,
+    /** Rozmiar ikon w doku (osobno od szuflady). */
+    val dockIconScale: Float = 1f,
+    val desktopIconScale: Float = 1f,
     val showLabels: Boolean = true,
     val labelSize: Float = 12f,
     val iconShape: IconShape = IconShape.Squircle,

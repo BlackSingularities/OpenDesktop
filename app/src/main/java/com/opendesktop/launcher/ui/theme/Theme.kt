@@ -5,9 +5,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.opendesktop.launcher.data.Config
+import com.opendesktop.launcher.ui.components.LocalMenuPanel
+import com.opendesktop.launcher.ui.components.PanelStyle
 
 /** Czarno-biała paleta jak w OpenPDF: akcent = biel, czerwień dla usuwania. */
 object Palette {
@@ -53,5 +56,7 @@ fun OpenDesktopTheme(cfg: Config, content: @Composable () -> Unit) {
             error = Palette.Danger,
         )
     }
-    MaterialTheme(colorScheme = scheme, content = content)
+    CompositionLocalProvider(LocalMenuPanel provides PanelStyle.of(cfg.menuColor, cfg.menuOpacity)) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
 }

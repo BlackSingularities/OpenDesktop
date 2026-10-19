@@ -367,15 +367,11 @@ private enum class Handle(val h: Int, val v: Int, val align: Alignment) {
     Top(0, -1, Alignment.TopCenter),
     Right(1, 0, Alignment.CenterEnd),
     Bottom(0, 1, Alignment.BottomCenter),
-    TopLeft(-1, -1, Alignment.TopStart),
-    TopRight(1, -1, Alignment.TopEnd),
-    BottomLeft(-1, 1, Alignment.BottomStart),
-    BottomRight(1, 1, Alignment.BottomEnd),
 }
 
 /**
- * Ramka zmiany rozmiaru zaznaczonego elementu: okrągła kropka na środku każdej krawędzi i w każdym
- * rogu – przeciągnięcie kropki przesuwa tę krawędź (róg – dwie naraz). Rysowana nad wszystkim
+ * Ramka zmiany rozmiaru zaznaczonego elementu: okrągła kropka na środku każdej krawędzi (góra, dół,
+ * lewo, prawo) – przeciągnięcie kropki przesuwa tę krawędź. Rysowana nad wszystkim
  * w siatce, z podglądem nowego rozmiaru w komórkach. Rozmiar liczony od przesunięcia palca
  * w układzie okna – z rzeczywistej (przeskalowanej w edycji) szerokości komórki.
  */

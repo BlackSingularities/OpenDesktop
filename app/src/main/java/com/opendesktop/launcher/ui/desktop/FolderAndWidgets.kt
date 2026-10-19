@@ -91,6 +91,7 @@ import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.ui.components.ActionMenu
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.MenuAction
+import com.opendesktop.launcher.ui.components.PanelStyle
 import com.opendesktop.launcher.ui.components.itemGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -126,7 +127,9 @@ fun FolderDialog(
         else -> 4
     }
     val rows = ((list.size + cols - 1) / cols).coerceAtLeast(1)
-    val ink = Color(0xFF202124)
+    // Tło okienka z ustawień; tekst ciemny na jasnym tle, biały na ciemnym
+    val panel = PanelStyle.of(cfg.folderColor, cfg.folderOpacity)
+    val ink = panel.content
     fun close() { onRename(name); onDismiss() }
 
     Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -145,7 +148,7 @@ fun FolderDialog(
             val cy = if (anchor == Rect.Zero) screenH / 2 else anchor.center.y
             val x = (cx - wPx / 2).coerceIn(margin, (screenW - wPx - margin).coerceAtLeast(margin))
             val y = (cy - hPx / 2).coerceIn(margin * 3, (screenH - hPx - margin * 3).coerceAtLeast(margin * 3))
-            val shape = RoundedCornerShape(6.dp)
+            val shape = panel.shape
             Column(
                 Modifier
                     .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
@@ -158,8 +161,8 @@ fun FolderDialog(
                         alpha = appear.value.coerceIn(0f, 1f)
                     }
                     .clip(shape)
-                    .background(Color.White.copy(alpha = 0.74f))
-                    .border(1.dp, Color.White.copy(alpha = 0.6f), shape)
+                    .background(panel.background)
+                    .border(1.dp, panel.border, shape)
                     .clickable(interactionSource = null, indication = null) {}
                     .padding(start = 10.dp, end = 10.dp, top = 10.dp),
             ) {
@@ -170,7 +173,7 @@ fun FolderDialog(
                         Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
                             AppIcon(
                                 app.icon, labelOf(app), 52.dp * cfg.desktopIconScale.coerceAtMost(1.3f), cfg.iconShape, cfg.showLabels,
-                                pressed = pressed, labelSize = 11f, labelColor = ink, shadow = false,
+                                pressed = pressed, labelSize = 11f, labelColor = ink, shadow = !panel.light,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .onGloballyPositioned { bounds = it.boundsInRoot() }

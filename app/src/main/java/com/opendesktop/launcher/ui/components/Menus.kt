@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,6 +38,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,6 +69,30 @@ data class MenuAction(
 
 data class MenuShortcut(val label: String, val icon: ImageBitmap?, val onClick: () -> Unit)
 
+/**
+ * Wygląd paneli w stylu okienek folderów: kolor z kryciem z ustawień, małe zaokrąglenie,
+ * jasny obrys. Tekst i ikony ciemne na jasnym, kryjącym tle – w pozostałych przypadkach białe.
+ */
+@Immutable
+data class PanelStyle(val background: Color) {
+    val content: Color get() = if (background.alpha >= 0.35f && background.copy(alpha = 1f).luminance() > 0.5f) PanelInk else Color.White
+    val light: Boolean get() = content == PanelInk
+    val border: Color get() = Color.White.copy(alpha = if (light) 0.6f else 0.18f)
+    val shape: Shape get() = RoundedCornerShape(6.dp)
+
+    companion object {
+        fun of(color: Long, opacity: Float) = PanelStyle(Color(color or 0xFF000000).copy(alpha = opacity.coerceIn(0f, 1f)))
+    }
+}
+
+val PanelInk = Color(0xFF202124)
+
+private val CompactItem = Modifier.height(36.dp)
+private val CompactPadding = PaddingValues(horizontal = 10.dp)
+
+/** Styl menu kontekstowych – dostarczany przez motyw z ustawień. */
+val LocalMenuPanel = staticCompositionLocalOf { PanelStyle(Color.White.copy(alpha = 0.74f)) }
+
 /** Menu kontekstowe kotwiczone w rodzicu (ikona, widżet, folder). */
 @Composable
 fun ActionMenu(
@@ -71,51 +101,60 @@ fun ActionMenu(
     actions: List<MenuAction>,
     shortcuts: List<MenuShortcut> = emptyList(),
 ) {
-    // Styl OpenPDF: ciemny panel, zaokrąglone rogi, tytuł wersalikami, ikony w kółkach
+    // Ten sam styl co okienka folderów: kolor i krycie z ustawień, tytuł wersalikami, ikony w kółkach
+    val panel = LocalMenuPanel.current
+    val fg = panel.content
     DropdownMenu(
         expanded = true,
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(20.dp),
-        containerColor = Palette.PanelHigh,
+        shape = panel.shape,
+        containerColor = panel.background,
         tonalElevation = 0.dp,
-        shadowElevation = 12.dp,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        // Cień prześwituje przez półprzezroczyste tło – tylko przy prawie kryjącym
+        shadowElevation = if (panel.background.alpha > 0.95f) 8.dp else 0.dp,
+        border = BorderStroke(1.dp, panel.border),
+        // Zwarte: niska wysokość wierszy, a przy wielu pozycjach przewijanie zamiast menu na pół ekranu
+        modifier = Modifier.heightIn(max = 340.dp).widthIn(min = 180.dp, max = 240.dp),
     ) {
         if (title != null) {
             Text(
                 title.uppercase(),
-                color = Palette.Accent,
+                color = fg.copy(alpha = 0.55f),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp).width(220.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
             )
         }
         if (shortcuts.isNotEmpty()) {
             shortcuts.forEach { s ->
                 DropdownMenuItem(
-                    text = { Text(s.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    text = { Text(s.label, color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = {
-                        if (s.icon != null) Image(s.icon, null, Modifier.size(24.dp).clip(CircleShape))
-                        else Box(Modifier.size(24.dp))
+                        if (s.icon != null) Image(s.icon, null, Modifier.size(22.dp).clip(CircleShape))
+                        else Box(Modifier.size(22.dp))
                     },
                     onClick = { onDismiss(); s.onClick() },
+                    modifier = CompactItem,
+                    contentPadding = CompactPadding,
                 )
             }
-            HorizontalDivider(Modifier.padding(vertical = 4.dp, horizontal = 12.dp), color = Color.White.copy(alpha = 0.1f))
+            HorizontalDivider(Modifier.padding(vertical = 2.dp, horizontal = 10.dp), color = fg.copy(alpha = 0.12f))
         }
         actions.forEach { a ->
-            val color = if (a.danger) Palette.Danger else Color.White
+            val color = if (a.danger) (if (panel.light) Color(0xFFD32F2F) else Palette.Danger) else fg
             DropdownMenuItem(
-                text = { Text(a.label, color = color, fontSize = 14.sp) },
+                text = { Text(a.label, color = color, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = {
-                    Box(Modifier.size(30.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                        Icon(a.icon, null, tint = color, modifier = Modifier.size(17.dp))
+                    Box(Modifier.size(24.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                        Icon(a.icon, null, tint = color, modifier = Modifier.size(14.dp))
                     }
                 },
                 onClick = { onDismiss(); a.onClick() },
+                modifier = CompactItem,
+                contentPadding = CompactPadding,
             )
         }
     }

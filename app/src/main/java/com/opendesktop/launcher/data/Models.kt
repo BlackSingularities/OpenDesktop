@@ -248,6 +248,12 @@ data class Config(
     val particleEffects: Boolean = false,
     val iconBounceAnimation: Boolean = true,
     val folderOpenAnimation: Boolean = true,
+    /** Tło menu kontekstowych (ikony, widżety, szuflada): kolor RGB i krycie. */
+    val menuColor: Long = 0xFFFFFFFF,
+    val menuOpacity: Float = 0.74f,
+    /** Tło okienek folderów: kolor RGB i krycie. */
+    val folderColor: Long = 0xFFFFFFFF,
+    val folderOpacity: Float = 0.74f,
     val swipeTrails: Boolean = false,
     // AI (OpenRouter)
     val openRouterKey: String = "",

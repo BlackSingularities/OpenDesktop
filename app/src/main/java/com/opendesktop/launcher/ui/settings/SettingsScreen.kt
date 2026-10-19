@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +50,7 @@ import com.opendesktop.launcher.R
 import com.opendesktop.launcher.data.*
 import com.opendesktop.launcher.ui.LauncherViewModel
 import com.opendesktop.launcher.ui.UpdateState
+import com.opendesktop.launcher.ui.components.PanelStyle
 import com.opendesktop.launcher.ui.theme.Palette
 import java.time.LocalDate
 
@@ -318,6 +320,68 @@ private val accents = listOf(
     0xFFFF8A80, 0xFF80D8FF, 0xFFB9F6CA, 0xFFF48FB1,
 )
 
+private val panelColors = listOf(
+    0xFFFFFFFF, 0xFFE8EAED, 0xFF9AA0A6, 0xFF202124, 0xFF000000,
+    0xFF8AB4FF, 0xFFC58AFF, 0xFF7EE0C3, 0xFFFFD27E, 0xFFFF8A80,
+)
+
+/** Kolor i krycie panelu (menu, folder) z małym podglądem w stylu tego panelu. */
+@Composable
+private fun PanelColorRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    color: Long,
+    opacity: Float,
+    onColor: (Long) -> Unit,
+    onOpacity: (Float) -> Unit,
+) {
+    val panel = PanelStyle.of(color, opacity)
+    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RowIcon(icon)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(title, fontSize = 14.sp, color = Color.White)
+                Text(subtitle, fontSize = 12.sp, color = Palette.TextDim)
+            }
+            // Podgląd na tle przypominającym tapetę
+            Box(
+                Modifier
+                    .size(64.dp, 40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF4A6FA5), Color(0xFFD9A35B)))),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(46.dp, 26.dp)
+                        .clip(panel.shape)
+                        .background(panel.background)
+                        .border(1.dp, panel.border, panel.shape),
+                    contentAlignment = Alignment.Center,
+                ) { Text("Aa", color = panel.content, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            }
+        }
+        Row(
+            Modifier.padding(start = 44.dp, top = 8.dp).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            panelColors.forEach { c ->
+                val sel = (color and 0xFFFFFF) == (c and 0xFFFFFF)
+                Box(
+                    Modifier.size(30.dp).clip(CircleShape)
+                        .background(if (sel) Color.White else Color.White.copy(alpha = 0.12f))
+                        .clickable { onColor(c) }
+                        .padding(if (sel) 3.dp else 2.dp)
+                        .clip(CircleShape)
+                        .background(Color(c)),
+                )
+            }
+        }
+    }
+    SliderRow(Icons.Rounded.Opacity, "Krycie", opacity * 100f, 0f..100f, 19, { "${it.toInt()}%" }) { onOpacity(it / 100f) }
+}
+
 @Composable
 private fun LookSection(cfg: Config, set: Setter) {
     val ctx = LocalContext.current
@@ -348,6 +412,29 @@ private fun LookSection(cfg: Config, set: Setter) {
                     }
                 }
             }
+        }
+    }
+    Group("Menu i foldery") {
+        PanelColorRow(
+            icon = Icons.Rounded.Menu,
+            title = "Menu kontekstowe",
+            subtitle = "Przytrzymanie ikony, widżetu i aplikacji w szufladzie",
+            color = cfg.menuColor,
+            opacity = cfg.menuOpacity,
+            onColor = { c -> set { it.copy(menuColor = c) } },
+            onOpacity = { o -> set { it.copy(menuOpacity = o) } },
+        )
+        PanelColorRow(
+            icon = Icons.Rounded.Folder,
+            title = "Tło folderów",
+            subtitle = "Okienko z ikonami po otwarciu folderu",
+            color = cfg.folderColor,
+            opacity = cfg.folderOpacity,
+            onColor = { c -> set { it.copy(folderColor = c) } },
+            onOpacity = { o -> set { it.copy(folderOpacity = o) } },
+        )
+        ActionRow(Icons.Rounded.RestartAlt, "Przywróć domyślny wygląd", "Biel, krycie 74% – dla menu i folderów") {
+            set { it.copy(menuColor = 0xFFFFFFFF, menuOpacity = 0.74f, folderColor = 0xFFFFFFFF, folderOpacity = 0.74f) }
         }
     }
     Group {

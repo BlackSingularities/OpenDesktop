@@ -282,17 +282,20 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         store.updateWorkspace { it.withoutItem(pageId, itemId) }
     }
 
-    fun resizeItem(pageId: String, itemId: String, w: Int, h: Int) {
+    /** Zmiana rozmiaru z dowolnej krawędzi – lewa i górna przesuwają też początek elementu. */
+    fun resizeItem(pageId: String, itemId: String, x: Int, y: Int, w: Int, h: Int) {
         val ws = workspace.value
         val page = ws.pages.firstOrNull { it.id == pageId } ?: return
-        val item = page.items.firstOrNull { it.id == itemId } ?: return
-        val nw = w.coerceIn(1, cols - item.x)
-        val nh = h.coerceIn(1, rows - item.y)
-        if (!config.value.allowOverlap && !GridOps.isFree(page.items, item.x, item.y, nw, nh, cols, rows, item.id)) {
+        if (page.items.none { it.id == itemId }) return
+        val nx = x.coerceIn(0, cols - 1)
+        val ny = y.coerceIn(0, rows - 1)
+        val nw = w.coerceIn(1, cols - nx)
+        val nh = h.coerceIn(1, rows - ny)
+        if (!config.value.allowOverlap && !GridOps.isFree(page.items, nx, ny, nw, nh, cols, rows, itemId)) {
             toast("Brak miejsca na taki rozmiar")
             return
         }
-        store.updateWorkspace { it.updatePage(pageId) { p -> p.copy(items = p.items.map { i -> if (i.id == itemId) i.copy(w = nw, h = nh) else i }) } }
+        store.updateWorkspace { it.updatePage(pageId) { p -> p.copy(items = p.items.map { i -> if (i.id == itemId) i.copy(x = nx, y = ny, w = nw, h = nh) else i }) } }
     }
 
     /** Wyznacza cel upuszczenia na siatce. (x, y) to lewy górny róg, (px, py) – komórka pod palcem. */

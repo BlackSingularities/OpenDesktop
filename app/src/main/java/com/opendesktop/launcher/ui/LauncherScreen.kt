@@ -540,8 +540,8 @@ fun LauncherScreen(
 
         override fun onDragEnd() = endDrag()
 
-        override fun onResize(pageId: String, item: DesktopItem, w: Int, h: Int) {
-            if (!cfg.layoutLocked) vm.resizeItem(pageId, item.id, w, h)
+        override fun onResize(pageId: String, item: DesktopItem, x: Int, y: Int, w: Int, h: Int) {
+            if (!cfg.layoutLocked) vm.resizeItem(pageId, item.id, x, y, w, h)
         }
 
         override fun onEmptyLongPress() {

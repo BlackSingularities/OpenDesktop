@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -79,7 +80,7 @@ interface DesktopCallbacks {
     fun onOpenFolder(pageId: String, item: DesktopItem, bounds: Rect)
     fun onDragStart(pageId: String, item: DesktopItem, bounds: Rect)
     fun onDragEnd()
-    fun onResize(pageId: String, item: DesktopItem, w: Int, h: Int)
+    fun onResize(pageId: String, item: DesktopItem, x: Int, y: Int, w: Int, h: Int)
     fun onEmptyLongPress()
     fun onEmptyDoubleTap()
     fun onEmptyTap()
@@ -189,6 +190,11 @@ fun DesktopGrid(
                     menu = menu,
                 )
             }
+        }
+        // Ramka zmiany rozmiaru zaznaczonego elementu – nad wszystkim
+        val sel = if (editMode) page.items.firstOrNull { it.id == selectedId } else null
+        if (sel != null) key("resize_${sel.id}") {
+            ResizeFrame(sel, page.id, cw, ch, cols, rows, drag) { x, y, w, h -> callbacks.onResize(page.id, sel, x, y, w, h) }
         }
     }
 }
@@ -332,58 +338,86 @@ private fun DesktopItemSlot(
                 modifier = Modifier.fillMaxSize().then(gestures),
             )
         }
-        if (editMode && selected) {
-            ResizeHandle(
-                drag = drag,
-                onChange = { dx, dy ->
-                    val nw = (item.w + (dx / cellPx.width).roundToInt()).coerceIn(1, cfg.columns - item.x)
-                    val nh = (item.h + (dy / cellPx.height).roundToInt()).coerceIn(1, cfg.rows - item.y)
-                    resize = IntSize(nw, nh)
-                },
-                onEnd = { callbacks.onResize(pageId, item, resize.width, resize.height) },
-                modifier = Modifier.align(Alignment.BottomEnd),
-            )
-        }
         if (showMenu) Box(Modifier.align(Alignment.Center)) { menu(item) }
     }
 }
 
-/** Uchwyt w rogu – mierzy przesunięcie palca w układzie okna, więc nie „skacze” przy przyciąganiu do siatki. */
+private enum class Edge { Left, Top, Right, Bottom }
+
+/**
+ * Ramka zmiany rozmiaru zaznaczonego elementu: kropka na środku każdej krawędzi. Rysowana nad
+ * wszystkim w siatce (żadna ikona jej nie przykryje). Rozmiar liczony w komórkach od przesunięcia
+ * palca w układzie okna – z rzeczywistej (przeskalowanej w edycji) szerokości komórki.
+ */
 @Composable
-private fun ResizeHandle(
+private fun ResizeFrame(
+    item: DesktopItem,
+    pageId: String,
+    cw: Dp,
+    ch: Dp,
+    cols: Int,
+    rows: Int,
     drag: DragController,
-    onChange: (Float, Float) -> Unit,
-    onEnd: () -> Unit,
-    modifier: Modifier,
+    onDone: (x: Int, y: Int, w: Int, h: Int) -> Unit,
 ) {
-    val change by rememberUpdatedState(onChange)
-    val end by rememberUpdatedState(onEnd)
-    Box(
-        modifier
-            .offset(6.dp, 6.dp)
-            .size(30.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary)
-            .border(2.dp, Color.White, CircleShape)
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    down.consume()
-                    val start = drag.pointer
-                    while (true) {
-                        val ev = awaitPointerEvent()
-                        val c = ev.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!c.pressed) break
-                        c.consume()
-                        val d = drag.pointer - start
-                        change(d.x, d.y)
-                    }
-                    end()
-                }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.Rounded.OpenInFull, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = 90f })
+    // Prostokąt w komórkach: [left, right) × [top, bottom)
+    var l by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.x) }
+    var t by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.y) }
+    var r by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.x + item.w) }
+    var b by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.y + item.h) }
+    val done by rememberUpdatedState(onDone)
+    Box(Modifier.offset(cw * l, ch * t).size(cw * (r - l), ch * (b - t)).zIndex(200_000f)) {
+        Box(Modifier.matchParentSize().padding(2.dp).border(2.dp, Color.White, RoundedCornerShape(14.dp)))
+        Edge.entries.forEach { edge ->
+            Box(
+                Modifier
+                    .align(
+                        when (edge) {
+                            Edge.Left -> Alignment.CenterStart
+                            Edge.Top -> Alignment.TopCenter
+                            Edge.Right -> Alignment.CenterEnd
+                            Edge.Bottom -> Alignment.BottomCenter
+                        }
+                    )
+                    .size(32.dp)
+                    .pointerInput(edge, cols, rows) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            val start = drag.pointer
+                            val l0 = l; val t0 = t; val r0 = r; val b0 = b
+                            val grid = drag.gridBounds[pageId]
+                            val cellW = grid?.let { it.width / cols } ?: cw.toPx()
+                            val cellH = grid?.let { it.height / rows } ?: ch.toPx()
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!c.pressed) break
+                                c.consume()
+                                val d = drag.pointer - start
+                                val dx = (d.x / cellW).roundToInt()
+                                val dy = (d.y / cellH).roundToInt()
+                                when (edge) {
+                                    Edge.Left -> l = (l0 + dx).coerceIn(0, r0 - 1)
+                                    Edge.Right -> r = (r0 + dx).coerceIn(l0 + 1, cols)
+                                    Edge.Top -> t = (t0 + dy).coerceIn(0, b0 - 1)
+                                    Edge.Bottom -> b = (b0 + dy).coerceIn(t0 + 1, rows)
+                                }
+                            }
+                            if (l != l0 || t != t0 || r != r0 || b != b0) done(l, t, r - l, b - t)
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(if (edge == Edge.Left || edge == Edge.Right) 10.dp else 26.dp, if (edge == Edge.Left || edge == Edge.Right) 26.dp else 10.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .border(1.dp, Color.Black.copy(alpha = 0.3f), RoundedCornerShape(50)),
+                )
+            }
+        }
     }
 }
 

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import com.opendesktop.launcher.ui.components.LabelShadow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -167,7 +169,8 @@ fun AppDrawer(
 
     val cb = DrawerCallbacks(
         label = label,
-        categoriesOf = categoriesOf,
+        // Globalne ustawienie: kategorie pod nazwą pokazują wszystkie układy albo żaden
+        categoriesOf = if (cfg.drawerShowCategories) categoriesOf else { _ -> emptyList() },
         shape = cfg.iconShape,
         labelSize = cfg.labelSize,
         showLabels = cfg.drawerLabels,
@@ -182,31 +185,39 @@ fun AppDrawer(
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Nagłówek: uchwyt + wyszukiwarka + menu
         Column(headerModifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
+            Box(Modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.width(36.dp).height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Kompaktowa wyszukiwarka; tekst i ikony z cieniem, żeby były czytelne na jasnej tapecie
                 Row(
                     Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(40.dp)
                         .clip(RoundedCornerShape(50))
                         .then(
-                            if (cfg.drawerHeaderBackground) Modifier.background(Color.White.copy(alpha = 0.12f))
+                            if (cfg.drawerHeaderBackground) Modifier.background(Color.Black.copy(alpha = 0.35f))
                             else Modifier
                         )
-                        .padding(horizontal = 14.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = 0.8f))
-                    Spacer(Modifier.width(10.dp))
+                    Box {
+                        Icon(Icons.Rounded.Search, null, tint = Color.Black.copy(alpha = 0.5f), modifier = Modifier.size(20.dp).offset(y = 1.dp))
+                        Icon(Icons.Rounded.Search, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(8.dp))
                     Box(Modifier.weight(1f)) {
-                        if (query.isEmpty()) Text("Szukaj w ${apps.size} aplikacjach", color = Color.White.copy(alpha = 0.5f), maxLines = 1)
+                        if (query.isEmpty()) Text(
+                            "Szukaj w ${apps.size} aplikacjach",
+                            color = Color.White.copy(alpha = 0.8f), maxLines = 1,
+                            style = TextStyle(fontSize = 14.sp, shadow = LabelShadow),
+                        )
                         BasicTextField(
                             value = query,
                             onValueChange = { query = it },
                             singleLine = true,
-                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                            textStyle = TextStyle(color = Color.White, fontSize = 15.sp, shadow = LabelShadow),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                             keyboardActions = KeyboardActions(onGo = {
@@ -243,7 +254,7 @@ fun AppDrawer(
                         )
                         HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text("Motyw szuflady…") },
+                            text = { Text("Układ szuflady…") },
                             leadingIcon = { Icon(Icons.Rounded.Dashboard, null) },
                             onClick = { sortMenu = false; styleMenu = true },
                         )
@@ -278,15 +289,15 @@ fun AppDrawer(
             // Filtr kategorii
             if (cfg.drawerCategoryChips && cfg.drawerStyle != DrawerStyle.Categories && ws.categories.isNotEmpty()) {
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Chip("Wszystkie", filter == null) { filter = null }
                     ws.categories.forEach { c -> Chip((c.emoji + " " + c.name).trim(), filter == c.id) { filter = if (filter == c.id) null else c.id } }
                     Chip("Bez kategorii", filter == NO_CATEGORY) { filter = if (filter == NO_CATEGORY) null else NO_CATEGORY }
                 }
             } else {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(2.dp))
             }
 
             // Wyszukiwanie z AI i w sieci
@@ -310,7 +321,7 @@ fun AppDrawer(
             }
         }
 
-        val padding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 96.dp)
+        val padding = PaddingValues(start = 8.dp, end = 8.dp, top = 0.dp, bottom = 96.dp)
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(closeConnection).navigationBarsPadding()) {
             if (!loaded) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)

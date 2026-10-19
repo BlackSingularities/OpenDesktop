@@ -195,6 +195,8 @@ data class Config(
     val drawerStyle: DrawerStyle = DrawerStyle.Grid,
     val drawerSort: DrawerSort = DrawerSort.Name,
     val drawerColumns: Int = 5,
+    /** Kategorie pod nazwą aplikacji we wszystkich układach szuflady. */
+    val drawerShowCategories: Boolean = true,
     /** Wiersze w stylu „Strony”; 0 = automatycznie. */
     val drawerRows: Int = 0,
     val drawerOpacity: Float = 0.86f,

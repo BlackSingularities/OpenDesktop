@@ -57,7 +57,7 @@ private enum class Section(val title: String, val icon: ImageVector, val summary
     Desktop("Pulpit", Icons.Rounded.Home, "Siatka, przejścia, wskaźnik ekranów"),
     Icons_("Ikony", Icons.Rounded.Apps, "Rozmiar, kształt, podpisy"),
     Dock("Dok", Icons.Rounded.Dashboard, "Miejsca, tło, podpisy"),
-    Drawer("Szuflada aplikacji", Icons.Rounded.GridView, "Motyw, sortowanie, kolumny i wiersze"),
+    Drawer("Szuflada aplikacji", Icons.Rounded.GridView, "Układ, sortowanie, kolumny i wiersze"),
     Gestures("Gesty", Icons.Rounded.Gesture, "Przesunięcia, dotknięcia, wibracje"),
     Look("Wygląd", Icons.Rounded.Palette, "Kolory, motyw, tapeta"),
     Effects("Efekty i animacje", Icons.Rounded.Animation, "Naciśnięcia, cząsteczki, parallax"),
@@ -247,8 +247,8 @@ private fun DockSection(cfg: Config, set: Setter) {
 @Composable
 private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
     Group("Układ") {
-        ActionRow(Icons.Rounded.Style, "Motyw", cfg.drawerStyle.label, chevron = true) {
-            pick.choose("Motyw szuflady", DrawerStyle.entries, cfg.drawerStyle, { it.label }, { it.description }) { s -> set { it.copy(drawerStyle = s) } }
+        ActionRow(Icons.Rounded.Style, "Układ", cfg.drawerStyle.label, chevron = true) {
+            pick.choose("Układ szuflady", DrawerStyle.entries, cfg.drawerStyle, { it.label }, { it.description }) { s -> set { it.copy(drawerStyle = s) } }
         }
         ActionRow(Icons.AutoMirrored.Rounded.Sort, "Sortowanie", cfg.drawerSort.label, chevron = true) {
             pick.choose("Sortowanie", DrawerSort.entries, cfg.drawerSort, { it.label }) { s -> set { it.copy(drawerSort = s) } }
@@ -274,6 +274,7 @@ private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
             if (Build.VERSION.SDK_INT >= 31) Tile(Icons.Rounded.BlurOn, "Rozmycie pulpitu", cfg.blurBehindDrawer) { v -> set { it.copy(blurBehindDrawer = v) } } else null,
             Tile(Icons.Rounded.Category, "Filtr kategorii", cfg.drawerCategoryChips) { v -> set { it.copy(drawerCategoryChips = v) } },
             Tile(Icons.Rounded.Label, "Podpisy ikon", cfg.drawerLabels) { v -> set { it.copy(drawerLabels = v) } },
+            Tile(Icons.Rounded.LocalOffer, "Kategorie pod nazwą", cfg.drawerShowCategories) { v -> set { it.copy(drawerShowCategories = v) } },
             Tile(Icons.Rounded.Keyboard, "Klawiatura od razu", cfg.searchAutoFocus) { v -> set { it.copy(searchAutoFocus = v) } },
         ),
     )

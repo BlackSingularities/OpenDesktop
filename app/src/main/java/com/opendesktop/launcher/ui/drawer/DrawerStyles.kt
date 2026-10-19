@@ -135,7 +135,7 @@ private fun SectionHeader(title: String) {
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         style = MaterialTheme.typography.titleSmall.copy(shadow = LabelShadow),
-        modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp),
+        modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 4.dp),
     )
 }
 
@@ -320,9 +320,12 @@ fun DrawerAlphabet(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingVal
 fun DrawerPages(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, fixedRows: Int = 0) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // fixedRows = 0 → tyle wierszy, ile się zmieści; inaczej wiersze ściskane do zadanej liczby
-        val rows = if (fixedRows > 0) fixedRows else ((maxHeight - 40.dp) / 104.dp).toInt().coerceAtLeast(3)
-        val rowH = if (fixedRows > 0) (maxHeight - 28.dp) / fixedRows else 104.dp
-        val iconSize = minOf(54.dp, rowH * 0.55f)
+        val avail = maxHeight - 28.dp
+        val rows = if (fixedRows > 0) fixedRows else (avail / 100.dp).toInt().coerceAtLeast(3)
+        // Rzędy wypełniają całą wysokość; ikona rośnie do komórki (ograniczona szerokością kolumny)
+        val rowH = avail / rows
+        val colW = maxWidth / columns
+        val iconSize = minOf(68.dp, rowH * (if (cb.showLabels) 0.6f else 0.75f), colW * 0.72f)
         val perPage = columns * rows
         val pages = remember(apps, perPage) { apps.chunked(perPage) }
         val state = rememberPagerState { pages.size }

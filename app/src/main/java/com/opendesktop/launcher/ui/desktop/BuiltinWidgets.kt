@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,15 +36,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.opendesktop.launcher.data.DesktopItem
+import com.opendesktop.launcher.data.SearchStyle
 import com.opendesktop.launcher.ui.components.LabelShadow
 import com.opendesktop.launcher.widget.LauncherWidgetHost
 import com.opendesktop.launcher.widget.LauncherWidgetHostView
@@ -98,23 +109,64 @@ private fun batteryLevel(ctx: Context): Int = runCatching {
     if (level < 0) -1 else level * 100 / scale
 }.getOrDefault(-1)
 
+/**
+ * Wyszukiwarka na pulpicie. Wygląd z [SearchStyle]: zaokrąglenie, tło, kolor tekstu, obrys
+ * i cienie. Ikona i tekst rosną razem z wysokością pola.
+ */
 @Composable
-fun SearchWidget(modifier: Modifier, aiEnabled: Boolean) {
-    Box(modifier.padding(horizontal = 6.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+fun SearchWidget(modifier: Modifier, aiEnabled: Boolean, style: SearchStyle = SearchStyle()) {
+    BoxWithConstraints(modifier.padding(horizontal = 6.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+        // Pole nie wyższe niż ~64 dp, nawet gdy widżet zajmuje kilka wierszy
+        val h = maxHeight.coerceAtMost(64.dp).coerceAtLeast(36.dp)
+        val shape = RoundedCornerShape(h * (style.radius.coerceIn(0, 50) / 100f))
+        val fg = Color(style.textColor)
+        val textShadow = if (style.textShadow) {
+            Shadow(if (fg.luminance() > 0.5f) Color.Black.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.6f), Offset(0f, 1.5f), 6f)
+        } else null
+        val iconSize = (h.value * 0.42f).coerceIn(18f, 28f).dp
         Row(
             Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(50))
-                .background(Color.White.copy(alpha = 0.2f))
-                .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(50))
-                .padding(horizontal = 18.dp),
+                .fillMaxWidth()
+                .height(h)
+                .then(
+                    if (style.shadow > 0.01f) Modifier.shadow(
+                        elevation = (style.shadow * 18f).dp,
+                        shape = shape,
+                        ambientColor = Color.Black,
+                        spotColor = Color.Black,
+                    ) else Modifier
+                )
+                .clip(shape)
+                .background(Color(style.background))
+                .then(if (style.border) Modifier.border(1.dp, fg.copy(alpha = 0.25f), shape) else Modifier)
+                .padding(horizontal = (h.value * 0.36f).coerceIn(12f, 22f).dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.Search, null, tint = Color.White)
+            ShadowedIcon(Icons.Rounded.Search, fg, iconSize, style.textShadow)
             Spacer(Modifier.width(10.dp))
-            Text("Szukaj aplikacji…", color = Color.White.copy(alpha = 0.85f), modifier = Modifier.weight(1f), maxLines = 1)
-            if (aiEnabled) Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
+            Text(
+                style.hint.ifBlank { "Szukaj aplikacji…" },
+                color = fg.copy(alpha = 0.88f),
+                style = TextStyle(fontSize = (h.value * 0.3f).coerceIn(13f, 18f).sp, shadow = textShadow),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (aiEnabled) ShadowedIcon(Icons.Rounded.AutoAwesome, fg.copy(alpha = 0.88f), iconSize * 0.8f, style.textShadow)
         }
+    }
+}
+
+/** Ikona z miękkim cieniem pod spodem (ta sama ikona, przesunięta i przyciemniona). */
+@Composable
+private fun ShadowedIcon(icon: ImageVector, tint: Color, size: Dp, shadow: Boolean) {
+    Box {
+        if (shadow) Icon(
+            icon, null,
+            tint = if (tint.luminance() > 0.5f) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.45f),
+            modifier = Modifier.size(size).offset(y = 1.dp).blur(2.dp),
+        )
+        Icon(icon, null, tint = tint, modifier = Modifier.size(size))
     }
 }
 

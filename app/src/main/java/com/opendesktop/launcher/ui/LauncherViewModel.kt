@@ -26,6 +26,7 @@ import com.opendesktop.launcher.data.ItemType
 import com.opendesktop.launcher.data.OpenRouter
 import com.opendesktop.launcher.data.Page
 import com.opendesktop.launcher.data.RepoHit
+import com.opendesktop.launcher.data.SearchStyle
 import com.opendesktop.launcher.data.ShortcutEntry
 import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.UpdateInfo
@@ -274,6 +275,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun setWidgetStretch(pageId: String, itemId: String, stretch: Boolean) = store.updateWorkspace { ws ->
         ws.updatePage(pageId) { p -> p.copy(items = p.items.map { if (it.id == itemId) it.copy(stretch = stretch) else it }) }
+    }
+
+    fun setSearchStyle(pageId: String, itemId: String, style: SearchStyle) = store.updateWorkspace { ws ->
+        ws.updatePage(pageId) { p -> p.copy(items = p.items.map { if (it.id == itemId) it.copy(searchStyle = style) else it }) }
     }
 
     fun removeItem(pageId: String, itemId: String) {

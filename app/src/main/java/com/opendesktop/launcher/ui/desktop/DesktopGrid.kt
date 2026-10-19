@@ -24,9 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -103,6 +105,8 @@ fun DesktopGrid(
     menu: @Composable (DesktopItem) -> Unit,
     onCellSize: (Size) -> Unit,
     modifier: Modifier = Modifier,
+    /** Postęp wejścia w edycję 0–1 (siatka pojawia się płynnie). */
+    editProgress: Float = if (editMode) 1f else 0f,
 ) {
     val cols = cfg.columns
     val rows = cfg.rows
@@ -131,18 +135,31 @@ fun DesktopGrid(
         val cellPx = with(density) { Size(cw.toPx(), ch.toPx()) }
         onCellSize(cellPx)
 
-        if (editMode && cfg.editGridLines) {
-            val line = Color.White.copy(alpha = 0.16f)
-            Canvas(Modifier.fillMaxSize()) {
+        if (editProgress > 0.001f && cfg.editGridLines) {
+            // Wolne komórki: delikatne wypełnienie i obrys; zajęte zostają czyste, żeby było widać,
+            // gdzie jest miejsce. Kropki na przecięciach ułatwiają celowanie przy przeciąganiu.
+            val occupied = remember(page.items, cols, rows) {
+                BooleanArray(cols * rows).also { occ ->
+                    page.items.forEach { o ->
+                        for (x in o.x.coerceAtLeast(0) until (o.x + o.w).coerceAtMost(cols)) {
+                            for (y in o.y.coerceAtLeast(0) until (o.y + o.h).coerceAtMost(rows)) occ[y * cols + x] = true
+                        }
+                    }
+                }
+            }
+            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = editProgress }) {
                 val inset = 4.dp.toPx()
+                val radius = CornerRadius(14.dp.toPx())
                 for (x in 0 until cols) for (y in 0 until rows) {
-                    drawRoundRect(
-                        line,
-                        topLeft = Offset(x * cellPx.width + inset, y * cellPx.height + inset),
-                        size = Size(cellPx.width - inset * 2, cellPx.height - inset * 2),
-                        cornerRadius = CornerRadius(14.dp.toPx()),
-                        style = Stroke(1.dp.toPx()),
-                    )
+                    if (occupied[y * cols + x]) continue
+                    val tl = Offset(x * cellPx.width + inset, y * cellPx.height + inset)
+                    val sz = Size(cellPx.width - inset * 2, cellPx.height - inset * 2)
+                    drawRoundRect(Color.White.copy(alpha = 0.05f), topLeft = tl, size = sz, cornerRadius = radius)
+                    drawRoundRect(Color.White.copy(alpha = 0.14f), topLeft = tl, size = sz, cornerRadius = radius, style = Stroke(1.dp.toPx()))
+                }
+                val dot = Color.White.copy(alpha = 0.35f)
+                for (x in 1 until cols) for (y in 1 until rows) {
+                    drawCircle(dot, radius = 1.5.dp.toPx(), center = Offset(x * cellPx.width, y * cellPx.height))
                 }
             }
         }
@@ -180,6 +197,7 @@ fun DesktopGrid(
                     ch = ch,
                     cellPx = cellPx,
                     editMode = editMode,
+                    editProgress = editProgress,
                     selected = selectedId == item.id,
                     showMenu = menuItemId == item.id,
                     drag = drag,
@@ -211,6 +229,7 @@ private fun DesktopItemSlot(
     ch: Dp,
     cellPx: Size,
     editMode: Boolean,
+    editProgress: Float,
     selected: Boolean,
     showMenu: Boolean,
     drag: DragController,
@@ -225,7 +244,8 @@ private fun DesktopItemSlot(
     var resize by remember(item.w, item.h) { mutableStateOf(IntSize(item.w, item.h)) }
     val isDragged = drag.payload?.item?.id == item.id
     val ghost by animateFloatAsState(if (isDragged) 0.25f else 1f, label = "ghost")
-    val wiggle by animateFloatAsState(if (editMode) 0.94f else 1f, label = "edit")
+    // Elementy w edycji lekko mniejsze – między nimi widać siatkę
+    val wiggle = 1f - 0.05f * editProgress
 
     // Elementy, których aplikacja zniknęła (odinstalowana), pomijamy
     if (item.type == ItemType.App && apps[item.app] == null && apps.isNotEmpty()) return
@@ -250,13 +270,12 @@ private fun DesktopItemSlot(
                 alpha = ghost
                 scaleX = wiggle; scaleY = wiggle
             }
-            .then(
-                if (selected && editMode) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp))
-                else Modifier
-            ),
     ) {
         val gestures = Modifier.itemGestures(
-            key = item.id + editMode,
+            // Klucz bez trybu edycji: wejście w edycję w trakcie przytrzymania nie przerywa gestu,
+            // więc po przytrzymaniu można od razu przeciągać
+            key = item.id,
+            holdMillis = if (editMode) 250L else null,
             onPress = { pressed = it },
             onTap = { callbacks.onItemTap(pageId, item, bounds) },
             onLongPress = { callbacks.onItemLongPress(pageId, item) },
@@ -327,7 +346,7 @@ private fun DesktopItemSlot(
                 if (editMode) Box(Modifier.matchParentSize().then(gestures))
             }
             ItemType.Clock -> ClockWidget(Modifier.fillMaxSize().then(gestures))
-            ItemType.Search -> SearchWidget(Modifier.fillMaxSize().then(gestures), aiEnabled)
+            ItemType.Search -> SearchWidget(Modifier.fillMaxSize().then(gestures), aiEnabled, item.searchStyle)
             ItemType.Action -> ActionIcon(
                 action = item.systemAction,
                 label = item.label,
@@ -342,12 +361,23 @@ private fun DesktopItemSlot(
     }
 }
 
-private enum class Edge { Left, Top, Right, Bottom }
+/** Uchwyt ramki: które krawędzie przesuwa (-1 = lewa/górna, 1 = prawa/dolna, 0 = żadna). */
+private enum class Handle(val h: Int, val v: Int, val align: Alignment) {
+    Left(-1, 0, Alignment.CenterStart),
+    Top(0, -1, Alignment.TopCenter),
+    Right(1, 0, Alignment.CenterEnd),
+    Bottom(0, 1, Alignment.BottomCenter),
+    TopLeft(-1, -1, Alignment.TopStart),
+    TopRight(1, -1, Alignment.TopEnd),
+    BottomLeft(-1, 1, Alignment.BottomStart),
+    BottomRight(1, 1, Alignment.BottomEnd),
+}
 
 /**
- * Ramka zmiany rozmiaru zaznaczonego elementu: kropka na środku każdej krawędzi. Rysowana nad
- * wszystkim w siatce (żadna ikona jej nie przykryje). Rozmiar liczony w komórkach od przesunięcia
- * palca w układzie okna – z rzeczywistej (przeskalowanej w edycji) szerokości komórki.
+ * Ramka zmiany rozmiaru zaznaczonego elementu: okrągła kropka na środku każdej krawędzi i w każdym
+ * rogu – przeciągnięcie kropki przesuwa tę krawędź (róg – dwie naraz). Rysowana nad wszystkim
+ * w siatce, z podglądem nowego rozmiaru w komórkach. Rozmiar liczony od przesunięcia palca
+ * w układzie okna – z rzeczywistej (przeskalowanej w edycji) szerokości komórki.
  */
 @Composable
 private fun ResizeFrame(
@@ -365,56 +395,87 @@ private fun ResizeFrame(
     var t by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.y) }
     var r by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.x + item.w) }
     var b by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.y + item.h) }
+    var active by remember { mutableStateOf<Handle?>(null) }
     val done by rememberUpdatedState(onDone)
-    Box(Modifier.offset(cw * l, ch * t).size(cw * (r - l), ch * (b - t)).zIndex(200_000f)) {
-        Box(Modifier.matchParentSize().padding(2.dp).border(2.dp, Color.White, RoundedCornerShape(14.dp)))
-        Edge.entries.forEach { edge ->
+    val accent = MaterialTheme.colorScheme.primary
+    // Płynne przejście ramki między komórkami
+    val ox by animateDpAsState(cw * l, spring(stiffness = 1200f), label = "fx")
+    val oy by animateDpAsState(ch * t, spring(stiffness = 1200f), label = "fy")
+    val fw by animateDpAsState(cw * (r - l), spring(stiffness = 1200f), label = "fw")
+    val fh by animateDpAsState(ch * (b - t), spring(stiffness = 1200f), label = "fh")
+    Box(Modifier.offset(ox, oy).size(fw, fh).zIndex(200_000f)) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(3.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = if (active != null) 0.14f else 0.06f))
+                .border(2.dp, Color.White, RoundedCornerShape(16.dp)),
+        )
+        // Rozmiar w komórkach podczas przeciągania
+        if (active != null) {
+            Text(
+                "${r - l} × ${b - t}",
+                color = Color.Black,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+        Handle.entries.forEach { handle ->
             Box(
                 Modifier
-                    .align(
-                        when (edge) {
-                            Edge.Left -> Alignment.CenterStart
-                            Edge.Top -> Alignment.TopCenter
-                            Edge.Right -> Alignment.CenterEnd
-                            Edge.Bottom -> Alignment.BottomCenter
-                        }
-                    )
-                    .size(32.dp)
-                    .pointerInput(edge, cols, rows) {
+                    .align(handle.align)
+                    // Kropka na linii ramki; pole dotyku większe niż sama kropka
+                    .offset(x = 14.dp * handle.h, y = 14.dp * handle.v)
+                    .size(40.dp)
+                    .pointerInput(handle, cols, rows) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
                             down.consume()
+                            active = handle
                             val start = drag.pointer
                             val l0 = l; val t0 = t; val r0 = r; val b0 = b
                             val grid = drag.gridBounds[pageId]
                             val cellW = grid?.let { it.width / cols } ?: cw.toPx()
                             val cellH = grid?.let { it.height / rows } ?: ch.toPx()
-                            while (true) {
-                                val ev = awaitPointerEvent()
-                                val c = ev.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!c.pressed) break
-                                c.consume()
-                                val d = drag.pointer - start
-                                val dx = (d.x / cellW).roundToInt()
-                                val dy = (d.y / cellH).roundToInt()
-                                when (edge) {
-                                    Edge.Left -> l = (l0 + dx).coerceIn(0, r0 - 1)
-                                    Edge.Right -> r = (r0 + dx).coerceIn(l0 + 1, cols)
-                                    Edge.Top -> t = (t0 + dy).coerceIn(0, b0 - 1)
-                                    Edge.Bottom -> b = (b0 + dy).coerceIn(t0 + 1, rows)
+                            try {
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!c.pressed) break
+                                    c.consume()
+                                    val d = drag.pointer - start
+                                    val dx = (d.x / cellW).roundToInt()
+                                    val dy = (d.y / cellH).roundToInt()
+                                    when (handle.h) {
+                                        -1 -> l = (l0 + dx).coerceIn(0, r0 - 1)
+                                        1 -> r = (r0 + dx).coerceIn(l0 + 1, cols)
+                                    }
+                                    when (handle.v) {
+                                        -1 -> t = (t0 + dy).coerceIn(0, b0 - 1)
+                                        1 -> b = (b0 + dy).coerceIn(t0 + 1, rows)
+                                    }
                                 }
+                            } finally {
+                                active = null
                             }
                             if (l != l0 || t != t0 || r != r0 || b != b0) done(l, t, r - l, b - t)
                         }
                     },
                 contentAlignment = Alignment.Center,
             ) {
+                val on = active == handle
                 Box(
                     Modifier
-                        .size(if (edge == Edge.Left || edge == Edge.Right) 10.dp else 26.dp, if (edge == Edge.Left || edge == Edge.Right) 26.dp else 10.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White)
-                        .border(1.dp, Color.Black.copy(alpha = 0.3f), RoundedCornerShape(50)),
+                        .size(if (on) 20.dp else 15.dp)
+                        .clip(CircleShape)
+                        .background(if (on) accent else Color.White)
+                        .border(1.5.dp, if (on) Color.White else Color.Black.copy(alpha = 0.35f), CircleShape),
                 )
             }
         }

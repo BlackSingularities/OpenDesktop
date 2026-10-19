@@ -7,10 +7,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
@@ -61,9 +64,12 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Transform
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Wallpaper
@@ -146,6 +152,7 @@ import com.opendesktop.launcher.ui.desktop.DropTarget
 import com.opendesktop.launcher.ui.desktop.DropZone
 import com.opendesktop.launcher.ui.desktop.FolderDialog
 import com.opendesktop.launcher.ui.desktop.PageIndicator
+import com.opendesktop.launcher.ui.desktop.SearchStyleDialog
 import com.opendesktop.launcher.ui.desktop.WidgetPicker
 import com.opendesktop.launcher.ui.desktop.pageTransition
 import com.opendesktop.launcher.ui.drawer.AppDrawer
@@ -160,6 +167,12 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class Overlay { None, Settings, Categories }
+
+/**
+ * Przytrzymanie przy zablokowanym układzie: najpierw kłódka. [menu] – menu elementu dostępne
+ * bez odblokowania (skróty, informacje), [selectId] – element zaznaczany po odblokowaniu.
+ */
+private data class LockPrompt(val title: String?, val menu: MenuTarget? = null, val selectId: String? = null)
 
 private sealed interface MenuTarget {
     data class Desktop(val pageId: String, val itemId: String) : MenuTarget
@@ -200,6 +213,7 @@ fun LauncherScreen(
     val drawer = remember { Animatable(0f) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     var editMode by remember { mutableStateOf(false) }
+    var lockPrompt by remember { mutableStateOf<LockPrompt?>(null) }
     var overlay by remember { mutableStateOf(Overlay.None) }
     var menu by remember { mutableStateOf<MenuTarget?>(null) }
     var selected by remember { mutableStateOf<String?>(null) }
@@ -214,6 +228,7 @@ fun LauncherScreen(
     }
     var folderPicker by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var searchStyleFor by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var primaryAppPicker by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var assignFor by remember { mutableStateOf<AppInfo?>(null) }
     var renameApp by remember { mutableStateOf<AppInfo?>(null) }
@@ -242,6 +257,22 @@ fun LauncherScreen(
         scope.launch { drawer.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = 480f)) }
     }
 
+    /**
+     * Wejście w tryb edycji (przytrzymanie elementu, pustego miejsca albo gest). Zablokowany układ
+     * pokazuje najpierw kłódkę – edycja otwiera się dopiero po odblokowaniu.
+     */
+    fun requestEdit(menuTarget: MenuTarget? = null, select: String? = null, title: String? = null) {
+        vibrate()
+        if (cfg.layoutLocked) {
+            menu = null
+            lockPrompt = LockPrompt(title, menuTarget, select)
+            return
+        }
+        editMode = true
+        selected = select
+        menu = menuTarget
+    }
+
     fun runGesture(a: GestureAction) {
         when (a) {
             GestureAction.None -> Unit
@@ -249,7 +280,7 @@ fun LauncherScreen(
             GestureAction.Search -> openDrawer(focus = true)
             GestureAction.Notifications -> SystemActions.expandNotifications(ctx)
             GestureAction.QuickSettings -> SystemActions.openQuickSettings(ctx)
-            GestureAction.EditMode -> { vibrate(); editMode = true }
+            GestureAction.EditMode -> requestEdit()
             GestureAction.Settings -> overlay = Overlay.Settings
         }
     }
@@ -276,8 +307,8 @@ fun LauncherScreen(
     // Przycisk Home: zamyka wszystko i wraca na ekran główny
     LaunchedEffect(Unit) {
         homePressed.collect {
-            val wasIdle = drawer.value == 0f && !editMode && overlay == Overlay.None && openFolder == null
-            menu = null; openFolder = null; editMode = false; selected = null; overlay = Overlay.None
+            val wasIdle = drawer.value == 0f && !editMode && overlay == Overlay.None && openFolder == null && lockPrompt == null
+            menu = null; openFolder = null; editMode = false; selected = null; overlay = Overlay.None; lockPrompt = null
             closeDrawer()
             val home = cfg.defaultPage.coerceIn(0, (ws.pages.size - 1).coerceAtLeast(0))
             if (wasIdle || pagerState.currentPage != home) pagerState.animateScrollToPage(home)
@@ -327,8 +358,11 @@ fun LauncherScreen(
 
     fun startDrag(source: DragSource, item: DesktopItem, fromPageId: String?, bounds: Rect) {
         if (cfg.layoutLocked) {
-            menu = null
-            vm.toast("Układ jest zablokowany – odblokujesz go w trybie edycji")
+            // Z pulpitu i doku kłódka jest już na ekranie (pokazało ją przytrzymanie)
+            if (source == DragSource.Drawer) {
+                menu = null
+                vm.toast("Układ jest zablokowany – przytrzymaj pulpit, aby go odblokować")
+            }
             return
         }
         menu = null
@@ -392,8 +426,9 @@ fun LauncherScreen(
         }
     }
 
-    BackHandler(enabled = drawer.targetValue > 0f || drawer.value > 0f || editMode || overlay != Overlay.None || openFolder != null || menu != null) {
+    BackHandler(enabled = drawer.targetValue > 0f || drawer.value > 0f || editMode || overlay != Overlay.None || openFolder != null || menu != null || lockPrompt != null) {
         when {
+            lockPrompt != null -> lockPrompt = null
             menu != null -> menu = null
             openFolder != null -> openFolder = null
             overlay == Overlay.Categories -> closeCategories()
@@ -429,7 +464,7 @@ fun LauncherScreen(
             val pageId = target.pageId
             // Przy zablokowanym układzie znikają akcje, które go zmieniają (przenoszenie, warstwy, usuwanie)
             val locked = cfg.layoutLocked
-            val resize = if (locked) null else MenuAction("Przenieś / zmień rozmiar", Icons.Rounded.OpenInFull) { editMode = true; selected = item.id }
+            val resize = if (locked) null else MenuAction("Przenieś / zmień rozmiar", Icons.Rounded.Transform) { editMode = true; selected = item.id }
             val remove = if (locked) null else MenuAction("Usuń z pulpitu", Icons.Rounded.DeleteOutline) { vm.removeItem(pageId, item.id) }
             // Warstwy: przydatne, gdy elementy na siebie zachodzą
             val page = ws.pages.firstOrNull { it.id == pageId }
@@ -466,6 +501,8 @@ fun LauncherScreen(
                     onDismiss = { menu = null },
                     actions = listOfNotNull(
                         resize,
+                        // Wygląd nie zmienia układu – dostępny także przy blokadzie
+                        if (item.type == ItemType.Search) MenuAction("Wygląd…", Icons.Rounded.Palette) { searchStyleFor = pageId to item.id } else null,
                         if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
                             MenuAction("Skonfiguruj", Icons.Rounded.Settings) { ctx.findActivity()?.let { vm.configureWidget(it, item) } }
                         } else null,
@@ -524,8 +561,17 @@ fun LauncherScreen(
         }
 
         override fun onItemLongPress(pageId: String, item: DesktopItem) {
-            vibrate()
-            menu = MenuTarget.Desktop(pageId, item.id)
+            // Widżety, foldery itp. od razu z ramką rozmiaru; ikony aplikacji i akcji tylko z menu
+            val select = item.id.takeIf { item.type != ItemType.App && item.type != ItemType.Action }
+            val title = when (item.type) {
+                ItemType.App -> appMap[item.app]?.let(labelOf)
+                ItemType.Folder -> item.label.ifBlank { "Folder" }
+                ItemType.Clock -> "Zegar"
+                ItemType.Search -> "Wyszukiwarka"
+                ItemType.Action -> item.label.ifBlank { item.systemAction?.label }
+                ItemType.Widget -> "Widżet"
+            }
+            requestEdit(MenuTarget.Desktop(pageId, item.id), select, title)
         }
 
         override fun onOpenFolder(pageId: String, item: DesktopItem, bounds: Rect) {
@@ -545,11 +591,7 @@ fun LauncherScreen(
             if (!cfg.layoutLocked) vm.resizeItem(pageId, item.id, x, y, w, h)
         }
 
-        override fun onEmptyLongPress() {
-            vibrate()
-            menu = null
-            editMode = true
-        }
+        override fun onEmptyLongPress() = requestEdit()
 
         override fun onEmptyDoubleTap() {
             if (!editMode) runGesture(cfg.doubleTap)
@@ -648,8 +690,18 @@ fun LauncherScreen(
                     }
                 },
         ) {
+            // Postęp wejścia w edycję (0–1): pomniejszenie, karty ekranów, siatka i przyciemnienie
+            val edit by animateFloatAsState(if (editMode) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 420f), label = "edit")
+            // Paski edycji podczas przeciągania tylko znikają (bez zmiany układu) – siatka nie skacze pod palcem
+            val barsAlpha by animateFloatAsState(if (drag.active) 0f else 1f, label = "editBars")
+            if (edit > 0.001f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = edit }.background(Color.Black.copy(alpha = 0.3f)))
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                AnimatedVisibility(editMode && !drag.active, enter = fadeIn() + slideInVertically(), exit = fadeOut() + slideOutVertically()) {
+                AnimatedVisibility(
+                    editMode,
+                    modifier = Modifier.graphicsLayer { alpha = barsAlpha },
+                    enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                    exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+                ) {
                     EditTopBar(
                         page = pagerState.currentPage,
                         count = ws.pages.size,
@@ -660,7 +712,8 @@ fun LauncherScreen(
                         onDone = { editMode = false; selected = null },
                     )
                 }
-                val editScale = if (editMode) 0.9f else 1f
+                // Lekkie pomniejszenie – sąsiednie ekrany ledwie wystają zza krawędzi
+                val editScale = 1f - 0.05f * edit
                 // Przy „Losowe” nowy efekt po każdym zatrzymaniu strony, stały w trakcie przesuwania
                 var transition by remember { mutableStateOf(cfg.transition) }
                 LaunchedEffect(pagerState.settledPage, cfg.transition) {
@@ -727,11 +780,15 @@ fun LauncherScreen(
                             .fillMaxSize()
                             .pageTransition(i, pagerState, transition)
                             .then(
-                                if (editMode) Modifier
-                                    .padding(horizontal = 6.dp)
-                                    .clip(RoundedCornerShape(26.dp))
-                                    .background(Color.White.copy(alpha = 0.06f))
-                                    .border(1.dp, Color.White.copy(alpha = if (cfg.defaultPage == i) 0.6f else 0.2f), RoundedCornerShape(26.dp))
+                                if (edit > 0.001f) Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(Color.White.copy(alpha = 0.07f * edit))
+                                    .border(
+                                        if (cfg.defaultPage == i) 1.5.dp else 1.dp,
+                                        Color.White.copy(alpha = edit * if (cfg.defaultPage == i) 0.55f else 0.18f),
+                                        RoundedCornerShape(28.dp),
+                                    )
                                 else Modifier
                             )
                             .padding(horizontal = 6.dp, vertical = 4.dp),
@@ -742,6 +799,7 @@ fun LauncherScreen(
                             apps = appMap,
                             labelOf = labelOf,
                             editMode = editMode,
+                            editProgress = edit,
                             selectedId = selected,
                             menuItemId = (menu as? MenuTarget.Desktop)?.takeIf { it.pageId == page.id }?.itemId,
                             drag = drag,
@@ -775,6 +833,11 @@ fun LauncherScreen(
                             .graphicsLayer { alpha = indicatorAlpha },
                     )
                 }
+                EditHint(
+                    visible = editMode && !drag.active,
+                    hasSelection = selected != null,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
+                )
                 }
                 if (cfg.dockEnabled) {
                     Dock(
@@ -786,13 +849,13 @@ fun LauncherScreen(
                         drag = drag,
                         menuKey = (menu as? MenuTarget.Dock)?.key,
                         onTap = { app, b -> if (!editMode) launch(app, b) },
-                        onLongPress = { app -> vibrate(); menu = MenuTarget.Dock(app.key) },
+                        onLongPress = { app -> requestEdit(MenuTarget.Dock(app.key), title = labelOf(app)) },
                         onDragStart = { app, b -> startDrag(DragSource.Dock, DesktopItem(type = ItemType.App, x = 0, y = 0, app = app.key), null, b) },
                         onDragEnd = { endDrag() },
                         onAdd = { dockPicker = true },
                         menu = dockMenu,
                         onActionTap = ::runAction,
-                        onActionLongPress = { a -> vibrate(); menu = MenuTarget.Dock(a.dockKey) },
+                        onActionLongPress = { a -> requestEdit(MenuTarget.Dock(a.dockKey), title = a.label) },
                         actionMenu = { a ->
                             ActionMenu(
                                 title = a.label,
@@ -802,7 +865,12 @@ fun LauncherScreen(
                         },
                     )
                 }
-                AnimatedVisibility(editMode && !drag.active, enter = fadeIn() + slideInVertically { it }, exit = fadeOut() + slideOutVertically { it }) {
+                AnimatedVisibility(
+                    editMode,
+                    modifier = Modifier.graphicsLayer { alpha = barsAlpha },
+                    enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                    exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                ) {
                     EditToolbar(
                         onWidgets = { widgetPicker = true },
                         onActions = { actionPicker = true },
@@ -813,12 +881,11 @@ fun LauncherScreen(
                             if (p != null && p.items.isEmpty()) vm.removePage(pagerState.currentPage) else confirmRemovePage = pagerState.currentPage
                         },
                         onSettings = { overlay = Overlay.Settings },
-                        locked = cfg.layoutLocked,
-                        onToggleLock = {
-                            val now = !cfg.layoutLocked
-                            vm.updateConfig { it.copy(layoutLocked = now) }
-                            selected = null
-                            vm.toast(if (now) "Układ zablokowany" else "Układ odblokowany")
+                        // Zablokowanie kończy edycję – kolejne przytrzymanie pokaże kłódkę
+                        onLock = {
+                            vm.updateConfig { it.copy(layoutLocked = true) }
+                            menu = null; selected = null; editMode = false
+                            vm.toast("Układ zablokowany")
                         },
                     )
                 }
@@ -884,6 +951,24 @@ fun LauncherScreen(
         }
         drag.payload?.let { p ->
             Box(Modifier.fillMaxSize().zIndex(20f)) { DragPreview(p, drag, appMap, cfg) }
+        }
+
+        // ------------------------------------------------------------- kłódka zablokowanego układu
+        lockPrompt?.let { lp ->
+            Box(Modifier.fillMaxSize().zIndex(25f)) {
+                LockPromptOverlay(
+                    title = lp.title,
+                    hasMenu = lp.menu != null,
+                    onDismiss = { lockPrompt = null },
+                    onShowMenu = { lockPrompt = null; menu = lp.menu },
+                    onUnlock = {
+                        vm.updateConfig { it.copy(layoutLocked = false) }
+                        lockPrompt = null
+                        editMode = true
+                        selected = lp.selectId
+                    },
+                )
+            }
         }
 
         // ------------------------------------------------------------- nakładki
@@ -973,6 +1058,18 @@ fun LauncherScreen(
             } else null,
             onConfirm = { name, _ -> vm.renameItem(pageId, folderId, name); renameFolder = null },
         )
+    }
+
+    searchStyleFor?.let { (pageId, itemId) ->
+        val item = ws.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
+        if (item != null) {
+            SearchStyleDialog(
+                initial = item.searchStyle,
+                aiEnabled = vm.aiReady,
+                onDismiss = { searchStyleFor = null },
+                onSave = { st -> vm.setSearchStyle(pageId, itemId, st); searchStyleFor = null },
+            )
+        } else searchStyleFor = null
     }
 
     renameApp?.let { app ->
@@ -1206,8 +1303,7 @@ private fun EditToolbar(
     onAddPage: () -> Unit,
     onRemovePage: () -> Unit,
     onSettings: () -> Unit,
-    locked: Boolean,
-    onToggleLock: () -> Unit,
+    onLock: () -> Unit,
 ) {
     // Jedna wspólna belka, przyciski dzielą szerokość po równo – bez przewijania
     Row(
@@ -1223,7 +1319,7 @@ private fun EditToolbar(
         BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper)
         BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
         BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage)
-        BigToolButton(if (locked) Icons.Rounded.Lock else Icons.Rounded.LockOpen, if (locked) "Odblokuj" else "Zablokuj", onToggleLock, highlighted = locked)
+        BigToolButton(Icons.Rounded.Lock, "Zablokuj", onLock)
         BigToolButton(Icons.Rounded.Settings, "Ustawienia", onSettings)
     }
 }
@@ -1267,5 +1363,110 @@ private fun RowScope.BigToolButton(
         Icon(icon, label, tint = fg, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(3.dp))
         Text(label, color = fg, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+}
+
+/** Krótka podpowiedź na dole pulpitu w trybie edycji; po kilku sekundach znika. */
+@Composable
+private fun EditHint(visible: Boolean, hasSelection: Boolean, modifier: Modifier = Modifier) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(visible, hasSelection) {
+        shown = visible
+        if (visible) { delay(3500); shown = false }
+    }
+    AnimatedVisibility(shown, modifier = modifier, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        Text(
+            if (hasSelection) "Przeciągnij kropki na krawędziach, aby zmienić rozmiar"
+            else "Przytrzymaj i przeciągnij, aby przenieść · stuknij widżet, aby zmienić rozmiar",
+            color = Color.White,
+            fontSize = 12.sp,
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.Black.copy(alpha = 0.6f))
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+        )
+    }
+}
+
+/**
+ * Kłódka po przytrzymaniu przy zablokowanym układzie. „Odblokuj” otwiera kłódkę (krótka animacja)
+ * i dopiero wtedy włącza tryb edycji. Stuknięcie obok zamyka bez zmian.
+ */
+@Composable
+private fun LockPromptOverlay(
+    title: String?,
+    hasMenu: Boolean,
+    onDismiss: () -> Unit,
+    onShowMenu: () -> Unit,
+    onUnlock: () -> Unit,
+) {
+    var unlocking by remember { mutableStateOf(false) }
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    LaunchedEffect(unlocking) {
+        if (unlocking) { delay(380); onUnlock() }
+    }
+    val enter by animateFloatAsState(if (appeared) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "lockIn")
+    val bounce by animateFloatAsState(if (unlocking) 1.12f else 1f, spring(dampingRatio = 0.35f, stiffness = 600f), label = "lockBounce")
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = enter.coerceIn(0f, 1f) }
+            .background(Color.Black.copy(alpha = 0.45f))
+            .pointerInput(Unit) { detectTapGestures { if (!unlocking) onDismiss() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .padding(horizontal = 32.dp)
+                .graphicsLayer { val s = 0.85f + 0.15f * enter; scaleX = s; scaleY = s }
+                .clip(RoundedCornerShape(30.dp))
+                .background(Color(0xF21C1C1C))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(30.dp))
+                // Dotknięcia karty nie zamykają nakładki
+                .pointerInput(Unit) { detectTapGestures { } }
+                .padding(horizontal = 24.dp, vertical = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .size(76.dp)
+                    .graphicsLayer { scaleX = bounce; scaleY = bounce }
+                    .clip(CircleShape)
+                    .background(if (unlocking) Color.White else Color.White.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                AnimatedContent(
+                    unlocking,
+                    transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith fadeOut() },
+                    label = "lockIcon",
+                ) { open ->
+                    Icon(
+                        if (open) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                        null,
+                        tint = if (open) Color.Black else Color.White,
+                        modifier = Modifier.size(38.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Text(if (unlocking) "Odblokowano" else "Układ zablokowany", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (title != null) "Odblokuj, aby przenieść lub zmienić „$title”."
+                else "Odblokuj, aby przenosić, zmieniać rozmiar i usuwać elementy pulpitu.",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 13.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (hasMenu) TopBarPill(Icons.Rounded.MoreHoriz, "Menu", highlighted = false) { if (!unlocking) onShowMenu() }
+                TopBarPill(Icons.Rounded.LockOpen, "Odblokuj", highlighted = true) {
+                    if (!unlocking) unlocking = true
+                }
+            }
+        }
     }
 }

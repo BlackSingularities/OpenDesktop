@@ -129,6 +129,25 @@ data class DesktopItem(
     val stretch: Boolean = false,
     /** Główna aplikacja folderu - uruchamia się po kliknięciu. */
     val primaryApp: String? = null,
+    /** Wygląd wbudowanej wyszukiwarki ([ItemType.Search]). */
+    val searchStyle: SearchStyle = SearchStyle(),
+)
+
+/**
+ * Wygląd widżetu wyszukiwarki. Kolory ARGB; cień pola i cień tekstu pomagają, żeby pole było
+ * czytelne na jasnej i na ciemnej tapecie.
+ */
+@Serializable
+data class SearchStyle(
+    /** Zaokrąglenie rogów: 0 = prostokąt, 50 = pigułka (procent wysokości). */
+    val radius: Int = 50,
+    val background: Long = 0x33FFFFFF,
+    val textColor: Long = 0xFFFFFFFF,
+    /** Siła cienia pod polem 0–1. */
+    val shadow: Float = 0f,
+    val border: Boolean = true,
+    val textShadow: Boolean = false,
+    val hint: String = "Szukaj aplikacji…",
 )
 
 @Serializable

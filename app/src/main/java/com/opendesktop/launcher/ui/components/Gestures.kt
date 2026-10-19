@@ -4,16 +4,22 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.Velocity
 
 /**
  * Jeden detektor dla ikon: tap, długie przytrzymanie (menu) i przeciąganie po przytrzymaniu.
  * Przed przytrzymaniem niczego nie konsumuje, więc przewijanie ekranów i gest szuflady działają.
+ * Ruch palca liczony jest w układzie okna – pomniejszenie pulpitu przy wejściu w edycję (w trakcie
+ * przytrzymania) przesuwa ikonę pod palcem, ale nie może samo z siebie zacząć przeciągania.
+ * [holdMillis] skraca czas przytrzymania (np. w trybie edycji przeciąganie zaczyna się szybciej).
  */
 @Composable
 fun Modifier.itemGestures(
@@ -25,6 +31,7 @@ fun Modifier.itemGestures(
     onDragStart: () -> Unit = {},
     onDragEnd: () -> Unit = {},
     onSwipeUp: (() -> Unit)? = null,
+    holdMillis: Long? = null,
 ): Modifier {
     val press by rememberUpdatedState(onPress)
     val tap by rememberUpdatedState(onTap)
@@ -32,16 +39,21 @@ fun Modifier.itemGestures(
     val dragStart by rememberUpdatedState(onDragStart)
     val dragEnd by rememberUpdatedState(onDragEnd)
     val swipeUp by rememberUpdatedState(onSwipeUp)
+    val hold by rememberUpdatedState(holdMillis)
+    val coords = remember { arrayOfNulls<LayoutCoordinates>(1) }
     if (!enabled) return this
-    return this.pointerInput(key) {
+    return this.onGloballyPositioned { coords[0] = it }.pointerInput(key) {
+        // Położenie palca w oknie (gdy brak współrzędnych – lokalne)
+        fun root(p: Offset): Offset = coords[0]?.takeIf { it.isAttached }?.localToRoot(p) ?: p
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            val downRoot = root(down.position)
             press(true)
             val slop = viewConfiguration.touchSlop
             // 0 = przytrzymanie, 1 = tap, 2 = ruch/anulowanie, 3 = swipe up
             var outcome = 0
             var swipeDetected = false
-            withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            withTimeoutOrNull(hold ?: viewConfiguration.longPressTimeoutMillis) {
                 while (outcome == 0) {
                     val ev = awaitPointerEvent()
                     val c = ev.changes.firstOrNull { it.id == down.id }
@@ -86,7 +98,7 @@ fun Modifier.itemGestures(
                         c.consume()
                         break
                     }
-                    if (!dragging && (c.position - down.position).getDistance() > slop) {
+                    if (!dragging && (root(c.position) - downRoot).getDistance() > slop) {
                         dragging = true
                         press(false)
                         dragStart()

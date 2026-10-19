@@ -151,6 +151,7 @@ fun SystemWidget(
             update = { v ->
                 (v as? LauncherWidgetHostView)?.let {
                     it.onLongPress = onLongPress
+                    it.stretch = item.stretch
                     it.updateSize(wDp, hDp)
                 }
             },

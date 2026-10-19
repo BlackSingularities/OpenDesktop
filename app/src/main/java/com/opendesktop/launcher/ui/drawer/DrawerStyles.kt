@@ -132,7 +132,7 @@ fun DrawerTouchable(
 @Composable
 fun DrawerCell(app: AppInfo, cb: DrawerCallbacks, iconSize: Dp, modifier: Modifier = Modifier) {
     DrawerTouchable(app, cb, modifier) { pressed ->
-        AppIcon(app.icon, cb.label(app), iconSize * cb.iconScale, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize, maxLines = 1)
+        AppIcon(app.icon, cb.label(app), iconSize, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize, maxLines = 1)
     }
 }
 
@@ -156,11 +156,22 @@ private fun SectionHeader(title: String) {
 fun GridSizing(columns: Int, rows: Int, cb: DrawerCallbacks, content: @Composable (cell: Modifier, icon: Dp) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val colW = maxWidth / columns
-        val cellH = if (rows > 0) maxHeight / rows else null
-        val base = cellH ?: (colW * if (cb.showLabels) 1.3f else 1f)
-        val icon = minOf(64.dp, base * (if (cb.showLabels) 0.58f else 0.74f), colW * 0.74f)
-        content(if (cellH != null) Modifier.height(cellH) else Modifier.padding(vertical = 4.dp), icon)
+        val label = labelSpace(cb)
+        val cellH = if (rows > 0) maxHeight / rows else colW + label
+        content(Modifier.height(cellH), cellIcon(colW, cellH, cb))
     }
+}
+
+/** Miejsce na podpis pod ikoną. */
+fun labelSpace(cb: DrawerCallbacks): Dp = if (cb.showLabels) (cb.labelSize + 12f).dp else 0.dp
+
+/**
+ * Rozmiar ikony względem komórki: 100% ≈ 90% wolnego miejsca (mały odstęp),
+ * 110% wypełnia komórkę bez odstępu; więcej nie wychodzi poza komórkę.
+ */
+fun cellIcon(cellW: Dp, cellH: Dp, cb: DrawerCallbacks): Dp {
+    val fit = minOf(cellW, cellH - labelSpace(cb)).coerceAtLeast(16.dp)
+    return minOf(fit, fit * 0.9f * cb.iconScale)
 }
 
 @Composable
@@ -190,9 +201,9 @@ fun DrawerPerspective(apps: List<AppInfo>, columns: Int, rowCount: Int, cb: Draw
         val hPx = with(density) { maxHeight.toPx() }
         val edge = hPx * 0.07f
         val colW = maxWidth / columns
-        val rowH = if (rowCount > 0) (maxHeight - with(density) { (edge * 2).toDp() }) / rowCount else colW * (if (cb.showLabels) 1.3f else 1f)
+        val rowH = if (rowCount > 0) (maxHeight - with(density) { (edge * 2).toDp() }) / rowCount else colW + labelSpace(cb)
         val rowPx = with(density) { rowH.toPx() }
-        val iconSize = minOf(64.dp, rowH * (if (cb.showLabels) 0.58f else 0.74f), colW * 0.74f)
+        val iconSize = cellIcon(colW, rowH, cb)
         val maxScroll = (rows.size * rowPx - (hPx - edge * 2)).coerceAtLeast(0f)
         val state = rememberScrollableState { delta ->
             val old = scroll
@@ -287,7 +298,7 @@ fun DrawerPages(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, fixedRow
         // Rzędy wypełniają całą wysokość; ikona rośnie do komórki (ograniczona szerokością kolumny)
         val rowH = avail / rows
         val colW = maxWidth / columns
-        val iconSize = minOf(68.dp, rowH * (if (cb.showLabels) 0.6f else 0.75f), colW * 0.72f)
+        val iconSize = cellIcon(colW, rowH, cb)
         val perPage = columns * rows
         val pages = remember(apps, perPage) { apps.chunked(perPage) }
         val state = rememberPagerState { pages.size }

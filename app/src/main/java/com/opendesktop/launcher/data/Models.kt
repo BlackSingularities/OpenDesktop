@@ -124,6 +124,8 @@ data class DesktopItem(
     val provider: String? = null,
     /** Akcja systemowa dla [ItemType.Action]. */
     val systemAction: SystemAction? = null,
+    /** Widżet systemowy: treść rozciągnięta na cały kafelek. */
+    val stretch: Boolean = false,
     /** Główna aplikacja folderu - uruchamia się po kliknięciu. */
     val primaryApp: String? = null,
 )

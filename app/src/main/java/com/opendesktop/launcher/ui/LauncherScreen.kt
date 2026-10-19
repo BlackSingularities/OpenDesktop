@@ -454,6 +454,11 @@ fun LauncherScreen(
                         if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
                             MenuAction("Skonfiguruj", Icons.Rounded.Settings) { ctx.findActivity()?.let { vm.configureWidget(it, item) } }
                         } else null,
+                        if (item.type == ItemType.Widget) {
+                            MenuAction(if (item.stretch) "Bez rozciągania" else "Rozciągnij na cały kafelek", Icons.Rounded.OpenInFull) {
+                                vm.setWidgetStretch(pageId, item.id, !item.stretch)
+                            }
+                        } else null,
                     ) + layers + MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) },
                 )
             }

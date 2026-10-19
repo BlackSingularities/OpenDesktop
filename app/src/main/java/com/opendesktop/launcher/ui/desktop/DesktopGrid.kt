@@ -228,7 +228,15 @@ private fun DesktopItemSlot(
         Modifier
             .offset(cw * item.x, ch * item.y)
             .size(cw * resize.width, ch * resize.height)
-            .zIndex(if (selected || showMenu) 100_000f else layer.toFloat())
+            // Widżety zawsze pod ikonami (inaczej widżet systemowy przechwytuje dotyk ikon nad nim);
+            // „Na wierzch/Na spód” ustala kolejność osobno wśród widżetów i wśród pozostałych elementów
+            .zIndex(
+                when {
+                    selected || showMenu -> 100_000f
+                    item.type == ItemType.Widget -> layer.toFloat()
+                    else -> 10_000f + layer
+                }
+            )
             .onGloballyPositioned { bounds = it.boundsInRoot() }
             .graphicsLayer {
                 alpha = ghost

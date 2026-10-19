@@ -272,6 +272,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setWidgetStretch(pageId: String, itemId: String, stretch: Boolean) = store.updateWorkspace { ws ->
+        ws.updatePage(pageId) { p -> p.copy(items = p.items.map { if (it.id == itemId) it.copy(stretch = stretch) else it }) }
+    }
+
     fun removeItem(pageId: String, itemId: String) {
         val item = workspace.value.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
         if (item?.type == ItemType.Widget && item.widgetId >= 0) runCatching { widgetHost.deleteAppWidgetId(item.widgetId) }

@@ -10,6 +10,7 @@ import android.util.SizeF
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import kotlin.math.abs
 
 class LauncherWidgetHost(context: Context) : AppWidgetHost(context, HOST_ID) {
@@ -67,6 +68,43 @@ class LauncherWidgetHostView(context: Context) : AppWidgetHostView(context) {
     override fun cancelLongPress() {
         super.cancelLongPress()
         removeCallbacks(trigger)
+    }
+
+    /**
+     * Rozciąganie: wiele widżetów rysuje treść o stałej wysokości mimo podanego rozmiaru.
+     * Wtedy skalujemy faktyczną treść (sumę obszarów jej elementów) na cały kafelek.
+     * Transformacja widoku przelicza też dotyk, więc przyciski widżetu dalej działają.
+     */
+    var stretch = false
+        set(v) {
+            if (field != v) {
+                field = v
+                requestLayout()
+            }
+        }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        val root = getChildAt(0) ?: return
+        if (!stretch || width <= 0 || height <= 0) {
+            root.scaleX = 1f; root.scaleY = 1f; root.translationX = 0f; root.translationY = 0f
+            return
+        }
+        var l = Int.MAX_VALUE; var t = Int.MAX_VALUE; var r = Int.MIN_VALUE; var b = Int.MIN_VALUE
+        if (root is ViewGroup && root.childCount > 0) {
+            for (i in 0 until root.childCount) {
+                val c = root.getChildAt(i)
+                if (c.visibility != VISIBLE || c.width == 0 || c.height == 0) continue
+                l = minOf(l, c.left); t = minOf(t, c.top); r = maxOf(r, c.right); b = maxOf(b, c.bottom)
+            }
+        }
+        if (l == Int.MAX_VALUE) { l = 0; t = 0; r = root.width; b = root.height }
+        val sx = (width.toFloat() / (r - l).coerceAtLeast(1)).coerceIn(0.5f, 3f)
+        val sy = (height.toFloat() / (b - t).coerceAtLeast(1)).coerceIn(0.5f, 3f)
+        root.pivotX = 0f; root.pivotY = 0f
+        root.scaleX = sx; root.scaleY = sy
+        root.translationX = -root.left - l * sx
+        root.translationY = -root.top - t * sy
     }
 
     fun updateSize(wDp: Float, hDp: Float) {

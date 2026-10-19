@@ -180,6 +180,7 @@ fun AppDrawer(
         onDragStart = { app, r -> onMenuKey(null); onDragStart(app, r) },
         onDragEnd = onDragEnd,
         menu = menu,
+        iconScale = cfg.iconScale,
     )
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {

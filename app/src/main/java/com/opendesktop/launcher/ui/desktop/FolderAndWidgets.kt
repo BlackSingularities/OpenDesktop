@@ -169,7 +169,7 @@ fun FolderDialog(
                         var pressed by remember { mutableStateOf(false) }
                         Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
                             AppIcon(
-                                app.icon, labelOf(app), 52.dp, cfg.iconShape, cfg.showLabels,
+                                app.icon, labelOf(app), 52.dp * cfg.desktopIconScale.coerceAtMost(1.3f), cfg.iconShape, cfg.showLabels,
                                 pressed = pressed, labelSize = 11f, labelColor = ink, shadow = false,
                                 modifier = Modifier
                                     .fillMaxSize()

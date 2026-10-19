@@ -170,7 +170,7 @@ fun DrawerHelix(apps: List<AppInfo>, cb: DrawerCallbacks) {
     ) {
         val wPx = with(density) { maxWidth.toPx() }
         val radius = wPx * 0.32f
-        val iconPx = with(density) { 58.dp.toPx() }
+        val iconPx = with(density) { 58.dp.toPx() } * cb.iconScale
         val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
         Canvas(Modifier.fillMaxSize()) {
             val s = scroll.value
@@ -270,7 +270,7 @@ fun DrawerSphere(apps: List<AppInfo>, cb: DrawerCallbacks) {
         val radius = minSide * 0.48f
         val baseIcon = (radius * 3.2f / sqrt(apps.size.coerceAtLeast(1).toFloat())).coerceIn(
             with(density) { 28.dp.toPx() }, with(density) { 70.dp.toPx() },
-        )
+        ) * cb.iconScale
         val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
         Canvas(Modifier.fillMaxSize()) {
             val cx = size.width / 2
@@ -323,7 +323,7 @@ fun DrawerWheel(apps: List<AppInfo>, cb: DrawerCallbacks) {
         val wPx = with(density) { maxWidth.toPx() }
         val radius = hPx * 0.46f
         val arcPx = radius * (stepDeg * PI.toFloat() / 180f)
-        val iconPx = with(density) { 56.dp.toPx() }
+        val iconPx = with(density) { 56.dp.toPx() } * cb.iconScale
         val focused = apps.getOrNull(scroll.value.roundToInt().coerceIn(0, (apps.size - 1).coerceAtLeast(0)))
         Box(
             Modifier
@@ -419,7 +419,7 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
     ) {
         val wPx = with(density) { maxWidth.toPx() }
         val radius = wPx * 0.40f
-        val iconPx = with(density) { 50.dp.toPx() }
+        val iconPx = with(density) { 50.dp.toPx() } * cb.iconScale
         val style = TextStyle(color = Color.White, fontSize = 11.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
         val step = (2 * PI / perRing).toFloat()
 
@@ -503,7 +503,7 @@ fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues)
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppIcon(app.icon, "", 48.dp, cb.shape, false, pressed = pressed)
+                    AppIcon(app.icon, "", 48.dp * cb.iconScale, cb.shape, false, pressed = pressed)
                     Spacer(Modifier.width(14.dp))
                     if (cb.showLabels) {
                         Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -558,7 +558,7 @@ fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppIcon(app.icon, "", 52.dp, cb.shape, false, pressed = pressed)
+                    AppIcon(app.icon, "", 52.dp * cb.iconScale, cb.shape, false, pressed = pressed)
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
                         if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -585,7 +585,7 @@ fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
-    val cell = with(density) { 60.dp.toPx() }
+    val cell = with(density) { 60.dp.toPx() } * cb.iconScale
     // Plaster miodu jak w zegarku: spirala heksagonalna od środka – pierwsze aplikacje listy w centrum
     val coords = remember(apps.size) { hexSpiral(apps.size) }
     val extent = remember(coords) { coords.maxOfOrNull { (q, r) -> hexToPx(q, r, 1f).getDistance() } ?: 0f } * cell

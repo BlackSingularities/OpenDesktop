@@ -98,6 +98,8 @@ class DrawerCallbacks(
     val onDragStart: (AppInfo, Rect) -> Unit,
     val onDragEnd: () -> Unit,
     val menu: @Composable (AppInfo) -> Unit,
+    /** Skala ikon z ustawień – działa w każdym układzie szuflady. */
+    val iconScale: Float = 1f,
 )
 
 @Composable
@@ -130,7 +132,7 @@ fun DrawerTouchable(
 @Composable
 fun DrawerCell(app: AppInfo, cb: DrawerCallbacks, iconSize: Dp, modifier: Modifier = Modifier) {
     DrawerTouchable(app, cb, modifier) { pressed ->
-        AppIcon(app.icon, cb.label(app), iconSize, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize, maxLines = 1)
+        AppIcon(app.icon, cb.label(app), iconSize * cb.iconScale, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize, maxLines = 1)
     }
 }
 
@@ -260,7 +262,7 @@ private fun ListRow(app: AppInfo, cb: DrawerCallbacks) {
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(app.icon, "", 44.dp, cb.shape, false, pressed = pressed)
+            AppIcon(app.icon, "", 44.dp * cb.iconScale, cb.shape, false, pressed = pressed)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -278,17 +278,20 @@ fun LauncherScreen(
     }
 
     // Przewijanie tapety razem z ekranami
-    LaunchedEffect(cfg.wallpaperScroll, ws.pages.size) {
-        if (!cfg.wallpaperScroll) return@LaunchedEffect
+    // Restart także przy zmianie rozmiaru okna (składany telefon) – system przelicza wtedy tapetę
+    // i trzeba mu od razu podać bieżące położenie, inaczej tapeta „odskakuje” do złego miejsca
+    LaunchedEffect(cfg.wallpaperScroll, ws.pages.size, rootSize) {
         val wm = WallpaperManager.getInstance(ctx)
-        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }.collect { p ->
-            val n = ws.pages.size
-            val token = view.windowToken ?: return@collect
-            runCatching {
-                wm.setWallpaperOffsetSteps(if (n > 1) 1f / (n - 1) else 1f, 1f)
-                wm.setWallpaperOffsets(token, if (n > 1) (p / (n - 1)).coerceIn(0f, 1f) else 0.5f, 0.5f)
-            }
+        val token = view.windowToken ?: return@LaunchedEffect
+        val n = ws.pages.size
+        if (!cfg.wallpaperScroll || n <= 1) {
+            // Wyłączone (albo jeden ekran) – tapeta na środku, a nie tam, gdzie ostatnio była
+            runCatching { wm.setWallpaperOffsetSteps(0f, 0f); wm.setWallpaperOffsets(token, 0.5f, 0.5f) }
+            return@LaunchedEffect
         }
+        runCatching { wm.setWallpaperOffsetSteps(1f / (n - 1), 0f) }
+        snapshotFlow { (pagerState.currentPage + pagerState.currentPageOffsetFraction) / (n - 1) }
+            .collect { x -> runCatching { wm.setWallpaperOffsets(token, x.coerceIn(0f, 1f), 0.5f) } }
     }
 
     // ------------------------------------------------------------------ cel upuszczenia

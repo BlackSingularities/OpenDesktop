@@ -260,6 +260,9 @@ data class Config(
     /** Tło okienek folderów: kolor RGB i krycie. */
     val folderColor: Long = 0xFFFFFFFF,
     val folderOpacity: Float = 0.74f,
+    /** Zaokrąglenie rogów menu kontekstowych i okienek folderów (dp). */
+    val menuRadius: Float = 6f,
+    val folderRadius: Float = 6f,
     val swipeTrails: Boolean = false,
     // AI (OpenRouter)
     val openRouterKey: String = "",

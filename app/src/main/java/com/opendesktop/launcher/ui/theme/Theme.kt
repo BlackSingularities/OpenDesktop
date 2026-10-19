@@ -56,7 +56,7 @@ fun OpenDesktopTheme(cfg: Config, content: @Composable () -> Unit) {
             error = Palette.Danger,
         )
     }
-    CompositionLocalProvider(LocalMenuPanel provides PanelStyle.of(cfg.menuColor, cfg.menuOpacity)) {
+    CompositionLocalProvider(LocalMenuPanel provides PanelStyle.of(cfg.menuColor, cfg.menuOpacity, cfg.menuRadius)) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }

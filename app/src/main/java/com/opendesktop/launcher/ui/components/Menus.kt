@@ -77,14 +77,14 @@ data class MenuShortcut(val label: String, val icon: ImageBitmap?, val onClick: 
  * jasny obrys. Tekst i ikony ciemne na jasnym, kryjącym tle – w pozostałych przypadkach białe.
  */
 @Immutable
-data class PanelStyle(val background: Color) {
+data class PanelStyle(val background: Color, val radius: Float = 6f) {
     val content: Color get() = if (background.alpha >= 0.35f && background.copy(alpha = 1f).luminance() > 0.5f) PanelInk else Color.White
     val light: Boolean get() = content == PanelInk
     val border: Color get() = Color.White.copy(alpha = if (light) 0.6f else 0.18f)
-    val shape: Shape get() = RoundedCornerShape(6.dp)
+    val shape: Shape get() = RoundedCornerShape(radius.coerceIn(0f, 40f).dp)
 
     companion object {
-        fun of(color: Long, opacity: Float) = PanelStyle(Color(color or 0xFF000000).copy(alpha = opacity.coerceIn(0f, 1f)))
+        fun of(color: Long, opacity: Float, radius: Float = 6f) = PanelStyle(Color(color or 0xFF000000).copy(alpha = opacity.coerceIn(0f, 1f)), radius)
     }
 }
 

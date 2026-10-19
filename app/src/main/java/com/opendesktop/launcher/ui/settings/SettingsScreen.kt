@@ -328,10 +328,12 @@ private fun PanelColorRow(
     subtitle: String,
     color: Long,
     opacity: Float,
+    radius: Float,
     onColor: (Long) -> Unit,
     onOpacity: (Float) -> Unit,
+    onRadius: (Float) -> Unit,
 ) {
-    val panel = PanelStyle.of(color, opacity)
+    val panel = PanelStyle.of(color, opacity, radius)
     Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             RowIcon(icon)
@@ -375,6 +377,7 @@ private fun PanelColorRow(
         }
     }
     SliderRow(Icons.Rounded.Opacity, "Krycie", opacity * 100f, 0f..100f, 19, { "${it.toInt()}%" }) { onOpacity(it / 100f) }
+    SliderRow(Icons.Rounded.RoundedCorner, "Zaokrąglenie rogów", radius, 0f..28f, 13, { "${it.toInt()} dp" }) { onRadius(it) }
 }
 
 @Composable
@@ -421,8 +424,10 @@ private fun LookSection(cfg: Config, set: Setter, pick: Picker) {
             subtitle = "Przytrzymanie ikony, widżetu i aplikacji w szufladzie",
             color = cfg.menuColor,
             opacity = cfg.menuOpacity,
+            radius = cfg.menuRadius,
             onColor = { c -> set { it.copy(menuColor = c) } },
             onOpacity = { o -> set { it.copy(menuOpacity = o) } },
+            onRadius = { r -> set { it.copy(menuRadius = r) } },
         )
         PanelColorRow(
             icon = Icons.Rounded.Folder,
@@ -430,11 +435,13 @@ private fun LookSection(cfg: Config, set: Setter, pick: Picker) {
             subtitle = "Okienko z ikonami po otwarciu folderu",
             color = cfg.folderColor,
             opacity = cfg.folderOpacity,
+            radius = cfg.folderRadius,
             onColor = { c -> set { it.copy(folderColor = c) } },
             onOpacity = { o -> set { it.copy(folderOpacity = o) } },
+            onRadius = { r -> set { it.copy(folderRadius = r) } },
         )
         ActionRow(Icons.Rounded.RestartAlt, "Przywróć domyślny wygląd", "Biel, krycie 74% – dla menu i folderów") {
-            set { it.copy(menuColor = 0xFFFFFFFF, menuOpacity = 0.74f, folderColor = 0xFFFFFFFF, folderOpacity = 0.74f) }
+            set { it.copy(menuColor = 0xFFFFFFFF, menuOpacity = 0.74f, folderColor = 0xFFFFFFFF, folderOpacity = 0.74f, menuRadius = 6f, folderRadius = 6f) }
         }
     }
     Group {

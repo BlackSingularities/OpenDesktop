@@ -128,7 +128,7 @@ fun FolderDialog(
     }
     val rows = ((list.size + cols - 1) / cols).coerceAtLeast(1)
     // Tło okienka z ustawień; tekst ciemny na jasnym tle, biały na ciemnym
-    val panel = PanelStyle.of(cfg.folderColor, cfg.folderOpacity)
+    val panel = PanelStyle.of(cfg.folderColor, cfg.folderOpacity, cfg.folderRadius)
     val ink = panel.content
     fun close() { onRename(name); onDismiss() }
 

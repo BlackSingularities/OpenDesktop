@@ -185,10 +185,8 @@ fun AppDrawer(
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Nagłówek: uchwyt + wyszukiwarka + menu
         Column(headerModifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.width(36.dp).height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.45f)))
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Bez uchwytu – wyszukiwarka na samej górze (zamykanie: gest w dół na nagłówku lub liście)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Kompaktowa wyszukiwarka; tekst i ikony z cieniem, żeby były czytelne na jasnej tapecie
                 Row(
                     Modifier

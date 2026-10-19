@@ -2,6 +2,11 @@ package com.opendesktop.launcher.ui.drawer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -169,47 +174,63 @@ fun DrawerGrid(sections: List<DrawerSection>, columns: Int, rows: Int, cb: Drawe
 }
 
 /**
- * Perspektywa 3D: zwykła siatka, ale rzędy przy górnej i dolnej krawędzi odchylają się w głąb,
- * maleją i ściskają – jakby lista była nawinięta na bęben. Liczone w warstwie graficznej.
+ * Perspektywa 3D: w środku zwykła siatka, a rzędy wyjeżdżające za górną/dolną krawędź nie znikają,
+ * tylko kładą się jak podłoga w perspektywie – coraz bardziej spłaszczone i węższe, ciasno
+ * upakowane w wąskim pasie [EDGE] przy krawędzi. Wszystkie rzędy są na ekranie naraz, więc
+ * przewijanie jest własne (scrollable – współpracuje z zamykaniem szuflady gestem w dół).
  */
 @Composable
-fun DrawerPerspective(apps: List<AppInfo>, columns: Int, rowCount: Int, cb: DrawerCallbacks) = GridSizing(columns, rowCount, cb) { cell, iconSize ->
+fun DrawerPerspective(apps: List<AppInfo>, columns: Int, rowCount: Int, cb: DrawerCallbacks) {
     val rows = remember(apps, columns) { apps.chunked(columns) }
-    val state = rememberLazyListState()
-    // Bez marginesów: lista od krawędzi do krawędzi
-    LazyColumn(state = state, modifier = Modifier.fillMaxSize()) {
-        itemsIndexed(rows, key = { _, r -> r.first().key }) { _, row ->
-            val rowKey = row.first().key
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        // Bez obrotu: rzędy przy krawędziach tylko maleją i spłaszczają się, dosuwając do siebie
-                        val info = state.layoutInfo
-                        val item = info.visibleItemsInfo.firstOrNull { it.key == rowKey } ?: return@graphicsLayer
-                        val h = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1).toFloat()
-                        val top = (item.offset - info.viewportStartOffset).toFloat()
-                        val center = (top + item.size / 2f) / h
-                        val zone = 0.2f
-                        val t = when {
-                            center > 1f - zone -> (center - (1f - zone)) / zone
-                            center < zone -> (zone - center) / zone
-                            else -> 0f
-                        }.coerceIn(0f, 1.5f)
-                        if (t > 0f) {
-                            val down = center > 0.5f
-                            transformOrigin = TransformOrigin(0.5f, if (down) 0f else 1f)
-                            scaleX = 1f - 0.3f * t.coerceAtMost(1.2f)
-                            scaleY = (1f - 0.55f * t).coerceAtLeast(0.2f)
-                            translationY = (if (down) -1f else 1f) * item.size * 0.5f * t * t
-                            alpha = (1.2f - 0.6f * t).coerceIn(0f, 1f)
+    var scroll by remember { mutableFloatStateOf(0f) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val hPx = with(density) { maxHeight.toPx() }
+        val edge = hPx * 0.07f
+        val colW = maxWidth / columns
+        val rowH = if (rowCount > 0) (maxHeight - with(density) { (edge * 2).toDp() }) / rowCount else colW * (if (cb.showLabels) 1.3f else 1f)
+        val rowPx = with(density) { rowH.toPx() }
+        val iconSize = minOf(64.dp, rowH * (if (cb.showLabels) 0.58f else 0.74f), colW * 0.74f)
+        val maxScroll = (rows.size * rowPx - (hPx - edge * 2)).coerceAtLeast(0f)
+        val state = rememberScrollableState { delta ->
+            val old = scroll
+            scroll = (scroll - delta).coerceIn(0f, maxScroll)
+            old - scroll
+        }
+        Box(Modifier.fillMaxSize().scrollable(state, Orientation.Vertical)) {
+            rows.forEachIndexed { i, row ->
+                key(row.first().key) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(rowH)
+                            .graphicsLayer {
+                                // Środek rzędu w układzie „płaskim”, potem rzutowanie na krawędzie
+                                val c = edge + i * rowPx - scroll + rowPx / 2
+                                val bottom = hPx - edge
+                                val (pc, f) = when {
+                                    c > bottom -> {
+                                        val f = 1f / (1f + (c - bottom) / rowPx * 1.3f)
+                                        (bottom + edge * (1f - f)) to f
+                                    }
+                                    c < edge -> {
+                                        val f = 1f / (1f + (edge - c) / rowPx * 1.3f)
+                                        (edge - edge * (1f - f)) to f
+                                    }
+                                    else -> c to 1f
+                                }
+                                translationY = pc - rowPx / 2
+                                scaleY = f
+                                scaleX = 0.55f + 0.45f * f
+                                alpha = ((f - 0.06f) / 0.3f).coerceIn(0f, 1f)
+                            },
+                    ) {
+                        for (c in 0 until columns) {
+                            val app = row.getOrNull(c)
+                            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                if (app != null) key(app.key) { DrawerCell(app, cb, iconSize) }
+                            }
                         }
-                    },
-            ) {
-                for (c in 0 until columns) {
-                    val app = row.getOrNull(c)
-                    Box(Modifier.weight(1f).then(cell), contentAlignment = Alignment.Center) {
-                        if (app != null) key(app.key) { DrawerCell(app, cb, iconSize) }
                     }
                 }
             }

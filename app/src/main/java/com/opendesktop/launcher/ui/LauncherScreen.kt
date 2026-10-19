@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
@@ -846,7 +847,8 @@ fun LauncherScreen(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
                 )
                 }
-                if (cfg.dockEnabled) {
+                // Dok przesunięty z ustawień – może zejść aż na pasek nawigacji (rysowany nad nim)
+                if (cfg.dockEnabled) Box(Modifier.offset(y = cfg.dockOffset.dp).zIndex(1f)) {
                     Dock(
                         keys = ws.dock,
                         apps = appMap,

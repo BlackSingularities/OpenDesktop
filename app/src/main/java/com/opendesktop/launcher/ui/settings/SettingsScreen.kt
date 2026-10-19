@@ -217,6 +217,10 @@ private fun DockSection(cfg: Config, set: Setter) {
     Group {
         SwitchRow(Icons.Rounded.ViewCarousel, "Pokaż dok", null, cfg.dockEnabled) { v -> set { it.copy(dockEnabled = v) } }
         SliderRow(Icons.Rounded.ViewWeek, "Miejsca w doku", cfg.dockCount.toFloat(), 3f..7f, 3) { v -> set { it.copy(dockCount = v.toInt()) } }
+        SliderRow(
+            Icons.Rounded.Height, "Położenie w pionie", cfg.dockOffset, -40f..60f, 19,
+            { v -> when { v > 0.5f -> "${v.toInt()} dp niżej"; v < -0.5f -> "${-v.toInt()} dp wyżej"; else -> "Domyślne" } },
+        ) { v -> set { it.copy(dockOffset = v) } }
         SliderRow(Icons.Rounded.PhotoSizeSelectLarge, "Rozmiar ikon", cfg.dockIconScale, 0.6f..1.3f, 13, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(dockIconScale = v) } }
     }
     Group("Wygląd") {

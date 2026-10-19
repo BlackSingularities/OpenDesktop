@@ -197,6 +197,8 @@ data class Config(
     val iconScale: Float = 1f,
     /** Rozmiar ikon w doku (osobno od szuflady). */
     val dockIconScale: Float = 1f,
+    /** Przesunięcie doku w pionie (dp): dodatnie = niżej, aż na pasek nawigacji. */
+    val dockOffset: Float = 0f,
     val desktopIconScale: Float = 1f,
     val showLabels: Boolean = true,
     val labelSize: Float = 12f,

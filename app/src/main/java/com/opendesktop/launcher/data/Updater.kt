@@ -31,10 +31,21 @@ data class UpdateInfo(
 data class RepoHit(val fullName: String, val description: String, val stars: Int, val url: String)
 
 /**
- * Aktualizacje z GitHub Releases. Tag ma postać v1.0.<N>, gdzie N = versionCode
- * (numer przebiegu workflow), więc porównujemy liczby, nie napisy.
+ * Aktualizacje z GitHub Releases. Tag ma postać v<główna>.<poboczna>.<poprawka>; wersje
+ * porównujemy część po części jako liczby (1.2.0 > 1.0.37), nie jako napisy.
  */
 object Updater {
+    /** Porównanie wersji „a.b.c” część po części; brakujące części = 0. */
+    fun compareVersions(a: String, b: String): Int {
+        val x = a.split('.').map { it.toIntOrNull() ?: 0 }
+        val y = b.split('.').map { it.toIntOrNull() ?: 0 }
+        for (i in 0 until maxOf(x.size, y.size)) {
+            val d = x.getOrElse(i) { 0 }.compareTo(y.getOrElse(i) { 0 })
+            if (d != 0) return d
+        }
+        return 0
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun s(o: Map<String, kotlinx.serialization.json.JsonElement>, k: String) =
@@ -50,8 +61,9 @@ object Updater {
         }
         val o = json.parseToJsonElement(body).jsonObject
         val tag = s(o, "tag_name").removePrefix("v")
-        val code = tag.substringAfterLast('.').toIntOrNull() ?: return null
-        if (code <= BuildConfig.VERSION_CODE) return null
+        if (compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) return null
+        // Identyfikator do „Pomiń tę wersję”: unikalny dla całej wersji, nie tylko poprawki
+        val code = tag.split('.').map { it.toIntOrNull() ?: 0 }.let { p -> p.getOrElse(0) { 0 } * 1_000_000 + p.getOrElse(1) { 0 } * 1_000 + p.getOrElse(2) { 0 } }
         val apk = o["assets"]?.jsonArray?.map { it.jsonObject }
             ?.firstOrNull { s(it, "name").endsWith(".apk") } ?: return null
         return UpdateInfo(

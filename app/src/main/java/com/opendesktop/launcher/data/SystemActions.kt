@@ -63,6 +63,14 @@ object SystemActions {
         }
     }
 
+    /** Uruchamia launcher ponownie: nowy start aktywności i zakończenie bieżącego procesu. */
+    fun restartApp(context: Context) {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK) ?: return
+        context.startActivity(Intent.makeRestartActivityTask(intent.component))
+        Runtime.getRuntime().exit(0)
+    }
+
     fun isDefaultLauncher(context: Context): Boolean {
         val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         return context.packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)

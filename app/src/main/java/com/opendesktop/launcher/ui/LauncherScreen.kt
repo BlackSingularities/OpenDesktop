@@ -36,6 +36,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -695,7 +698,7 @@ fun LauncherScreen(
             // Paski edycji podczas przeciągania tylko znikają (bez zmiany układu) – siatka nie skacze pod palcem
             val barsAlpha by animateFloatAsState(if (drag.active) 0f else 1f, label = "editBars")
             if (edit > 0.001f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = edit }.background(Color.Black.copy(alpha = 0.3f)))
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+            Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 AnimatedVisibility(
                     editMode,
                     modifier = Modifier.graphicsLayer { alpha = barsAlpha },
@@ -889,6 +892,10 @@ fun LauncherScreen(
                         },
                     )
                 }
+                // Dok schodzi nisko – zostaje tylko część paska nawigacji (gest/przyciski nie zachodzą
+                // na ikony); w edycji i bez doku pełny odstęp
+                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                Spacer(Modifier.height(if (cfg.dockEnabled && !editMode) navBottom * 0.3f else navBottom))
             }
         }
 

@@ -1254,7 +1254,7 @@ private fun EditTopBar(
         ) {
             TopBarIcon(Icons.AutoMirrored.Rounded.ArrowBack, "Przesuń ekran w lewo", enabled = page > 0, onClick = onMoveLeft)
             Column(Modifier.padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("EKRAN", color = Color.White.copy(alpha = 0.55f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                Text("Ekran", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 Text("${page + 1} / $count", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
             TopBarIcon(Icons.AutoMirrored.Rounded.ArrowForward, "Przesuń ekran w prawo", enabled = page < count - 1, onClick = onMoveRight)

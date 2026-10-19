@@ -219,6 +219,8 @@ data class Config(
     val drawerOpacity: Float = 0.86f,
     val drawerAnimation: DrawerAnimation = DrawerAnimation.Slide,
     val drawerCategoryChips: Boolean = true,
+    /** Karty kategorii u góry (przesuwane w bok) w każdym układzie szuflady. */
+    val drawerCategoryTabs: Boolean = false,
     val drawerLabels: Boolean = true,
     val blurBehindDrawer: Boolean = true,
     val searchAutoFocus: Boolean = false,

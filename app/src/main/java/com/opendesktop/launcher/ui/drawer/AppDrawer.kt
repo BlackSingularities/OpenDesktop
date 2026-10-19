@@ -82,6 +82,10 @@ import com.opendesktop.launcher.data.DrawerStyle
 import com.opendesktop.launcher.data.SystemActions
 import com.opendesktop.launcher.data.Workspace
 import com.opendesktop.launcher.ui.LauncherViewModel
+import com.opendesktop.launcher.ui.components.PanelMenu
+import com.opendesktop.launcher.ui.components.PanelMenuDivider
+import com.opendesktop.launcher.ui.components.PanelMenuHeader
+import com.opendesktop.launcher.ui.components.PanelMenuItem
 
 private const val NO_CATEGORY = "__none__"
 
@@ -147,6 +151,9 @@ fun AppDrawer(
         if (q.isNotEmpty()) sorted.sortedByDescending { label(it).startsWith(q, true) } else sorted
     }
 
+    // Karty kategorii: zawsze w układzie „Zakładki kategorii”, w pozostałych – z ustawień (nie przy wyszukiwaniu)
+    val tabsOn = query.isBlank() && ws.categories.isNotEmpty() &&
+        (cfg.drawerStyle == DrawerStyle.Categories || cfg.drawerCategoryTabs)
     val sections = remember(visible, cfg.drawerSort, ws.categories, query) {
         when {
             query.isNotBlank() -> listOf(DrawerSection("search", null, visible))
@@ -236,48 +243,31 @@ fun AppDrawer(
                 // Jeden przycisk: sortowanie, ukryte, motyw, kategorie i ustawienia w jednym menu
                 Box {
                     IconButton(onClick = { sortMenu = true }) { Icon(Icons.Rounded.MoreVert, "Menu szuflady", tint = Color.White) }
-                    DropdownMenu(sortMenu, { sortMenu = false }) {
-                        Text("Sortowanie", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                    PanelMenu(sortMenu, { sortMenu = false }, title = "Szuflada") {
+                        PanelMenuHeader("Sortowanie")
                         DrawerSort.entries.forEach { s ->
-                            DropdownMenuItem(
-                                text = { Text(s.label) },
-                                leadingIcon = { if (cfg.drawerSort == s) Icon(Icons.Rounded.Check, null) else Spacer(Modifier.size(24.dp)) },
-                                onClick = { vm.updateConfig { it.copy(drawerSort = s) }; sortMenu = false },
-                            )
+                            PanelMenuItem(s.label, null, checked = cfg.drawerSort == s, onClick = { vm.updateConfig { it.copy(drawerSort = s) }; sortMenu = false })
                         }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text(if (showHidden) "Ukryj ukryte" else "Pokaż ukryte (${ws.hidden.size})") },
-                            leadingIcon = { Icon(if (showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null) },
+                        PanelMenuDivider()
+                        PanelMenuItem(
+                            if (showHidden) "Ukryj ukryte" else "Pokaż ukryte (${ws.hidden.size})",
+                            if (showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                             onClick = { showHidden = !showHidden; sortMenu = false },
                         )
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("Układ szuflady…") },
-                            leadingIcon = { Icon(Icons.Rounded.Dashboard, null) },
-                            onClick = { sortMenu = false; styleMenu = true },
+                        PanelMenuDivider()
+                        PanelMenuItem("Układ szuflady…", Icons.Rounded.Dashboard, onClick = { sortMenu = false; styleMenu = true })
+                        PanelMenuItem(
+                            "Karty kategorii u góry", null, checked = cfg.drawerCategoryTabs || cfg.drawerStyle == DrawerStyle.Categories,
+                            onClick = { vm.updateConfig { it.copy(drawerCategoryTabs = !it.drawerCategoryTabs) }; sortMenu = false },
                         )
-                        DropdownMenuItem(
-                            text = { Text("Kategorie") },
-                            leadingIcon = { Icon(Icons.Rounded.Category, null) },
-                            onClick = { sortMenu = false; onOpenCategories() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Ustawienia") },
-                            leadingIcon = { Icon(Icons.Rounded.Settings, null) },
-                            onClick = { sortMenu = false; onOpenSettings() },
-                        )
+                        PanelMenuItem("Kategorie", Icons.Rounded.Category, onClick = { sortMenu = false; onOpenCategories() })
+                        PanelMenuItem("Ustawienia", Icons.Rounded.Settings, onClick = { sortMenu = false; onOpenSettings() })
                     }
-                    DropdownMenu(styleMenu, { styleMenu = false }) {
-                        DrawerStyle.entries.forEach { s ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(s.label, fontWeight = if (cfg.drawerStyle == s) FontWeight.SemiBold else FontWeight.Normal)
-                                        Text(s.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                },
-                                leadingIcon = { if (cfg.drawerStyle == s) Icon(Icons.Rounded.Check, null) else Spacer(Modifier.size(24.dp)) },
+                    PanelMenu(styleMenu, { styleMenu = false }, title = "Układ szuflady") {
+                        // „Zakładki kategorii” to teraz siatka z kartami – bez dubla na liście
+                        DrawerStyle.entries.filter { it != DrawerStyle.Categories }.forEach { s ->
+                            PanelMenuItem(
+                                s.label, null, checked = cfg.drawerStyle == s || (s == DrawerStyle.Grid && cfg.drawerStyle == DrawerStyle.Categories), subtitle = s.description,
                                 onClick = { vm.updateConfig { it.copy(drawerStyle = s) }; styleMenu = false },
                             )
                         }
@@ -286,7 +276,7 @@ fun AppDrawer(
             }
 
             // Filtr kategorii
-            if (cfg.drawerCategoryChips && cfg.drawerStyle != DrawerStyle.Categories && ws.categories.isNotEmpty()) {
+            if (cfg.drawerCategoryChips && !tabsOn && ws.categories.isNotEmpty()) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -326,13 +316,26 @@ fun AppDrawer(
                 CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
             } else if (visible.isEmpty()) {
                 EmptyResult(query, ctx)
-            } else when (cfg.drawerStyle) {
-                // Kolumny i wiersze z ustawień działają we wszystkich układach siatkowych
-                DrawerStyle.Grid -> DrawerGrid(sections, cfg.drawerColumns, cfg.drawerRows, cb, padding)
-                DrawerStyle.Perspective -> DrawerPerspective(visible, cfg.drawerColumns, cfg.drawerRows, cb)
-                DrawerStyle.List -> DrawerList(sections, cb, padding)
-                DrawerStyle.Pages -> DrawerPages(visible, cfg.drawerColumns, cb, cfg.drawerRows)
-                DrawerStyle.Categories -> {
+            } else {
+                // Widok jednego zestawu aplikacji w wybranym układzie (cała szuflada albo jedna karta)
+                val styleView: @Composable (List<AppInfo>, List<DrawerSection>) -> Unit = { list, secs ->
+                    when (cfg.drawerStyle) {
+                        // Kolumny i wiersze z ustawień działają we wszystkich układach siatkowych
+                        DrawerStyle.Grid, DrawerStyle.Categories -> DrawerGrid(secs, cfg.drawerColumns, cfg.drawerRows, cb, padding)
+                        DrawerStyle.Perspective -> DrawerPerspective(list, cfg.drawerColumns, cfg.drawerRows, cb)
+                        DrawerStyle.List -> DrawerList(secs, cb, padding)
+                        DrawerStyle.Pages -> DrawerPages(list, cfg.drawerColumns, cb, cfg.drawerRows)
+                        DrawerStyle.Helix -> DrawerHelix(list, cb)
+                        DrawerStyle.Sphere -> DrawerSphere(list, cb)
+                        DrawerStyle.Wheel -> DrawerWheel(list, cb)
+                        DrawerStyle.Bubbles -> DrawerBubbles(list, cb)
+                        DrawerStyle.Cylinder -> DrawerCylinder(list, cb)
+                        DrawerStyle.Wave -> DrawerWave(list, cb, padding)
+                        DrawerStyle.Stack -> DrawerStack(list, cb, padding)
+                    }
+                }
+                if (tabsOn) {
+                    // Karty kategorii u góry – w każdym układzie; przy wyszukiwaniu zwykły widok wyników
                     val tabs = remember(visible, ws.categories) {
                         listOf("Wszystkie" to visible) +
                             ws.categories.mapNotNull { c ->
@@ -341,15 +344,10 @@ fun AppDrawer(
                             } +
                             visible.filter { ws.assignments[it.key].isNullOrEmpty() }.let { if (it.isEmpty()) emptyList() else listOf("Inne" to it) }
                     }
-                    DrawerCategoryTabs(tabs, cfg.drawerColumns, cfg.drawerRows, cb, padding)
-                }
-                DrawerStyle.Helix -> DrawerHelix(visible, cb)
-                DrawerStyle.Sphere -> DrawerSphere(visible, cb)
-                DrawerStyle.Wheel -> DrawerWheel(visible, cb)
-                DrawerStyle.Bubbles -> DrawerBubbles(visible, cb)
-                DrawerStyle.Cylinder -> DrawerCylinder(visible, cb)
-                DrawerStyle.Wave -> DrawerWave(visible, cb, padding)
-                DrawerStyle.Stack -> DrawerStack(visible, cb, padding)
+                    DrawerCategoryTabs(tabs, cfg.drawerColumns, cfg.drawerRows, cb, padding) { list ->
+                        styleView(list, if (list === visible) sections else listOf(DrawerSection("tab", null, list)))
+                    }
+                } else styleView(visible, sections)
             }
         }
     }

@@ -199,7 +199,8 @@ fun DrawerPerspective(apps: List<AppInfo>, columns: Int, rowCount: Int, cb: Draw
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val hPx = with(density) { maxHeight.toPx() }
-        val edge = hPx * 0.07f
+        // Pas załamania u góry i dołu: wąski (mały odstęp od górnej krawędzi), ale mocno zagięty
+        val edge = hPx * 0.03f
         val colW = maxWidth / columns
         val rowH = if (rowCount > 0) (maxHeight - with(density) { (edge * 2).toDp() }) / rowCount else colW + labelSpace(cb)
         val rowPx = with(density) { rowH.toPx() }
@@ -223,18 +224,18 @@ fun DrawerPerspective(apps: List<AppInfo>, columns: Int, rowCount: Int, cb: Draw
                                 val bottom = hPx - edge
                                 val (pc, f) = when {
                                     c > bottom -> {
-                                        val f = 1f / (1f + (c - bottom) / rowPx * 1.3f)
+                                        val f = 1f / (1f + (c - bottom) / rowPx * 3f)
                                         (bottom + edge * (1f - f)) to f
                                     }
                                     c < edge -> {
-                                        val f = 1f / (1f + (edge - c) / rowPx * 1.3f)
+                                        val f = 1f / (1f + (edge - c) / rowPx * 3f)
                                         (edge - edge * (1f - f)) to f
                                     }
                                     else -> c to 1f
                                 }
                                 translationY = pc - rowPx / 2
                                 scaleY = f
-                                scaleX = 0.55f + 0.45f * f
+                                scaleX = 0.45f + 0.55f * f
                                 alpha = ((f - 0.06f) / 0.3f).coerceIn(0f, 1f)
                             },
                     ) {
@@ -335,6 +336,8 @@ fun DrawerCategoryTabs(
     rows: Int,
     cb: DrawerCallbacks,
     padding: PaddingValues,
+    /** Treść jednej karty – domyślnie siatka; inne układy szuflady podają własny widok. */
+    content: (@Composable (List<AppInfo>) -> Unit)? = null,
 ) {
     val state = rememberPagerState { tabs.size }
     val scope = rememberCoroutineScope()
@@ -369,6 +372,10 @@ fun DrawerCategoryTabs(
         }
         HorizontalPager(state, Modifier.weight(1f)) { p ->
             val list = tabs[p].second
+            if (content != null) {
+                Box(Modifier.fillMaxSize()) { content(list) }
+                return@HorizontalPager
+            }
             GridSizing(columns, rows, cb) { cell, icon ->
                 LazyVerticalGrid(GridCells.Fixed(columns), contentPadding = padding, modifier = Modifier.fillMaxSize()) {
                     items(list, key = { it.key }) { app -> DrawerCell(app, cb, icon, cell) }

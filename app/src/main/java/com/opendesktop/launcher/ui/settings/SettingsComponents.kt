@@ -1,5 +1,6 @@
 package com.opendesktop.launcher.ui.settings
 
+import com.opendesktop.launcher.ui.components.HeaderTextStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -78,11 +79,9 @@ fun Group(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column {
         if (title != null) {
             Text(
-                title.uppercase(),
-                color = Palette.Accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.4.sp,
+                title,
+                color = Palette.TextDim,
+                style = HeaderTextStyle,
                 modifier = Modifier.padding(start = 4.dp, bottom = 3.dp, top = 4.dp),
             )
         }

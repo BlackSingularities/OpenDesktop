@@ -251,7 +251,7 @@ private fun DockSection(cfg: Config, set: Setter) {
 private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
     Group("Układ") {
         ActionRow(Icons.Rounded.Style, "Układ", cfg.drawerStyle.label, chevron = true) {
-            pick.choose("Układ szuflady", DrawerStyle.entries, cfg.drawerStyle, { it.label }, { it.description }) { s -> set { it.copy(drawerStyle = s) } }
+            pick.choose("Układ szuflady", DrawerStyle.entries.filter { it != DrawerStyle.Categories }, cfg.drawerStyle, { it.label }, { it.description }) { s -> set { it.copy(drawerStyle = s) } }
         }
         ActionRow(Icons.AutoMirrored.Rounded.Sort, "Sortowanie", cfg.drawerSort.label, chevron = true) {
             pick.choose("Sortowanie", DrawerSort.entries, cfg.drawerSort, { it.label }) { s -> set { it.copy(drawerSort = s) } }
@@ -276,6 +276,7 @@ private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
             Tile(Icons.Rounded.Rectangle, "Tło wyszukiwarki", cfg.drawerHeaderBackground) { v -> set { it.copy(drawerHeaderBackground = v) } },
             if (Build.VERSION.SDK_INT >= 31) Tile(Icons.Rounded.BlurOn, "Rozmycie pulpitu", cfg.blurBehindDrawer) { v -> set { it.copy(blurBehindDrawer = v) } } else null,
             Tile(Icons.Rounded.Category, "Filtr kategorii", cfg.drawerCategoryChips) { v -> set { it.copy(drawerCategoryChips = v) } },
+            Tile(Icons.Rounded.ViewCarousel, "Karty kategorii", cfg.drawerCategoryTabs) { v -> set { it.copy(drawerCategoryTabs = v) } },
             Tile(Icons.Rounded.Label, "Podpisy ikon", cfg.drawerLabels) { v -> set { it.copy(drawerLabels = v) } },
             Tile(Icons.Rounded.LocalOffer, "Kategorie pod nazwą", cfg.drawerShowCategories) { v -> set { it.copy(drawerShowCategories = v) } },
             Tile(Icons.Rounded.Keyboard, "Klawiatura od razu", cfg.searchAutoFocus) { v -> set { it.copy(searchAutoFocus = v) } },

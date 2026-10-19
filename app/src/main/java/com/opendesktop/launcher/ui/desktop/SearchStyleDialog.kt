@@ -1,5 +1,6 @@
 package com.opendesktop.launcher.ui.desktop
 
+import com.opendesktop.launcher.ui.components.HeaderTextStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -151,11 +152,9 @@ fun SearchStyleDialog(initial: SearchStyle, aiEnabled: Boolean, onDismiss: () ->
 @Composable
 private fun Label(text: String) {
     Text(
-        text.uppercase(),
+        text,
         color = Palette.TextDim,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.2.sp,
+        style = HeaderTextStyle,
         modifier = Modifier.padding(start = 4.dp, top = 6.dp),
     )
 }

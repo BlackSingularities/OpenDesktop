@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -317,16 +318,23 @@ private fun DesktopItemSlot(
                         pressed = pressed || mergeTarget,
                         modifier = Modifier.fillMaxSize().then(gestures),
                         badge = {
-                            Box(
+                            // Znaczek folderu: cztery małe kwadraty 2×2, bez obramowania
+                            val sq = size * 0.1f
+                            Column(
                                 Modifier
                                     .align(Alignment.BottomEnd)
-                                    .offset(x = size * 0.1f, y = size * 0.1f)
-                                    .size(size * 0.42f)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF1C1C1C))
-                                    .border(1.5.dp, Color.White, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) { Icon(Icons.Rounded.Folder, "Folder", tint = Color.White, modifier = Modifier.size(size * 0.24f)) }
+                                    .offset(x = size * 0.06f, y = size * 0.06f)
+                                    .clip(RoundedCornerShape(size * 0.08f))
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                                    .padding(size * 0.05f),
+                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(size * 0.03f),
+                            ) {
+                                repeat(2) {
+                                    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(size * 0.03f)) {
+                                        repeat(2) { Box(Modifier.size(sq).clip(RoundedCornerShape(sq * 0.3f)).background(Color.White.copy(alpha = 0.9f))) }
+                                    }
+                                }
+                            }
                         },
                     )
                 } else FolderIcon(
@@ -499,31 +507,36 @@ fun Dock(
 ) {
     val slots = cfg.dockCount
     val dragKey = drag.payload?.takeIf { it.source == DragSource.Dock }?.item?.app
-    Box(
+    // Dok nisko przy dolnej krawędzi; skrajne ikony sięgają brzegów pulpitu (te same marginesy
+    // co strony), a odstępy między ikonami rozkładają się równo
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 2.dp)
             .onGloballyPositioned { drag.dockBounds = it.boundsInRoot() }
             .then(
                 if (cfg.dockBackground) Modifier
                     .clip(RoundedCornerShape(30.dp))
                     .background(Color.White.copy(alpha = cfg.dockOpacity))
+                    .padding(horizontal = 10.dp)
                 else Modifier
             )
-            .padding(vertical = 10.dp, horizontal = 4.dp),
+            .padding(vertical = 6.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Ikona jak największa: ok. 80% miejsca na jedno pole
+        val iconSize = (maxWidth / slots * 0.8f * cfg.iconScale).coerceIn(40.dp, 76.dp)
+        val slotW = if (cfg.dockLabels) (maxWidth / slots).coerceAtLeast(iconSize) else iconSize
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
             // Wpisy doku: aplikacje albo skróty akcji systemowych
             val visible = keys.filter { it in apps || SystemAction.fromDockKey(it) != null }
             for (i in 0 until slots) {
                 val entry = visible.getOrNull(i)
                 val app = entry?.let { apps[it] }
                 val action = entry?.let { SystemAction.fromDockKey(it) }
-                val iconSize = (52.dp * cfg.iconScale).coerceIn(36.dp, 64.dp)
-                val areaH = if (cfg.dockLabels) 78.dp else 60.dp
+                val areaH = iconSize + if (cfg.dockLabels) 24.dp else 6.dp
                 // Odbicia tylko bez podpisów – podpis stałby między ikoną a odbiciem
                 val reflect = cfg.dockReflection && !cfg.dockLabels
-                Box(Modifier.weight(1f).height(areaH + if (reflect) iconSize * 0.45f else 0.dp), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.width(slotW).height(areaH + if (reflect) iconSize * 0.45f else 0.dp), contentAlignment = Alignment.TopCenter) {
                     if (action != null) key(entry) {
                         var pressed by remember { mutableStateOf(false) }
                         ActionIcon(

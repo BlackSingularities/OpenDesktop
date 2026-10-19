@@ -59,6 +59,9 @@ import androidx.compose.ui.unit.sp
 import com.opendesktop.launcher.data.AppInfo
 import com.opendesktop.launcher.data.IconShape
 import com.opendesktop.launcher.data.SystemAction
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 
 data class MenuAction(
     val label: String,
@@ -93,6 +96,97 @@ private val CompactPadding = PaddingValues(horizontal = 10.dp)
 /** Styl menu kontekstowych – dostarczany przez motyw z ustawień. */
 val LocalMenuPanel = staticCompositionLocalOf { PanelStyle(Color.White.copy(alpha = 0.74f)) }
 
+/**
+ * Styl nagłówków w całej aplikacji (menu, grupy ustawień, okna): półgruby, zwykła wielkość liter,
+ * bez rozstrzelenia – spokojniejszy niż dawne wersaliki.
+ */
+val HeaderTextStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.1.sp)
+
+/**
+ * Panel menu w stylu okienek folderów (kolor i krycie z ustawień). Wspólny dla wszystkich menu
+ * kontekstowych i rozwijanych: zwarte, z maksymalną wysokością i przewijaniem.
+ */
+@Composable
+fun PanelMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    title: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val panel = LocalMenuPanel.current
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = panel.shape,
+        containerColor = panel.background,
+        tonalElevation = 0.dp,
+        // Cień prześwituje przez półprzezroczyste tło – tylko przy prawie kryjącym
+        shadowElevation = if (panel.background.alpha > 0.95f) 8.dp else 0.dp,
+        border = BorderStroke(1.dp, panel.border),
+        modifier = Modifier.heightIn(max = 340.dp).widthIn(min = 180.dp, max = 260.dp),
+    ) {
+        if (title != null) PanelMenuHeader(title)
+        content()
+    }
+}
+
+/** Wyśrodkowany nagłówek menu (tytuł albo nazwa sekcji). */
+@Composable
+fun PanelMenuHeader(text: String) {
+    Text(
+        text,
+        color = LocalMenuPanel.current.content.copy(alpha = 0.6f),
+        style = HeaderTextStyle,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+fun PanelMenuDivider() {
+    HorizontalDivider(Modifier.padding(vertical = 2.dp, horizontal = 10.dp), color = LocalMenuPanel.current.content.copy(alpha = 0.12f))
+}
+
+/**
+ * Wiersz menu: ikona w kółku (albo znacznik wyboru), etykieta i opcjonalny opis.
+ * [checked] = true/false pokazuje znacznik zamiast ikony (listy wyboru), null – zwykłą ikonę.
+ */
+@Composable
+fun PanelMenuItem(
+    label: String,
+    icon: ImageVector?,
+    onClick: () -> Unit,
+    danger: Boolean = false,
+    checked: Boolean? = null,
+    subtitle: String? = null,
+) {
+    val panel = LocalMenuPanel.current
+    val color = if (danger) (if (panel.light) Color(0xFFD32F2F) else Palette.Danger) else panel.content
+    DropdownMenuItem(
+        text = {
+            Column {
+                Text(
+                    label, color = color, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (checked == true) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                if (subtitle != null) Text(subtitle, color = color.copy(alpha = 0.6f), fontSize = 11.sp, lineHeight = 13.sp, maxLines = 2)
+            }
+        },
+        leadingIcon = {
+            val ic = if (checked != null) (if (checked) Icons.Rounded.Check else null) else icon
+            Box(
+                Modifier.size(24.dp).clip(CircleShape).background(if (ic != null) color.copy(alpha = 0.14f) else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) { if (ic != null) Icon(ic, null, tint = color, modifier = Modifier.size(14.dp)) }
+        },
+        onClick = onClick,
+        modifier = if (subtitle != null) Modifier.heightIn(min = 44.dp) else CompactItem,
+        contentPadding = CompactPadding,
+    )
+}
+
 /** Menu kontekstowe kotwiczone w rodzicu (ikona, widżet, folder). */
 @Composable
 fun ActionMenu(
@@ -101,33 +195,8 @@ fun ActionMenu(
     actions: List<MenuAction>,
     shortcuts: List<MenuShortcut> = emptyList(),
 ) {
-    // Ten sam styl co okienka folderów: kolor i krycie z ustawień, tytuł wersalikami, ikony w kółkach
-    val panel = LocalMenuPanel.current
-    val fg = panel.content
-    DropdownMenu(
-        expanded = true,
-        onDismissRequest = onDismiss,
-        shape = panel.shape,
-        containerColor = panel.background,
-        tonalElevation = 0.dp,
-        // Cień prześwituje przez półprzezroczyste tło – tylko przy prawie kryjącym
-        shadowElevation = if (panel.background.alpha > 0.95f) 8.dp else 0.dp,
-        border = BorderStroke(1.dp, panel.border),
-        // Zwarte: niska wysokość wierszy, a przy wielu pozycjach przewijanie zamiast menu na pół ekranu
-        modifier = Modifier.heightIn(max = 340.dp).widthIn(min = 180.dp, max = 240.dp),
-    ) {
-        if (title != null) {
-            Text(
-                title.uppercase(),
-                color = fg.copy(alpha = 0.55f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.4.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 2.dp),
-            )
-        }
+    val fg = LocalMenuPanel.current.content
+    PanelMenu(expanded = true, onDismiss = onDismiss, title = title) {
         if (shortcuts.isNotEmpty()) {
             shortcuts.forEach { s ->
                 DropdownMenuItem(
@@ -141,21 +210,10 @@ fun ActionMenu(
                     contentPadding = CompactPadding,
                 )
             }
-            HorizontalDivider(Modifier.padding(vertical = 2.dp, horizontal = 10.dp), color = fg.copy(alpha = 0.12f))
+            PanelMenuDivider()
         }
         actions.forEach { a ->
-            val color = if (a.danger) (if (panel.light) Color(0xFFD32F2F) else Palette.Danger) else fg
-            DropdownMenuItem(
-                text = { Text(a.label, color = color, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = {
-                    Box(Modifier.size(24.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                        Icon(a.icon, null, tint = color, modifier = Modifier.size(14.dp))
-                    }
-                },
-                onClick = { onDismiss(); a.onClick() },
-                modifier = CompactItem,
-                contentPadding = CompactPadding,
-            )
+            PanelMenuItem(a.label, a.icon, onClick = { onDismiss(); a.onClick() }, danger = a.danger)
         }
     }
 }
@@ -163,11 +221,9 @@ fun ActionMenu(
 @Composable
 private fun PickerHeader(title: String) {
     Text(
-        title.uppercase(),
+        title,
         color = MaterialTheme.colorScheme.primary,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.4.sp,
+        style = HeaderTextStyle,
         modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp),
     )
 }

@@ -163,11 +163,11 @@ fun FolderIcon(
                 .size(iconSize)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(RoundedCornerShape(30))
-                .background(Color.White.copy(alpha = if (highlight) 0.36f else 0.22f))
-                .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(30))
-                .padding(iconSize * 0.12f),
+                // Subtelne tło bez obramowania – widać głównie cztery miniatury 2×2
+                .background(Color.White.copy(alpha = if (highlight) 0.3f else 0.12f))
+                .padding(iconSize * 0.1f),
         ) {
-            val mini = (iconSize * 0.76f - 4.dp) / 2
+            val mini = (iconSize * 0.8f - 4.dp) / 2
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
                 for (r in 0 until 2) {
                     Row(Modifier, horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -230,8 +230,10 @@ fun DrawScope.drawAppIcon(img: ImageBitmap, center: Offset, sizePx: Float, alpha
 
 /** Rozmiar ikony mieszczący się w komórce o podanych wymiarach. */
 fun iconSizeFor(cellW: Dp, cellH: Dp, scale: Float, withLabel: Boolean, desktopMode: Boolean = false): Dp {
-    val labelSpace = if (withLabel) 22.dp else 0.dp
+    // Ikony wypełniają komórkę: na pulpicie do pełnej szerokości/wysokości (bez podpisu),
+    // w szufladzie i folderach z niewielkim marginesem
+    val labelSpace = if (withLabel) 20.dp else 0.dp
     val base = minOf(cellW, cellH - labelSpace)
-    val baseScale = if (desktopMode) 0.92f else 0.72f
-    return (base * baseScale * scale).coerceIn(24.dp, 140.dp)
+    val baseScale = if (desktopMode) 1f else 0.84f
+    return (base * baseScale * scale).coerceAtMost(base).coerceIn(24.dp, 160.dp)
 }

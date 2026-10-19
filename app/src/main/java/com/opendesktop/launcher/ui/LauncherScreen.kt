@@ -199,6 +199,12 @@ fun LauncherScreen(
     var openFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
     // Miejsce ikony folderu na ekranie — okienko otwiera się przy niej (Rect.Zero = na środku)
     var folderAnchor by remember { mutableStateOf(Rect.Zero) }
+    // Kategorie otwarte z ustawień wracają do ustawień, otwarte z szuflady – na pulpit
+    var categoriesFromSettings by remember { mutableStateOf(false) }
+    fun closeCategories() {
+        overlay = if (categoriesFromSettings) Overlay.Settings else Overlay.None
+        categoriesFromSettings = false
+    }
     var folderPicker by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
     var primaryAppPicker by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
@@ -374,6 +380,7 @@ fun LauncherScreen(
         when {
             menu != null -> menu = null
             openFolder != null -> openFolder = null
+            overlay == Overlay.Categories -> closeCategories()
             overlay != Overlay.None -> overlay = Overlay.None
             drawer.value > 0f -> closeDrawer()
             editMode -> { editMode = false; selected = null }
@@ -771,7 +778,7 @@ fun LauncherScreen(
                     onDragStart = { app, b -> startDrag(DragSource.Drawer, DesktopItem(type = ItemType.App, x = 0, y = 0, app = app.key), null, b) },
                     onDragEnd = { endDrag() },
                     onOpenSettings = { overlay = Overlay.Settings },
-                    onOpenCategories = { overlay = Overlay.Categories },
+                    onOpenCategories = { categoriesFromSettings = false; overlay = Overlay.Categories },
                     closeConnection = closeConnection,
                     headerModifier = headerDrag,
                     menu = drawerMenu,
@@ -792,10 +799,10 @@ fun LauncherScreen(
         // ------------------------------------------------------------- nakładki
         when (overlay) {
             Overlay.Settings -> Box(Modifier.fillMaxSize().zIndex(30f)) {
-                SettingsScreen(vm, onClose = { overlay = Overlay.None }, onOpenCategories = { overlay = Overlay.Categories })
+                SettingsScreen(vm, onClose = { overlay = Overlay.None }, onOpenCategories = { categoriesFromSettings = true; overlay = Overlay.Categories })
             }
             Overlay.Categories -> Box(Modifier.fillMaxSize().zIndex(30f)) {
-                CategoriesScreen(vm, onClose = { overlay = Overlay.None })
+                CategoriesScreen(vm, onClose = { closeCategories() })
             }
             Overlay.None -> Unit
         }

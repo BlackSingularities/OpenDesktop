@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -1142,24 +1143,57 @@ private fun EditTopBar(
     onHome: () -> Unit,
     onDone: () -> Unit,
 ) {
-    // Ta sama belka co dolny pasek edycji: numer ekranu i kompaktowe przyciski
+    // Kompaktowe pigułki zamiast belki na całą szerokość: po lewej numer ekranu z przesuwaniem
+    // jego pozycji, po prawej „Główny” i białe „Gotowe”
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            Modifier.height(44.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TopBarIcon(Icons.AutoMirrored.Rounded.ArrowBack, "Przesuń ekran w lewo", enabled = page > 0, onClick = onMoveLeft)
+            Column(Modifier.padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("EKRAN", color = Color.White.copy(alpha = 0.55f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                Text("${page + 1} / $count", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            TopBarIcon(Icons.AutoMirrored.Rounded.ArrowForward, "Przesuń ekran w prawo", enabled = page < count - 1, onClick = onMoveRight)
+        }
+        Spacer(Modifier.weight(1f))
+        TopBarPill(Icons.Rounded.Home, if (isHome) "Główny" else "Ustaw główny", highlighted = isHome, onClick = onHome)
+        TopBarPill(Icons.Rounded.Check, "Gotowe", highlighted = true, onClick = onDone)
+    }
+}
+
+@Composable
+private fun TopBarIcon(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .then(if (enabled) Modifier.pointerInput(onClick) { detectTapGestures { onClick() } } else Modifier)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.3f },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(20.dp)) }
+}
+
+@Composable
+private fun TopBarPill(icon: ImageVector, label: String, highlighted: Boolean, onClick: () -> Unit) {
+    val fg = if (highlighted) Color.Black else Color.White
     Row(
         Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .padding(4.dp),
+            .height(44.dp)
+            .clip(RoundedCornerShape(50))
+            .background(if (highlighted) Color.White else Color.Black.copy(alpha = 0.55f))
+            .pointerInput(onClick) { detectTapGestures { onClick() } }
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1.3f).padding(start = 12.dp)) {
-            Text("EKRAN", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-            Text("${page + 1} z $count", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        }
-        BigToolButton(Icons.AutoMirrored.Rounded.ArrowBack, "W lewo", enabled = page > 0, onClick = onMoveLeft)
-        BigToolButton(Icons.AutoMirrored.Rounded.ArrowForward, "W prawo", enabled = page < count - 1, onClick = onMoveRight)
-        BigToolButton(Icons.Rounded.Home, if (isHome) "Główny" else "Ustaw główny", highlighted = isHome, onClick = onHome)
-        BigToolButton(Icons.Rounded.Check, "Gotowe", highlighted = true, onClick = onDone)
+        Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = fg, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

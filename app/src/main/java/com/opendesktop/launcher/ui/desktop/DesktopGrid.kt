@@ -232,8 +232,10 @@ private fun DesktopItemSlot(
             // „Na wierzch/Na spód” ustala kolejność osobno wśród widżetów i wśród pozostałych elementów
             .zIndex(
                 when {
+                    // Zaznaczony widżet idzie na wierzch tylko wśród widżetów – inaczej jego nakładka
+                    // w trybie edycji przykrywa i blokuje ikony leżące na nim
+                    item.type == ItemType.Widget -> layer.toFloat() + if (selected || showMenu) 5_000f else 0f
                     selected || showMenu -> 100_000f
-                    item.type == ItemType.Widget -> layer.toFloat()
                     else -> 10_000f + layer
                 }
             )

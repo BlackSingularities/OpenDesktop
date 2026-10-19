@@ -208,15 +208,18 @@ fun SliderRow(
 /** Kafelek-przełącznik: biały, gdy włączony. */
 class Tile(val icon: ImageVector, val label: String, val value: Boolean, val onChange: (Boolean) -> Unit)
 
+/** Kafelki po 4 w rzędzie; niepełny rząd jest wyśrodkowany. */
 @Composable
 fun TileGrid(tiles: List<Tile>) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val tileW = (maxWidth - 18.dp) / 4
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         tiles.chunked(4).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
                 row.forEach { t ->
                     Column(
                         Modifier
-                            .weight(1f)
+                            .width(tileW)
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (t.value) Palette.Accent else Palette.Group)
                             .clickable { t.onChange(!t.value) }
@@ -236,9 +239,9 @@ fun TileGrid(tiles: List<Tile>) {
                         )
                     }
                 }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+    }
     }
 }
 

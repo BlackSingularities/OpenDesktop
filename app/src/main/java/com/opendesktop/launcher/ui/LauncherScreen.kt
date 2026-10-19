@@ -968,7 +968,7 @@ fun LauncherScreen(
             text = {
                 Text(
                     "Ustaw OpenDesktop jako domyślny ekran główny, aby działały przycisk Home, skróty aplikacji i widżety.\n\n" +
-                        "Wskazówki: przesuń w górę — szuflada; przytrzymaj puste miejsce — tryb edycji; przytrzymaj ikonę i przeciągnij — przenoszenie; upuść ikonę na ikonę — folder.",
+                        "Wskazówki: przesuń w górę – szuflada; przytrzymaj puste miejsce – tryb edycji; przytrzymaj ikonę i przeciągnij – przenoszenie; upuść ikonę na ikonę – folder.",
                 )
             },
             confirmButton = {
@@ -1062,7 +1062,7 @@ private fun EditToolbar(
     onRemovePage: () -> Unit,
     onSettings: () -> Unit,
 ) {
-    // Jedna wspólna belka, przyciski dzielą szerokość po równo — bez przewijania
+    // Jedna wspólna belka, przyciski dzielą szerokość po równo – bez przewijania
     Row(
         Modifier
             .fillMaxWidth()

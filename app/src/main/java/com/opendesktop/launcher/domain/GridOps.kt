@@ -3,7 +3,7 @@ package com.opendesktop.launcher.domain
 import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.data.Page
 
-/** Czyste operacje na siatce pulpitu — bez Androida, testowalne jednostkowo. */
+/** Czyste operacje na siatce pulpitu – bez Androida, testowalne jednostkowo. */
 object GridOps {
     fun overlaps(a: DesktopItem, x: Int, y: Int, w: Int, h: Int): Boolean =
         a.x < x + w && x < a.x + a.w && a.y < y + h && y < a.y + a.h
@@ -50,7 +50,7 @@ object GridOps {
 
     /**
      * Dopasowuje elementy do nowego rozmiaru siatki. Przy wyłączonym nakładaniu konflikty są
-     * przenoszone w najbliższe wolne miejsce, a to, co się nie zmieści — na kolejne ekrany.
+     * przenoszone w najbliższe wolne miejsce, a to, co się nie zmieści – na kolejne ekrany.
      */
     fun normalize(pages: List<Page>, cols: Int, rows: Int, allowOverlap: Boolean): List<Page> {
         val overflow = mutableListOf<DesktopItem>()

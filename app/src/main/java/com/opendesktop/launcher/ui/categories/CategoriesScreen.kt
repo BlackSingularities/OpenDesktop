@@ -121,7 +121,7 @@ fun CategoriesScreen(vm: LauncherViewModel, onClose: () -> Unit) {
                     }
                 }
                 if (ws.categories.isEmpty()) {
-                    item { Text("Brak kategorii — utwórz pierwszą przyciskiem +", color = Color.White.copy(alpha = 0.6f)) }
+                    item { Text("Brak kategorii – utwórz pierwszą przyciskiem +", color = Color.White.copy(alpha = 0.6f)) }
                 }
                 items(ws.categories, key = { it.id }) { c ->
                     Row(
@@ -209,7 +209,7 @@ private fun AiCategorizeDialog(vm: LauncherViewModel, job: AiJob, apps: List<App
         "Praca / dom / rozrywka",
         "Jak w sklepie Play, ale bardziej szczegółowo",
         "Według kolorów ikon",
-        "Minimalistycznie — najwyżej 5 grup",
+        "Minimalistycznie – najwyżej 5 grup",
     )
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -273,7 +273,7 @@ private fun AiResultPreview(cats: List<AiCategory>, apps: List<AppInfo>) {
                 Text("${c.emoji} ${c.name}".trim(), fontWeight = FontWeight.SemiBold)
                 val list = c.apps.mapNotNull { byPkg[it] }
                 Text(
-                    list.joinToString { it.label }.ifBlank { "—" },
+                    list.joinToString { it.label }.ifBlank { "–" },
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis,
                 )
                 HorizontalDivider(Modifier.padding(top = 8.dp))

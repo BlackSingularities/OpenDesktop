@@ -152,7 +152,7 @@ private fun ModelRow(m: AiModel, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Wyszukiwanie repozytorium z wydaniami na GitHubie — źródło aktualizacji. */
+/** Wyszukiwanie repozytorium z wydaniami na GitHubie – źródło aktualizacji. */
 @Composable
 fun RepoSearchDialog(vm: LauncherViewModel, onDismiss: () -> Unit) {
     val cfg by vm.config.collectAsStateWithLifecycle()

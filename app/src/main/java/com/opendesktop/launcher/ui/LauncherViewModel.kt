@@ -263,7 +263,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /** Przenosi element na wierzch (koniec listy) albo na spód (początek) — kolejność listy = warstwy. */
+    /** Przenosi element na wierzch (koniec listy) albo na spód (początek) – kolejność listy = warstwy. */
     fun moveLayer(pageId: String, itemId: String, toFront: Boolean) = store.updateWorkspace { ws ->
         ws.updatePage(pageId) { p ->
             val item = p.items.firstOrNull { it.id == itemId } ?: return@updatePage p
@@ -291,7 +291,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         store.updateWorkspace { it.updatePage(pageId) { p -> p.copy(items = p.items.map { i -> if (i.id == itemId) i.copy(w = nw, h = nh) else i }) } }
     }
 
-    /** Wyznacza cel upuszczenia na siatce. (x, y) to lewy górny róg, (px, py) — komórka pod palcem. */
+    /** Wyznacza cel upuszczenia na siatce. (x, y) to lewy górny róg, (px, py) – komórka pod palcem. */
     fun cellTarget(page: Page, moving: DesktopItem, x: Int, y: Int, px: Int, py: Int): DropTarget.Cell {
         val w = moving.w.coerceAtMost(cols)
         val h = moving.h.coerceAtMost(rows)
@@ -399,7 +399,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             if (it.id != folderId) it
             else when (rest.size) {
                 0 -> null
-                // Czysta ikona aplikacji — bez resztek folderu (główna aplikacja, rozmiar)
+                // Czysta ikona aplikacji – bez resztek folderu (główna aplikacja, rozmiar)
                 1 -> DesktopItem(id = it.id, type = ItemType.App, x = it.x, y = it.y, app = rest.first())
                 else -> it.copy(apps = rest, primaryApp = it.primaryApp?.takeIf { p -> p in rest })
             }
@@ -430,7 +430,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             else overflow += key
         }
         var w = ws.updatePage(pageId) { it.copy(items = items) }
-        // Nie zmieściło się na tej stronie — na kolejne wolne miejsca
+        // Nie zmieściło się na tej stronie – na kolejne wolne miejsca
         for (key in overflow) {
             val (w2, s) = w.place(0, 1, 1)
             w = w2.updatePage(s.first) { p -> p.copy(items = p.items + DesktopItem(type = ItemType.App, x = s.second, y = s.third, app = key)) }
@@ -450,7 +450,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val ws = workspace.value
         if (key in ws.dock) return
         if (ws.dock.size >= config.value.dockCount) {
-            toast("Dok jest pełny — zwiększ liczbę miejsc w ustawieniach")
+            toast("Dok jest pełny – zwiększ liczbę miejsc w ustawieniach")
             return
         }
         store.updateWorkspace { it.copy(dock = it.dock + key) }

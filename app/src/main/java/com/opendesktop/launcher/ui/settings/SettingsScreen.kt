@@ -52,7 +52,7 @@ import com.opendesktop.launcher.ui.UpdateState
 import com.opendesktop.launcher.ui.theme.Palette
 import java.time.LocalDate
 
-/** Sekcje ustawień — każda ma własny widok. */
+/** Sekcje ustawień – każda ma własny widok. */
 private enum class Section(val title: String, val icon: ImageVector, val summary: String) {
     Desktop("Pulpit", Icons.Rounded.Home, "Siatka, przejścia, wskaźnik ekranów"),
     Icons_("Ikony", Icons.Rounded.Apps, "Rozmiar, kształt, podpisy"),
@@ -256,9 +256,9 @@ private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
         ActionRow(Icons.Rounded.Animation, "Animacja otwierania", cfg.drawerAnimation.label, chevron = true) {
             pick.choose("Animacja otwierania", DrawerAnimation.entries, cfg.drawerAnimation, { it.label }) { s -> set { it.copy(drawerAnimation = s) } }
         }
-        SliderRow(Icons.Rounded.ViewColumn, "Kolumny", cfg.drawerColumns.toFloat(), 3f..8f, 4) { v -> set { it.copy(drawerColumns = v.toInt()) } }
+        SliderRow(Icons.Rounded.ViewColumn, "Kolumny", cfg.drawerColumns.toFloat(), 2f..12f, 9) { v -> set { it.copy(drawerColumns = v.toInt()) } }
         SliderRow(
-            Icons.Rounded.TableRows, "Wiersze (styl Strony)", cfg.drawerRows.toFloat(), 0f..16f, 15,
+            Icons.Rounded.TableRows, "Wiersze na ekranie", cfg.drawerRows.toFloat(), 0f..20f, 19,
             { if (it.toInt() == 0) "Auto" else it.toInt().toString() },
         ) { v -> set { it.copy(drawerRows = v.toInt()) } }
     }
@@ -405,7 +405,7 @@ private fun AiSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
         }
     }
     Group {
-        ActionRow(Icons.Rounded.Memory, "Model", cfg.aiModelName.ifBlank { cfg.aiModel.ifBlank { "Nie wybrano — dotknij, aby wybrać" } }, chevron = true) {
+        ActionRow(Icons.Rounded.Memory, "Model", cfg.aiModelName.ifBlank { cfg.aiModel.ifBlank { "Nie wybrano – dotknij, aby wybrać" } }, chevron = true) {
             vm.loadModels()
             modelPicker = true
         }

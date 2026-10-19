@@ -49,7 +49,7 @@ class DragController {
     val gridBounds = mutableStateMapOf<String, Rect>()
     var dockBounds by mutableStateOf(Rect.Zero)
     val zoneBounds = mutableStateMapOf<DropZone, Rect>()
-    /** Ekran utworzony automatycznie podczas przeciągania — usuwany, jeśli zostanie pusty. */
+    /** Ekran utworzony automatycznie podczas przeciągania – usuwany, jeśli zostanie pusty. */
     var autoPageId: String? = null
 
     val active: Boolean get() = payload != null

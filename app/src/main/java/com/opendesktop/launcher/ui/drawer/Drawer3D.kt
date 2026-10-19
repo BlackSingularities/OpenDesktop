@@ -104,7 +104,7 @@ private fun hexSpiral(n: Int): List<Pair<Int, Int>> {
 
 private fun hexToPx(q: Int, r: Int, cell: Float) = Offset(cell * (q + r / 2f), cell * 0.866f * r)
 
-/** Punkt po rzutowaniu — używany do rysowania i trafiania palcem. */
+/** Punkt po rzutowaniu – używany do rysowania i trafiania palcem. */
 private class Projected(val app: AppInfo, val x: Float, val y: Float, val size: Float, val depth: Float, val alpha: Float)
 
 private class HitHolder {
@@ -114,7 +114,7 @@ private class HitHolder {
         .maxByOrNull { it.depth }
 }
 
-/** Kotwica menu dla widoków rysowanych — menu pojawia się w miejscu ikony. */
+/** Kotwica menu dla widoków rysowanych – menu pojawia się w miejscu ikony. */
 @Composable
 private fun CanvasMenuAnchor(anchor: Pair<AppInfo, Offset>?, cb: DrawerCallbacks, origin: Offset) {
     val a = anchor ?: return
@@ -136,57 +136,6 @@ private fun DrawScope.labelUnder(
 }
 
 // ------------------------------------------------------------------------- Karuzela
-
-@Composable
-fun DrawerCarousel(apps: List<AppInfo>, cb: DrawerCallbacks) {
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val item = 150.dp
-        val side = ((maxWidth - item) / 2).coerceAtLeast(0.dp)
-        val state = rememberPagerState { apps.size }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            HorizontalPager(
-                state,
-                pageSize = PageSize.Fixed(item),
-                contentPadding = PaddingValues(horizontal = side),
-                beyondViewportPageCount = 4,
-                modifier = Modifier.fillMaxWidth().height(230.dp),
-            ) { i ->
-                val app = apps[i]
-                Box(
-                    Modifier.fillMaxSize().graphicsLayer {
-                        val o = (i - state.currentPage) - state.currentPageOffsetFraction
-                        val ao = abs(o).coerceAtMost(3f)
-                        rotationY = (-o * 48f).coerceIn(-70f, 70f)
-                        val s = 1f - 0.16f * ao.coerceAtMost(2f)
-                        scaleX = s; scaleY = s
-                        alpha = (1f - 0.22f * ao).coerceIn(0.15f, 1f)
-                        cameraDistance = 18f * density
-                        translationX = -o * size.width * 0.18f
-                    },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    DrawerTouchable(app, cb) { pressed ->
-                        com.opendesktop.launcher.ui.components.AppIcon(app.icon, "", 112.dp, cb.shape, false, pressed = pressed)
-                    }
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-            val current = apps.getOrNull(state.currentPage)
-            if (cb.showLabels) {
-                Text(
-                    current?.let(cb.label).orEmpty(),
-                    color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
-                    style = TextStyle(shadow = LabelShadow), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                )
-            }
-            Text(
-                "${state.currentPage + 1} / ${apps.size}",
-                color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp,
-            )
-        }
-    }
-}
 
 // ------------------------------------------------------------------------- Helisa
 
@@ -484,13 +433,13 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
             val toRing = (s.toInt() + visibleRings).coerceAtMost(rings - 1)
             for (r in fromRing..toRing) {
                 val dy = r - s
-                // Pierścienie poza środkiem lekko się zwężają — złudzenie walca widzianego z boku
+                // Pierścienie poza środkiem lekko się zwężają – złudzenie walca widzianego z boku
                 val ringScale = 1f - 0.06f * abs(dy).coerceAtMost(4f)
                 val fade = (1f - abs(dy) / (visibleRings + 0.5f)).coerceIn(0f, 1f)
                 for (c in 0 until perRing) {
                     val i = r * perRing + c
                     if (i > apps.lastIndex) break
-                    // Co drugi pierścień przesunięty o pół kroku — ciaśniejsze, „cegiełkowe” ułożenie
+                    // Co drugi pierścień przesunięty o pół kroku – ciaśniejsze, „cegiełkowe” ułożenie
                     val theta = c * step + yaw.value + if (r % 2 == 1) step / 2 else 0f
                     val z = cos(theta)
                     val x = cx + sin(theta) * radius * ringScale
@@ -516,7 +465,7 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
 
 /**
  * Fala: przesunięcie wiersza w bok zależy od jego położenia na ekranie, więc przy przewijaniu
- * przez listę przechodzi płynna fala. Liczone w warstwie graficznej — bez rekompozycji.
+ * przez listę przechodzi płynna fala. Liczone w warstwie graficznej – bez rekompozycji.
  */
 @Composable
 fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
@@ -569,7 +518,7 @@ fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues)
 
 /**
  * Stos kart: zwykła przewijana lista kart, ale karta wyjeżdżająca u góry zatrzymuje się,
- * maleje i blednie, a kolejne nasuwają się na nią — jak przekładane karty w portfelu.
+ * maleje i blednie, a kolejne nasuwają się na nią – jak przekładane karty w portfelu.
  */
 @Composable
 fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
@@ -637,7 +586,7 @@ fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     val cell = with(density) { 60.dp.toPx() }
-    // Plaster miodu jak w zegarku: spirala heksagonalna od środka — pierwsze aplikacje listy w centrum
+    // Plaster miodu jak w zegarku: spirala heksagonalna od środka – pierwsze aplikacje listy w centrum
     val coords = remember(apps.size) { hexSpiral(apps.size) }
     val extent = remember(coords) { coords.maxOfOrNull { (q, r) -> hexToPx(q, r, 1f).getDistance() } ?: 0f } * cell
     LaunchedEffect(extent) {

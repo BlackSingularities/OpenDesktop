@@ -70,7 +70,7 @@ object OpenRouter {
             .sortedBy { it.name.ifBlank { it.id }.lowercase() }
     }
 
-    /** Sprawdza klucz — zwraca opis limitu/wykorzystania albo rzuca wyjątek. */
+    /** Sprawdza klucz – zwraca opis limitu/wykorzystania albo rzuca wyjątek. */
     suspend fun checkKey(key: String): String {
         val body = try {
             Http.get("$BASE/key", headers(key))
@@ -122,7 +122,7 @@ object OpenRouter {
         return when (e.code) {
             401 -> "Nieprawidłowy klucz API (401)"
             402 -> "Brak środków na koncie OpenRouter (402)"
-            429 -> "Za dużo zapytań — spróbuj za chwilę (429)"
+            429 -> "Za dużo zapytań – spróbuj za chwilę (429)"
             else -> msg ?: "Błąd HTTP ${e.code}"
         }
     }

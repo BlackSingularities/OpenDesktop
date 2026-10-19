@@ -338,7 +338,7 @@ private fun DesktopItemSlot(
     }
 }
 
-/** Uchwyt w rogu — mierzy przesunięcie palca w układzie okna, więc nie „skacze” przy przyciąganiu do siatki. */
+/** Uchwyt w rogu – mierzy przesunięcie palca w układzie okna, więc nie „skacze” przy przyciąganiu do siatki. */
 @Composable
 private fun ResizeHandle(
     drag: DragController,
@@ -420,7 +420,7 @@ fun Dock(
                 val action = entry?.let { SystemAction.fromDockKey(it) }
                 val iconSize = (52.dp * cfg.iconScale).coerceIn(36.dp, 64.dp)
                 val areaH = if (cfg.dockLabels) 78.dp else 60.dp
-                // Odbicia tylko bez podpisów — podpis stałby między ikoną a odbiciem
+                // Odbicia tylko bez podpisów – podpis stałby między ikoną a odbiciem
                 val reflect = cfg.dockReflection && !cfg.dockLabels
                 Box(Modifier.weight(1f).height(areaH + if (reflect) iconSize * 0.45f else 0.dp), contentAlignment = Alignment.TopCenter) {
                     if (action != null) key(entry) {

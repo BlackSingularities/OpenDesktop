@@ -328,11 +328,11 @@ fun AppDrawer(
             } else if (visible.isEmpty()) {
                 EmptyResult(query, ctx)
             } else when (cfg.drawerStyle) {
-                DrawerStyle.Grid -> DrawerGrid(sections, cfg.drawerColumns, cb, padding)
-                DrawerStyle.Perspective -> DrawerPerspective(visible, cfg.drawerColumns, cb, padding)
+                // Kolumny i wiersze z ustawień działają we wszystkich układach siatkowych
+                DrawerStyle.Grid -> DrawerGrid(sections, cfg.drawerColumns, cfg.drawerRows, cb, padding)
+                DrawerStyle.Perspective -> DrawerPerspective(visible, cfg.drawerColumns, cfg.drawerRows, cb)
                 DrawerStyle.List -> DrawerList(sections, cb, padding)
                 DrawerStyle.Pages -> DrawerPages(visible, cfg.drawerColumns, cb, cfg.drawerRows)
-                DrawerStyle.Alphabet -> DrawerAlphabet(visible, cb, padding)
                 DrawerStyle.Categories -> {
                     val tabs = remember(visible, ws.categories) {
                         listOf("Wszystkie" to visible) +
@@ -342,16 +342,8 @@ fun AppDrawer(
                             } +
                             visible.filter { ws.assignments[it.key].isNullOrEmpty() }.let { if (it.isEmpty()) emptyList() else listOf("Inne" to it) }
                     }
-                    DrawerCategoryTabs(tabs, cfg.drawerColumns, cb, padding)
+                    DrawerCategoryTabs(tabs, cfg.drawerColumns, cfg.drawerRows, cb, padding)
                 }
-                DrawerStyle.Tiles -> DrawerTiles(visible, ws.usage, cb, padding)
-                DrawerStyle.Compact -> DrawerCompact(visible, cfg.drawerColumns.coerceAtLeast(6), cb, padding)
-                DrawerStyle.SearchBar -> DrawerSearchBar(visible, ws.usage, cfg.drawerColumns, cb, padding)
-                DrawerStyle.Material -> DrawerMaterial(visible, cb, padding)
-                DrawerStyle.iOS -> DraweriOS(visible, cfg.drawerColumns, cb, padding)
-                DrawerStyle.Horizontal -> DrawerHorizontal(visible, cfg.drawerRows, cb)
-                DrawerStyle.Flow -> DrawerFlow(visible, ws.usage, cb, padding)
-                DrawerStyle.Carousel -> DrawerCarousel(visible, cb)
                 DrawerStyle.Helix -> DrawerHelix(visible, cb)
                 DrawerStyle.Sphere -> DrawerSphere(visible, cb)
                 DrawerStyle.Wheel -> DrawerWheel(visible, cb)

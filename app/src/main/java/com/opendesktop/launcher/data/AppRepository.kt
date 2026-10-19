@@ -36,7 +36,7 @@ data class AppInfo(
     val component: ComponentName,
     val user: UserHandle,
     val icon: ImageBitmap,
-    /** Średni kolor ikony (ARGB) — tło kafelków. */
+    /** Średni kolor ikony (ARGB) – tło kafelków. */
     val color: Int,
     val systemCategory: Int,
     val installTime: Long,
@@ -83,7 +83,7 @@ class AppRepository(
     fun reload() {
         job?.cancel()
         job = scope.launch(Dispatchers.Default) {
-            // Seria zdarzeń przy instalacji — przeładowujemy raz
+            // Seria zdarzeń przy instalacji – przeładowujemy raz
             if (_loaded.value) delay(250)
             val density = context.resources.displayMetrics.density
             val sizePx = (72 * density).toInt().coerceIn(96, 216)
@@ -171,7 +171,7 @@ class AppRepository(
         }
     }
 
-    /** Skróty aplikacji — działają, gdy OpenDesktop jest domyślnym launcherem. */
+    /** Skróty aplikacji – działają, gdy OpenDesktop jest domyślnym launcherem. */
     fun shortcuts(app: AppInfo): List<ShortcutEntry> = runCatching {
         if (!launcherApps.hasShortcutHostPermission()) return emptyList()
         val q = LauncherApps.ShortcutQuery()

@@ -1,6 +1,8 @@
 package com.opendesktop.launcher.ui.drawer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -139,13 +141,28 @@ private fun SectionHeader(title: String) {
     )
 }
 
+/**
+ * Rozmiar komórki siatki z ustawień: [rows] = 0 → ciasne, zwykłe przewijanie;
+ * inaczej na ekranie mieści się dokładnie [rows] wierszy. Ikona dopasowuje się do komórki.
+ */
 @Composable
-fun DrawerGrid(sections: List<DrawerSection>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
-    LazyVerticalGrid(GridCells.Fixed(columns), contentPadding = padding, modifier = Modifier.fillMaxSize()) {
-        sections.forEach { s ->
-            if (s.title != null) item(key = "h_${s.key}", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.title) }
-            items(s.apps, key = { "${s.key}_${it.key}" }) { app ->
-                DrawerCell(app, cb, if (columns >= 6) 46.dp else 54.dp, Modifier.padding(vertical = 10.dp))
+fun GridSizing(columns: Int, rows: Int, cb: DrawerCallbacks, content: @Composable (cell: Modifier, icon: Dp) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val colW = maxWidth / columns
+        val cellH = if (rows > 0) maxHeight / rows else null
+        val base = cellH ?: (colW * if (cb.showLabels) 1.3f else 1f)
+        val icon = minOf(64.dp, base * (if (cb.showLabels) 0.58f else 0.74f), colW * 0.74f)
+        content(if (cellH != null) Modifier.height(cellH) else Modifier.padding(vertical = 4.dp), icon)
+    }
+}
+
+@Composable
+fun DrawerGrid(sections: List<DrawerSection>, columns: Int, rows: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+    GridSizing(columns, rows, cb) { cell, icon ->
+        LazyVerticalGrid(GridCells.Fixed(columns), contentPadding = padding, modifier = Modifier.fillMaxSize()) {
+            sections.forEach { s ->
+                if (s.title != null) item(key = "h_${s.key}", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.title) }
+                items(s.apps, key = { "${s.key}_${it.key}" }) { app -> DrawerCell(app, cb, icon, cell) }
             }
         }
     }
@@ -153,13 +170,12 @@ fun DrawerGrid(sections: List<DrawerSection>, columns: Int, cb: DrawerCallbacks,
 
 /**
  * Perspektywa 3D: zwykła siatka, ale rzędy przy górnej i dolnej krawędzi odchylają się w głąb,
- * maleją i ściskają — jakby lista była nawinięta na bęben. Liczone w warstwie graficznej.
+ * maleją i ściskają – jakby lista była nawinięta na bęben. Liczone w warstwie graficznej.
  */
 @Composable
-fun DrawerPerspective(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+fun DrawerPerspective(apps: List<AppInfo>, columns: Int, rowCount: Int, cb: DrawerCallbacks) = GridSizing(columns, rowCount, cb) { cell, iconSize ->
     val rows = remember(apps, columns) { apps.chunked(columns) }
     val state = rememberLazyListState()
-    val iconSize = if (columns >= 6) 50.dp else 58.dp
     // Bez marginesów: lista od krawędzi do krawędzi
     LazyColumn(state = state, modifier = Modifier.fillMaxSize()) {
         itemsIndexed(rows, key = { _, r -> r.first().key }) { _, row ->
@@ -192,7 +208,7 @@ fun DrawerPerspective(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, pa
             ) {
                 for (c in 0 until columns) {
                     val app = row.getOrNull(c)
-                    Box(Modifier.weight(1f).padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).then(cell), contentAlignment = Alignment.Center) {
                         if (app != null) key(app.key) { DrawerCell(app, cb, iconSize) }
                     }
                 }
@@ -235,83 +251,6 @@ private fun ListRow(app: AppInfo, cb: DrawerCallbacks) {
                     )
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun DrawerAlphabet(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
-    val groups = remember(apps) {
-        apps.groupBy { a -> cb.label(a).firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() }?.toString() ?: "#" }
-            .toSortedMap(compareBy<String> { it == "#" }.thenBy { it })
-    }
-    val letters = groups.keys.toList()
-    val indexOf = remember(groups) {
-        var i = 0
-        val m = HashMap<String, Int>()
-        groups.forEach { (l, list) -> m[l] = i; i += 1 + list.size }
-        m
-    }
-    val state = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    var scrubbing by remember { mutableStateOf<String?>(null) }
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(state = state, contentPadding = padding, modifier = Modifier.fillMaxSize().padding(end = 28.dp)) {
-            groups.forEach { (letter, list) ->
-                stickyHeader(key = "h_$letter") {
-                    Box(Modifier.padding(vertical = 4.dp).size(34.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
-                        Text(letter, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
-                    }
-                }
-                items(list, key = { "a_${it.key}" }) { app -> ListRow(app, cb) }
-            }
-        }
-        Column(
-            Modifier
-                .align(Alignment.CenterEnd)
-                .width(28.dp)
-                .fillMaxHeight(0.86f)
-                .pointerInput(letters) {
-                    fun jump(y: Float) {
-                        if (letters.isEmpty()) return
-                        val i = (y / size.height * letters.size).toInt().coerceIn(0, letters.lastIndex)
-                        val l = letters[i]
-                        if (scrubbing != l) {
-                            scrubbing = l
-                            scope.launch { state.scrollToItem(indexOf[l] ?: 0) }
-                        }
-                    }
-                    awaitEachGesture {
-                        val d = awaitFirstDown()
-                        d.consume()
-                        jump(d.position.y)
-                        while (true) {
-                            val e = awaitPointerEvent()
-                            val c = e.changes.firstOrNull() ?: break
-                            if (!c.pressed) break
-                            c.consume()
-                            jump(c.position.y)
-                        }
-                        scrubbing = null
-                    }
-                },
-            verticalArrangement = Arrangement.SpaceEvenly,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            letters.forEach { l ->
-                Text(
-                    l,
-                    color = if (l == scrubbing) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.75f),
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-        scrubbing?.let { l ->
-            Box(
-                Modifier.align(Alignment.Center).size(96.dp).clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center,
-            ) { Text(l, color = MaterialTheme.colorScheme.onPrimary, fontSize = 44.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -359,242 +298,49 @@ fun DrawerPages(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, fixedRow
 fun DrawerCategoryTabs(
     tabs: List<Pair<String, List<AppInfo>>>,
     columns: Int,
+    rows: Int,
     cb: DrawerCallbacks,
     padding: PaddingValues,
 ) {
     val state = rememberPagerState { tabs.size }
     val scope = rememberCoroutineScope()
+    val tabsScroll = rememberLazyListState()
+    LaunchedEffect(state.currentPage) { if (tabs.isNotEmpty()) tabsScroll.animateScrollToItem(state.currentPage) }
     Column(Modifier.fillMaxSize()) {
+        // Ciasne zakładki-pigułki (styl OpenPDF) zamiast wysokiego paska kart
         if (tabs.isNotEmpty()) {
-            ScrollableTabRow(
-                selectedTabIndex = state.currentPage.coerceIn(0, tabs.lastIndex),
-                edgePadding = 12.dp,
-                containerColor = Color.Transparent,
-                contentColor = Color.White,
-                divider = {},
-                indicator = { positions ->
-                    val i = state.currentPage.coerceIn(0, positions.lastIndex)
-                    if (positions.isNotEmpty()) {
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(positions[i]).clip(RoundedCornerShape(50)),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                },
+            LazyRow(
+                state = tabsScroll,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                tabs.forEachIndexed { i, (title, list) ->
-                    Tab(
-                        selected = state.currentPage == i,
-                        onClick = { scope.launch { state.animateScrollToPage(i) } },
-                        text = { Text("$title  ${list.size}", maxLines = 1) },
+                itemsIndexed(tabs, key = { i, _ -> i }) { i, (title, list) ->
+                    val sel = state.currentPage == i
+                    Text(
+                        "$title  ${list.size}",
+                        color = if (sel) Color.Black else Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        style = if (sel) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodySmall.copy(shadow = LabelShadow),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (sel) Color.White else Color.White.copy(alpha = 0.1f))
+                            .clickable { scope.launch { state.animateScrollToPage(i) } }
+                            .padding(horizontal = 11.dp, vertical = 5.dp),
                     )
                 }
             }
         }
         HorizontalPager(state, Modifier.weight(1f)) { p ->
             val list = tabs[p].second
-            LazyVerticalGrid(GridCells.Fixed(columns), contentPadding = padding, modifier = Modifier.fillMaxSize()) {
-                items(list, key = { it.key }) { app -> DrawerCell(app, cb, 54.dp, Modifier.padding(vertical = 10.dp)) }
-            }
-        }
-    }
-}
-
-@Composable
-fun DrawerTiles(apps: List<AppInfo>, usage: Map<String, Int>, cb: DrawerCallbacks, padding: PaddingValues) {
-    val top = remember(apps, usage) {
-        apps.sortedByDescending { usage[it.key] ?: 0 }.filter { (usage[it.key] ?: 0) > 0 }.take(6).map { it.key }.toSet()
-    }
-    LazyVerticalGrid(
-        GridCells.Fixed(4),
-        contentPadding = padding,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-    ) {
-        items(apps, key = { it.key }, span = { GridItemSpan(if (it.key in top) 2 else 1) }) { app ->
-            val wide = app.key in top
-            DrawerTouchable(app, cb, Modifier.fillMaxWidth().height(96.dp)) { pressed ->
-                val base = Color(app.color)
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(lerp(base, Color.Black, if (pressed) 0.55f else 0.35f))
-                        .padding(10.dp),
-                ) {
-                    AppIcon(app.icon, "", if (wide) 48.dp else 40.dp, cb.shape, false, pressed = pressed, modifier = Modifier.align(if (wide) Alignment.CenterStart else Alignment.TopCenter))
-                    if (cb.showLabels) {
-                        Text(
-                            cb.label(app),
-                            color = Color.White,
-                            fontSize = if (wide) 15.sp else 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter)
-                                .then(if (wide) Modifier.offset(x = 0.dp) else Modifier),
-                        )
-                    }
+            GridSizing(columns, rows, cb) { cell, icon ->
+                LazyVerticalGrid(GridCells.Fixed(columns), contentPadding = padding, modifier = Modifier.fillMaxSize()) {
+                    items(list, key = { it.key }) { app -> DrawerCell(app, cb, icon, cell) }
                 }
             }
         }
     }
 }
 
-@Composable
-fun DrawerCompact(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
-    LazyVerticalGrid(
-        GridCells.Fixed(columns),
-        contentPadding = padding,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        items(apps, key = { it.key }) { app ->
-            DrawerCell(app, cb, 42.dp, Modifier.padding(4.dp))
-        }
-    }
-}
-
-/** Częste na górze: wyróżniony pasek najczęściej używanych, pod nim pełna siatka. */
-@Composable
-fun DrawerSearchBar(apps: List<AppInfo>, usage: Map<String, Int>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
-    val frequent = remember(apps, usage, columns) {
-        apps.filter { (usage[it.key] ?: 0) > 0 }.sortedByDescending { usage[it.key] ?: 0 }.take(columns)
-    }
-    LazyVerticalGrid(
-        GridCells.Fixed(columns),
-        contentPadding = padding,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-    ) {
-        if (frequent.isNotEmpty()) {
-            item(key = "freq", span = { GridItemSpan(maxLineSpan) }) {
-                Column(
-                    Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(22.dp))
-                        .background(Color.White.copy(alpha = 0.08f)).padding(vertical = 8.dp),
-                ) {
-                    Text(
-                        "NAJCZĘŚCIEJ UŻYWANE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp),
-                    )
-                    Row(Modifier.fillMaxWidth()) {
-                        for (c in 0 until columns) {
-                            val app = frequent.getOrNull(c)
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                if (app != null) key("f_${app.key}") { DrawerCell(app, cb, 50.dp, Modifier.padding(vertical = 4.dp)) }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        items(apps, key = { it.key }) { app ->
-            DrawerCell(app, cb, 52.dp, Modifier.padding(vertical = 8.dp))
-        }
-    }
-}
-
-@Composable
-fun DrawerMaterial(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
-    LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        items(apps, key = { it.key }) { app ->
-            DrawerTouchable(app, cb, Modifier.fillMaxWidth()) { pressed ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (pressed) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.08f))
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppIcon(app.icon, "", 52.dp, cb.shape, false, pressed = pressed)
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val cats = cb.categoriesOf(app)
-                        if (cats.isNotEmpty()) {
-                            Text(
-                                cats.joinToString("  ") { (it.emoji + " " + it.name).trim() },
-                                color = Color.White.copy(alpha = 0.65f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DraweriOS(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
-    LazyVerticalGrid(
-        GridCells.Fixed(columns),
-        contentPadding = padding,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-    ) {
-        items(apps, key = { it.key }) { app ->
-            DrawerCell(app, cb, 60.dp, Modifier.padding(vertical = 8.dp))
-        }
-    }
-}
-
-/** Pozioma siatka: ciągłe przewijanie w bok; liczba wierszy z ustawień (0 = ile się zmieści). */
-@Composable
-fun DrawerHorizontal(apps: List<AppInfo>, fixedRows: Int, cb: DrawerCallbacks) {
-    BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = 24.dp)) {
-        val rows = if (fixedRows > 0) fixedRows else (maxHeight / 100.dp).toInt().coerceAtLeast(3)
-        val cellH = maxHeight / rows
-        val iconSize = minOf(56.dp, cellH * 0.55f)
-        LazyHorizontalGrid(
-            GridCells.Fixed(rows),
-            contentPadding = PaddingValues(horizontal = 12.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(apps, key = { it.key }) { app ->
-                DrawerCell(app, cb, iconSize, Modifier.width(maxWidth / 5).height(cellH))
-            }
-        }
-    }
-}
-
-/**
- * Przepływ: mozaika w kolumnach o różnej wysokości. Rozmiar kafelka zależy od tego, jak często
- * aplikacja jest używana względem najczęściej używanej (trzy progi).
- */
-@Composable
-fun DrawerFlow(apps: List<AppInfo>, usage: Map<String, Int>, cb: DrawerCallbacks, padding: PaddingValues) {
-    val maxUse = remember(usage) { (usage.values.maxOrNull() ?: 0).coerceAtLeast(1) }
-    LazyVerticalStaggeredGrid(
-        StaggeredGridCells.Fixed(3),
-        contentPadding = padding,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalItemSpacing = 8.dp,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-    ) {
-        items(apps, key = { it.key }) { app ->
-            val ratio = (usage[app.key] ?: 0).toFloat() / maxUse
-            val level = when {
-                ratio > 0.5f -> 2
-                ratio > 0.15f -> 1
-                else -> 0
-            }
-            DrawerTouchable(app, cb, Modifier.fillMaxWidth().height((88 + level * 34).dp)) { pressed ->
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(lerp(Color(app.color), Color.Black, if (pressed) 0.7f else 0.55f))
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AppIcon(app.icon, cb.label(app), (40 + level * 14).dp, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize)
-                }
-            }
-        }
-    }
-}

@@ -1,6 +1,8 @@
 package com.opendesktop.launcher.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import com.opendesktop.launcher.ui.theme.Palette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -69,15 +71,26 @@ fun ActionMenu(
     actions: List<MenuAction>,
     shortcuts: List<MenuShortcut> = emptyList(),
 ) {
-    DropdownMenu(expanded = true, onDismissRequest = onDismiss) {
+    // Styl OpenPDF: ciemny panel, zaokrąglone rogi, tytuł wersalikami, ikony w kółkach
+    DropdownMenu(
+        expanded = true,
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = Palette.PanelHigh,
+        tonalElevation = 0.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+    ) {
         if (title != null) {
             Text(
-                title,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                title.uppercase(),
+                color = Palette.Accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).width(220.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp).width(220.dp),
             )
         }
         if (shortcuts.isNotEmpty()) {
@@ -91,13 +104,17 @@ fun ActionMenu(
                     onClick = { onDismiss(); s.onClick() },
                 )
             }
-            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            HorizontalDivider(Modifier.padding(vertical = 4.dp, horizontal = 12.dp), color = Color.White.copy(alpha = 0.1f))
         }
         actions.forEach { a ->
-            val color = if (a.danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+            val color = if (a.danger) Palette.Danger else Color.White
             DropdownMenuItem(
-                text = { Text(a.label, color = color) },
-                leadingIcon = { Icon(a.icon, null, tint = color) },
+                text = { Text(a.label, color = color, fontSize = 14.sp) },
+                leadingIcon = {
+                    Box(Modifier.size(30.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                        Icon(a.icon, null, tint = color, modifier = Modifier.size(17.dp))
+                    }
+                },
                 onClick = { onDismiss(); a.onClick() },
             )
         }

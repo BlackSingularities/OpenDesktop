@@ -263,6 +263,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** Przenosi element na wierzch (koniec listy) albo na spód (początek) — kolejność listy = warstwy. */
+    fun moveLayer(pageId: String, itemId: String, toFront: Boolean) = store.updateWorkspace { ws ->
+        ws.updatePage(pageId) { p ->
+            val item = p.items.firstOrNull { it.id == itemId } ?: return@updatePage p
+            val rest = p.items - item
+            p.copy(items = if (toFront) rest + item else listOf(item) + rest)
+        }
+    }
+
     fun removeItem(pageId: String, itemId: String) {
         val item = workspace.value.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
         if (item?.type == ItemType.Widget && item.widgetId >= 0) runCatching { widgetHost.deleteAppWidgetId(item.widgetId) }

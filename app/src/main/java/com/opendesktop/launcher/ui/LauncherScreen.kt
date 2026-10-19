@@ -49,6 +49,8 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FlipToBack
+import androidx.compose.material.icons.rounded.FlipToFront
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -400,8 +402,14 @@ fun LauncherScreen(
             val pageId = target.pageId
             val resize = MenuAction("Przenieś / zmień rozmiar", Icons.Rounded.OpenInFull) { editMode = true; selected = item.id }
             val remove = MenuAction("Usuń z pulpitu", Icons.Rounded.DeleteOutline) { vm.removeItem(pageId, item.id) }
+            // Warstwy: przydatne, gdy elementy na siebie zachodzą
+            val page = ws.pages.firstOrNull { it.id == pageId }
+            val layers = listOfNotNull(
+                if (page != null && page.items.lastOrNull()?.id != item.id) MenuAction("Na wierzch", Icons.Rounded.FlipToFront) { vm.moveLayer(pageId, item.id, toFront = true) } else null,
+                if (page != null && page.items.firstOrNull()?.id != item.id) MenuAction("Na spód", Icons.Rounded.FlipToBack) { vm.moveLayer(pageId, item.id, toFront = false) } else null,
+            )
             when (item.type) {
-                ItemType.App -> appMap[item.app]?.let { AppMenu(it, listOf(resize, remove)) }
+                ItemType.App -> appMap[item.app]?.let { AppMenu(it, listOf(resize) + layers + remove) }
                 ItemType.Folder -> ActionMenu(
                     title = item.label.ifBlank { "Folder" },
                     onDismiss = { menu = null },
@@ -414,6 +422,7 @@ fun LauncherScreen(
                             Icons.Rounded.Settings
                         ) { primaryAppPicker = pageId to item.id },
                         resize,
+                    ) + layers + listOf(
                         MenuAction("Rozgrupuj", Icons.Rounded.CallSplit) { vm.ungroup(pageId, item.id) },
                         MenuAction("Usuń folder", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) },
                     ),
@@ -431,8 +440,7 @@ fun LauncherScreen(
                         if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
                             MenuAction("Skonfiguruj", Icons.Rounded.Settings) { ctx.findActivity()?.let { vm.configureWidget(it, item) } }
                         } else null,
-                        MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) }
-                    ),
+                    ) + layers + MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) },
                 )
             }
         }
@@ -741,7 +749,7 @@ fun LauncherScreen(
                         }
                     }
                     .then(
-                        if (cfg.drawerBackground) Modifier.background(Color(0xFF070A12).copy(alpha = cfg.drawerOpacity))
+                        if (cfg.drawerBackground) Modifier.background(Color.Black.copy(alpha = cfg.drawerOpacity))
                         else Modifier
                     ),
             ) {

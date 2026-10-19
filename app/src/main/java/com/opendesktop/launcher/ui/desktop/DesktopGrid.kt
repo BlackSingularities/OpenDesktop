@@ -165,10 +165,12 @@ fun DesktopGrid(
             )
         }
 
-        for (item in page.items) {
+        // Kolejność na liście = kolejność warstw (ostatni na wierzchu); tak samo liczy trafienia dotyku
+        page.items.forEachIndexed { layer, item ->
             key(item.id) {
                 DesktopItemSlot(
                     item = item,
+                    layer = layer,
                     pageId = page.id,
                     cfg = cfg,
                     apps = apps,
@@ -194,6 +196,7 @@ fun DesktopGrid(
 @Composable
 private fun DesktopItemSlot(
     item: DesktopItem,
+    layer: Int,
     pageId: String,
     cfg: Config,
     apps: Map<String, AppInfo>,
@@ -225,7 +228,7 @@ private fun DesktopItemSlot(
         Modifier
             .offset(cw * item.x, ch * item.y)
             .size(cw * resize.width, ch * resize.height)
-            .zIndex(if (selected || showMenu) 2f else if (item.type == ItemType.Widget) 0f else 1f)
+            .zIndex(if (selected || showMenu) 100_000f else layer.toFloat())
             .onGloballyPositioned { bounds = it.boundsInRoot() }
             .graphicsLayer {
                 alpha = ghost

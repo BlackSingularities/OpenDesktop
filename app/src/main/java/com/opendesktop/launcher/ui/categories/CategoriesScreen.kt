@@ -89,7 +89,7 @@ fun CategoriesScreen(vm: LauncherViewModel, onClose: () -> Unit) {
     }
     val uncategorized = apps.count { ws.assignments[it.key].isNullOrEmpty() }
 
-    Surface(color = Color(0xFA0E121C), modifier = Modifier.fillMaxSize()) {
+    Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Wstecz", tint = Color.White) }

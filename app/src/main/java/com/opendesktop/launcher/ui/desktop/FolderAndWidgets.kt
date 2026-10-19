@@ -4,7 +4,10 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.pm.PackageManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import com.opendesktop.launcher.ui.theme.Palette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -112,37 +115,43 @@ fun FolderDialog(
                 .clickable(interactionSource = null, indication = null) { onRename(name); onDismiss() },
             contentAlignment = Alignment.Center,
         ) {
+            // Styl OpenPDF: ciemny panel, nazwa w polu-grupie, okrągłe przyciski akcji
             Surface(
-                shape = RoundedCornerShape(32.dp),
-                color = Color(0xEE1B2030),
+                shape = RoundedCornerShape(24.dp),
+                color = Palette.PanelHigh.copy(alpha = 0.97f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(20.dp)
                     .widthIn(max = 460.dp)
                     .graphicsLayer { scaleX = 0.9f + 0.1f * shown; scaleY = 0.9f + 0.1f * shown; alpha = shown }
                     .clickable(interactionSource = null, indication = null) {},
             ) {
-                Column(Modifier.padding(20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        "FOLDER", color = Palette.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Palette.Group).padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         BasicTextField(
                             value = name,
                             onValueChange = { name = it.take(30) },
                             singleLine = true,
-                            textStyle = TextStyle(color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            textStyle = TextStyle(color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                            cursorBrush = SolidColor(Color.White),
                             modifier = Modifier.weight(1f),
                             decorationBox = { inner ->
-                                if (name.isEmpty()) Text("Nazwa folderu", color = Color.White.copy(alpha = 0.4f), fontSize = 22.sp)
+                                if (name.isEmpty()) Text("Nazwa folderu", color = Palette.TextFaint, fontSize = 18.sp)
                                 inner()
                             },
                         )
-                        if (aiEnabled) {
-                            IconButton(onClick = { onSuggestName { name = it } }) {
-                                Icon(Icons.Rounded.AutoAwesome, "Zaproponuj nazwę (AI)", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        IconButton(onClick = onAddApps) { Icon(Icons.Rounded.Add, "Dodaj aplikacje", tint = Color.White) }
+                        if (aiEnabled) FolderRoundButton(Icons.Rounded.AutoAwesome, "Zaproponuj nazwę (AI)") { onSuggestName { name = it } }
+                        Spacer(Modifier.width(6.dp))
+                        FolderRoundButton(Icons.Rounded.Add, "Dodaj aplikacje", onClick = onAddApps)
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     LazyVerticalGrid(
                         GridCells.Fixed(4),
                         modifier = Modifier.heightIn(max = 420.dp),
@@ -187,6 +196,14 @@ fun FolderDialog(
     }
 }
 
+@Composable
+private fun FolderRoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(38.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(20.dp)) }
+}
+
 private class WidgetEntry(
     val info: AppWidgetProviderInfo?,
     val builtin: String?,
@@ -221,7 +238,7 @@ fun WidgetPicker(
         WidgetEntry(null, "search", "Pasek wyszukiwania", "OpenDesktop", 5 to 1),
     )
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(color = Color(0xF20F1320), modifier = Modifier.fillMaxSize()) {
+        Surface(color = Palette.Panel, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Wstecz", tint = Color.White) }

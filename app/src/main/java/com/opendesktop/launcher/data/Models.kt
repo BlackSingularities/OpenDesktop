@@ -88,7 +88,7 @@ enum class GestureAction(val label: String) {
 }
 
 @Serializable
-enum class ItemType { App, Folder, Widget, Clock, Search, Action }
+enum class ItemType { App, Folder, Widget, Clock, Search, Action, Gadget }
 
 @Serializable
 enum class SystemAction(val label: String) {
@@ -131,6 +131,81 @@ data class DesktopItem(
     val primaryApp: String? = null,
     /** Wygląd wbudowanej wyszukiwarki ([ItemType.Search]). */
     val searchStyle: SearchStyle = SearchStyle(),
+    /** Rodzaj wbudowanego widżetu dla [ItemType.Gadget]. */
+    val gadget: GadgetKind? = null,
+    /** Wygląd i ustawienia wbudowanego widżetu ([ItemType.Gadget]). */
+    val gadgetStyle: GadgetStyle = GadgetStyle(),
+)
+
+/** Wbudowane widżety OpenDesktop – domyślny rozmiar w komórkach siatki. */
+@Serializable
+enum class GadgetKind(val label: String, val description: String, val w: Int, val h: Int) {
+    DigitalClock("Zegar cyfrowy", "Godzina, data i bateria", 4, 2),
+    AnalogClock("Zegar analogowy", "Tarcza ze wskazówkami", 2, 2),
+    ClockWeather("Zegar z pogodą", "Godzina obok bieżącej pogody", 4, 2),
+    Weather("Pogoda", "Temperatura i warunki teraz", 3, 2),
+    Forecast("Prognoza", "Pogoda na kilka dni", 4, 2),
+    Calendar("Kalendarz", "Siatka miesiąca z dzisiejszym dniem", 3, 3),
+    DateCard("Kartka z kalendarza", "Dzień tygodnia i data", 2, 2),
+    Battery("Bateria", "Poziom naładowania", 2, 2),
+    WorldClock("Zegary świata", "Godzina w innych miastach", 4, 2),
+    Countdown("Odliczanie", "Dni do wybranej daty", 3, 2),
+    Note("Notatka", "Własny tekst na pulpicie", 3, 2),
+    Greeting("Powitanie", "Dzień dobry o każdej porze", 4, 1),
+    Progress("Postęp czasu", "Ile minęło z dnia, miesiąca, roku", 4, 1),
+    Proverb("Przysłowie dnia", "Codziennie inne", 4, 2),
+    Storage("Pamięć", "Miejsce na dane i RAM", 3, 2),
+    ;
+
+    fun defaultStyle(): GadgetStyle = when (this) {
+        DigitalClock, AnalogClock, ClockWeather, Greeting -> GadgetStyle(background = 0x00000000, border = false, textShadow = true)
+        else -> GadgetStyle()
+    }
+}
+
+/**
+ * Wygląd i opcje wbudowanego widżetu. Część pól dotyczy tylko wybranych rodzajów
+ * (np. [city] – pogody, [zones] – zegarów świata). Kolory ARGB.
+ */
+@Serializable
+data class GadgetStyle(
+    val background: Long = 0x40000000,
+    /** Zaokrąglenie rogów w dp. */
+    val radius: Int = 24,
+    val textColor: Long = 0xFFFFFFFF,
+    val accent: Long = 0xFF8AB4FF,
+    val border: Boolean = true,
+    /** Siła cienia pod kartą 0–1. */
+    val shadow: Float = 0f,
+    val textShadow: Boolean = false,
+    /** Mnożnik wielkości tekstu. */
+    val textScale: Float = 1f,
+    /** Grubość głównego tekstu (100–900). */
+    val weight: Int = 300,
+    /** Wyrównanie: 0 = do lewej, 1 = środek, 2 = do prawej. */
+    val align: Int = 1,
+    /** Wewnętrzny margines w dp. */
+    val padding: Int = 12,
+    val use24h: Boolean = true,
+    val showSeconds: Boolean = false,
+    val showDate: Boolean = true,
+    val showBattery: Boolean = false,
+    /** Dodatkowe szczegóły (odczuwalna, wiatr, cyfry na tarczy…). */
+    val showDetails: Boolean = true,
+    /** Wariant – znaczenie zależy od rodzaju (tarcza, okres postępu, układ baterii…). */
+    val mode: Int = 0,
+    val city: String = "Warszawa",
+    val fahrenheit: Boolean = false,
+    val zones: List<String> = listOf("Europe/London", "America/New_York", "Asia/Tokyo"),
+    /** Data docelowa odliczania (RRRR-MM-DD). */
+    val target: String = "",
+    /** Podpis: imię w powitaniu, nazwa odliczania, tytuł notatki. */
+    val label: String = "",
+    /** Treść notatki. */
+    val text: String = "",
+    val mondayFirst: Boolean = true,
+    /** Liczba dni prognozy. */
+    val days: Int = 5,
 )
 
 /**

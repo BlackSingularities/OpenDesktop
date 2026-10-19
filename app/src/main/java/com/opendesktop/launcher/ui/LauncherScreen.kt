@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -642,10 +643,11 @@ fun LauncherScreen(
                         PageTransition.entries.filter { it != PageTransition.Random && it != transition }.random()
                     } else cfg.transition
                 }
+                Box(Modifier.weight(1f)) {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxSize()
                         .graphicsLayer { scaleX = editScale; scaleY = editScale },
                     beyondViewportPageCount = ws.pages.size,
                     userScrollEnabled = !drag.active,
@@ -684,14 +686,27 @@ fun LauncherScreen(
                         )
                     }
                 }
+                // Wskaźnik ekranów: nakładka u góry, bez zajmowania miejsca; widać go tylko
+                // w trakcie przewijania ekranów i chwilę po nim
                 if (cfg.showPageIndicator && ws.pages.size > 1) {
+                    var indicatorShown by remember { mutableStateOf(false) }
+                    LaunchedEffect(pagerState.isScrollInProgress) {
+                        if (pagerState.isScrollInProgress) indicatorShown = true
+                        else { delay(700); indicatorShown = false }
+                    }
+                    val indicatorAlpha by animateFloatAsState(if (indicatorShown || cfg.pageIndicatorAlways) 1f else 0f, label = "pageIndicator")
                     PageIndicator(
                         count = ws.pages.size,
                         current = pagerState.currentPage,
                         fraction = pagerState.currentPageOffsetFraction,
                         homeIndex = cfg.defaultPage,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                            .graphicsLayer { alpha = indicatorAlpha },
                     )
+                }
                 }
                 if (cfg.dockEnabled) {
                     Dock(

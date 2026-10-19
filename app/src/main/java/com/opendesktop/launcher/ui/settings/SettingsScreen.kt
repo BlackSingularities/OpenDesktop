@@ -200,6 +200,7 @@ private fun DesktopSection(vm: LauncherViewModel, cfg: Config, set: Setter, pick
     TileGrid(
         listOf(
             Tile(Icons.Rounded.FiberManualRecord, "Wskaźnik ekranów", cfg.showPageIndicator) { v -> set { it.copy(showPageIndicator = v) } },
+            Tile(Icons.Rounded.PushPin, "Wskaźnik zawsze widoczny", cfg.pageIndicatorAlways) { v -> set { it.copy(pageIndicatorAlways = v) } },
             Tile(Icons.Rounded.Wallpaper, "Przewijanie tapety", cfg.wallpaperScroll) { v -> set { it.copy(wallpaperScroll = v) } },
             Tile(Icons.Rounded.GridOn, "Siatka w edycji", cfg.editGridLines) { v -> set { it.copy(editGridLines = v) } },
         ),

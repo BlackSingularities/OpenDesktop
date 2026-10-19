@@ -166,6 +166,8 @@ data class Config(
     val defaultPage: Int = 0,
     val wallpaperScroll: Boolean = true,
     val showPageIndicator: Boolean = true,
+    /** Wskaźnik ekranów widoczny stale, a nie tylko podczas przewijania. */
+    val pageIndicatorAlways: Boolean = false,
     val editGridLines: Boolean = true,
     // Ikony
     val iconScale: Float = 1f,

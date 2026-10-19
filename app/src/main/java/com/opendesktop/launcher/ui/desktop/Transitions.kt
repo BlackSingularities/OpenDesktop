@@ -16,6 +16,10 @@ import kotlin.math.sin
  */
 fun Modifier.pageTransition(page: Int, state: PagerState, transition: PageTransition): Modifier = graphicsLayer {
     val position = (page - state.currentPage) - state.currentPageOffsetFraction
+    // Ekran całkiem poza widokiem zostaje na swoim miejscu. Inaczej efekty z kompensacją
+    // translationX (Przenikanie, Głębia, Stos…) kładą niewidoczny sąsiedni ekran na bieżący,
+    // a jego elementy przechwytują dotyk ikon leżących pod nimi.
+    if (abs(position) >= 0.999f) return@graphicsLayer
     val p = position.coerceIn(-1f, 1f)
     val ap = abs(p)
     val w = size.width

@@ -413,9 +413,10 @@ fun LauncherScreen(
             title = labelOf(app),
             onDismiss = { menu = null },
             shortcuts = shortcuts.map { s -> MenuShortcut(s.label, s.icon) { vm.startShortcut(s) } },
-            actions = extra + listOfNotNull(
-                MenuAction("Kategorie…", Icons.Rounded.Category) { assignFor = app },
-                MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameApp = app },
+            // Zablokowany układ: tylko skróty, informacje i odinstalowanie – nic, co zmienia układ
+            actions = (if (cfg.layoutLocked) emptyList() else extra) + listOfNotNull(
+                if (cfg.layoutLocked) null else MenuAction("Kategorie…", Icons.Rounded.Category) { assignFor = app },
+                if (cfg.layoutLocked) null else MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameApp = app },
                 MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { vm.openDetails(app) },
                 if (!app.isSystem) MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) } else null,
             ),
@@ -443,9 +444,9 @@ fun LauncherScreen(
                     onDismiss = { menu = null },
                     actions = listOfNotNull(
                         MenuAction("Otwórz folder", Icons.Rounded.FolderOpen) { folderAnchor = Rect.Zero; openFolder = pageId to item.id },
-                        MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameFolder = pageId to item.id },
-                        MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
-                        MenuAction(
+                        if (locked) null else MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameFolder = pageId to item.id },
+                        if (locked) null else MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
+                        if (locked) null else MenuAction(
                             if (item.primaryApp != null) "Zmień główną aplikację" else "Ustaw główną aplikację",
                             Icons.Rounded.Settings
                         ) { primaryAppPicker = pageId to item.id },
@@ -468,7 +469,7 @@ fun LauncherScreen(
                         if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
                             MenuAction("Skonfiguruj", Icons.Rounded.Settings) { ctx.findActivity()?.let { vm.configureWidget(it, item) } }
                         } else null,
-                        if (item.type == ItemType.Widget) {
+                        if (item.type == ItemType.Widget && !locked) {
                             MenuAction(if (item.stretch) "Bez rozciągania" else "Rozciągnij na cały kafelek", Icons.Rounded.OpenInFull) {
                                 vm.setWidgetStretch(pageId, item.id, !item.stretch)
                             }
@@ -796,7 +797,7 @@ fun LauncherScreen(
                             ActionMenu(
                                 title = a.label,
                                 onDismiss = { menu = null },
-                                actions = listOf(MenuAction("Usuń z doku", Icons.Rounded.DeleteOutline) { vm.removeFromDock(a.dockKey) }),
+                                actions = if (cfg.layoutLocked) emptyList() else listOf(MenuAction("Usuń z doku", Icons.Rounded.DeleteOutline) { vm.removeFromDock(a.dockKey) }),
                             )
                         },
                     )

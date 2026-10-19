@@ -15,7 +15,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import kotlin.math.abs
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -54,6 +57,8 @@ import androidx.compose.material.icons.rounded.FlipToBack
 import androidx.compose.material.icons.rounded.FlipToFront
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material.icons.rounded.Settings
@@ -242,6 +247,7 @@ fun LauncherScreen(
             GestureAction.Drawer -> openDrawer()
             GestureAction.Search -> openDrawer(focus = true)
             GestureAction.Notifications -> SystemActions.expandNotifications(ctx)
+            GestureAction.QuickSettings -> SystemActions.openQuickSettings(ctx)
             GestureAction.EditMode -> { vibrate(); editMode = true }
             GestureAction.Settings -> overlay = Overlay.Settings
         }
@@ -319,6 +325,11 @@ fun LauncherScreen(
     }
 
     fun startDrag(source: DragSource, item: DesktopItem, fromPageId: String?, bounds: Rect) {
+        if (cfg.layoutLocked) {
+            menu = null
+            vm.toast("Układ jest zablokowany – odblokujesz go w trybie edycji")
+            return
+        }
         menu = null
         vibrate()
         drag.zoneBounds.clear()
@@ -414,20 +425,22 @@ fun LauncherScreen(
         val target = menu as? MenuTarget.Desktop
         if (target != null) {
             val pageId = target.pageId
-            val resize = MenuAction("Przenieś / zmień rozmiar", Icons.Rounded.OpenInFull) { editMode = true; selected = item.id }
-            val remove = MenuAction("Usuń z pulpitu", Icons.Rounded.DeleteOutline) { vm.removeItem(pageId, item.id) }
+            // Przy zablokowanym układzie znikają akcje, które go zmieniają (przenoszenie, warstwy, usuwanie)
+            val locked = cfg.layoutLocked
+            val resize = if (locked) null else MenuAction("Przenieś / zmień rozmiar", Icons.Rounded.OpenInFull) { editMode = true; selected = item.id }
+            val remove = if (locked) null else MenuAction("Usuń z pulpitu", Icons.Rounded.DeleteOutline) { vm.removeItem(pageId, item.id) }
             // Warstwy: przydatne, gdy elementy na siebie zachodzą
             val page = ws.pages.firstOrNull { it.id == pageId }
-            val layers = listOfNotNull(
+            val layers = if (locked) emptyList() else listOfNotNull(
                 if (page != null && page.items.lastOrNull()?.id != item.id) MenuAction("Na wierzch", Icons.Rounded.FlipToFront) { vm.moveLayer(pageId, item.id, toFront = true) } else null,
                 if (page != null && page.items.firstOrNull()?.id != item.id) MenuAction("Na spód", Icons.Rounded.FlipToBack) { vm.moveLayer(pageId, item.id, toFront = false) } else null,
             )
             when (item.type) {
-                ItemType.App -> appMap[item.app]?.let { AppMenu(it, listOf(resize) + layers + remove) }
+                ItemType.App -> appMap[item.app]?.let { AppMenu(it, listOfNotNull(resize) + layers + listOfNotNull(remove)) }
                 ItemType.Folder -> ActionMenu(
                     title = item.label.ifBlank { "Folder" },
                     onDismiss = { menu = null },
-                    actions = listOf(
+                    actions = listOfNotNull(
                         MenuAction("Otwórz folder", Icons.Rounded.FolderOpen) { folderAnchor = Rect.Zero; openFolder = pageId to item.id },
                         MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameFolder = pageId to item.id },
                         MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
@@ -436,7 +449,7 @@ fun LauncherScreen(
                             Icons.Rounded.Settings
                         ) { primaryAppPicker = pageId to item.id },
                         resize,
-                    ) + layers + listOf(
+                    ) + layers + if (locked) emptyList() else listOf(
                         MenuAction("Rozgrupuj", Icons.Rounded.CallSplit) { vm.ungroup(pageId, item.id) },
                         MenuAction("Usuń folder", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) },
                     ),
@@ -459,7 +472,7 @@ fun LauncherScreen(
                                 vm.setWidgetStretch(pageId, item.id, !item.stretch)
                             }
                         } else null,
-                    ) + layers + MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) },
+                    ) + layers + listOfNotNull(if (locked) null else MenuAction("Usuń", Icons.Rounded.Delete, danger = true) { vm.removeItem(pageId, item.id) }),
                 )
             }
         }
@@ -526,7 +539,9 @@ fun LauncherScreen(
 
         override fun onDragEnd() = endDrag()
 
-        override fun onResize(pageId: String, item: DesktopItem, w: Int, h: Int) = vm.resizeItem(pageId, item.id, w, h)
+        override fun onResize(pageId: String, item: DesktopItem, w: Int, h: Int) {
+            if (!cfg.layoutLocked) vm.resizeItem(pageId, item.id, w, h)
+        }
 
         override fun onEmptyLongPress() {
             vibrate()
@@ -651,7 +666,50 @@ fun LauncherScreen(
                         PageTransition.entries.filter { it != PageTransition.Random && it != transition }.random()
                     } else cfg.transition
                 }
-                Box(Modifier.weight(1f)) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        // Gesty dwoma palcami: uszczypnięcie, rozsunięcie, przesunięcie w górę/dół.
+                        // Faza Initial – przy dwóch palcach ani ikony, ani przewijanie ekranów nie reagują
+                        .pointerInput(editMode, cfg.pinchIn, cfg.pinchOut, cfg.twoFingerUp, cfg.twoFingerDown) {
+                            val swipe = 90.dp.toPx()
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                var startDist = 0f
+                                var startCenter = Offset.Zero
+                                var tracking = false
+                                var fired = false
+                                while (true) {
+                                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                                    val down = ev.changes.filter { it.pressed }
+                                    if (down.isEmpty()) break
+                                    if (down.size < 2 || editMode || drag.active) continue
+                                    val a = down[0].position
+                                    val b = down[1].position
+                                    val dist = (a - b).getDistance()
+                                    val center = (a + b) / 2f
+                                    if (!tracking) {
+                                        tracking = true; startDist = dist.coerceAtLeast(1f); startCenter = center
+                                    } else if (!fired) {
+                                        val ratio = dist / startDist
+                                        val dy = center.y - startCenter.y
+                                        val action = when {
+                                            ratio < 0.7f -> cfg.pinchIn
+                                            ratio > 1.4f -> cfg.pinchOut
+                                            abs(ratio - 1f) < 0.2f && dy < -swipe -> cfg.twoFingerUp
+                                            abs(ratio - 1f) < 0.2f && dy > swipe -> cfg.twoFingerDown
+                                            else -> null
+                                        }
+                                        if (action != null) {
+                                            fired = true
+                                            if (action != GestureAction.None) { vibrate(); runGesture(action) }
+                                        }
+                                    }
+                                    ev.changes.forEach { it.consume() }
+                                }
+                            }
+                        },
+                ) {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
@@ -753,6 +811,13 @@ fun LauncherScreen(
                             if (p != null && p.items.isEmpty()) vm.removePage(pagerState.currentPage) else confirmRemovePage = pagerState.currentPage
                         },
                         onSettings = { overlay = Overlay.Settings },
+                        locked = cfg.layoutLocked,
+                        onToggleLock = {
+                            val now = !cfg.layoutLocked
+                            vm.updateConfig { it.copy(layoutLocked = now) }
+                            selected = null
+                            vm.toast(if (now) "Układ zablokowany" else "Układ odblokowany")
+                        },
                     )
                 }
             }
@@ -1106,6 +1171,8 @@ private fun EditToolbar(
     onAddPage: () -> Unit,
     onRemovePage: () -> Unit,
     onSettings: () -> Unit,
+    locked: Boolean,
+    onToggleLock: () -> Unit,
 ) {
     // Jedna wspólna belka, przyciski dzielą szerokość po równo – bez przewijania
     Row(
@@ -1121,6 +1188,7 @@ private fun EditToolbar(
         BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper)
         BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
         BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage)
+        BigToolButton(if (locked) Icons.Rounded.Lock else Icons.Rounded.LockOpen, if (locked) "Odblokuj" else "Zablokuj", onToggleLock, highlighted = locked)
         BigToolButton(Icons.Rounded.Settings, "Ustawienia", onSettings)
     }
 }

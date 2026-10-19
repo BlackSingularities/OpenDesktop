@@ -294,6 +294,20 @@ private fun GesturesSection(cfg: Config, set: Setter, pick: Picker) {
             pick.choose("Podwójne dotknięcie", GestureAction.entries, cfg.doubleTap, { it.label }) { g -> set { it.copy(doubleTap = g) } }
         }
     }
+    Group("Dwa palce") {
+        ActionRow(Icons.Rounded.ZoomIn, "Uszczypnięcie", cfg.pinchIn.label, chevron = true) {
+            pick.choose("Uszczypnięcie (palce do siebie)", GestureAction.entries, cfg.pinchIn, { it.label }) { g -> set { it.copy(pinchIn = g) } }
+        }
+        ActionRow(Icons.Rounded.ZoomOut, "Rozsunięcie palców", cfg.pinchOut.label, chevron = true) {
+            pick.choose("Rozsunięcie palców", GestureAction.entries, cfg.pinchOut, { it.label }) { g -> set { it.copy(pinchOut = g) } }
+        }
+        ActionRow(Icons.Rounded.KeyboardDoubleArrowUp, "Dwa palce w górę", cfg.twoFingerUp.label, chevron = true) {
+            pick.choose("Dwa palce w górę", GestureAction.entries, cfg.twoFingerUp, { it.label }) { g -> set { it.copy(twoFingerUp = g) } }
+        }
+        ActionRow(Icons.Rounded.KeyboardDoubleArrowDown, "Dwa palce w dół", cfg.twoFingerDown.label, chevron = true) {
+            pick.choose("Dwa palce w dół", GestureAction.entries, cfg.twoFingerDown, { it.label }) { g -> set { it.copy(twoFingerDown = g) } }
+        }
+    }
     Group {
         SwitchRow(Icons.Rounded.Vibration, "Wibracje", "Lekka wibracja przy przytrzymaniu i przeciąganiu", cfg.haptics) { v -> set { it.copy(haptics = v) } }
     }

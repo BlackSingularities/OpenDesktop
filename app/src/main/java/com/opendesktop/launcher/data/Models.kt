@@ -82,6 +82,7 @@ enum class GestureAction(val label: String) {
     Drawer("Szuflada aplikacji"),
     Search("Wyszukiwanie"),
     Notifications("Powiadomienia"),
+    QuickSettings("Szybkie ustawienia"),
     EditMode("Tryb edycji pulpitu"),
     Settings("Ustawienia launchera"),
 }
@@ -168,6 +169,8 @@ data class Config(
     val defaultPage: Int = 0,
     val wallpaperScroll: Boolean = true,
     val showPageIndicator: Boolean = true,
+    /** Blokada układu: bez przeciągania, zmiany rozmiaru i usuwania elementów. */
+    val layoutLocked: Boolean = false,
     /** Wskaźnik ekranów widoczny stale, a nie tylko podczas przewijania. */
     val pageIndicatorAlways: Boolean = false,
     val editGridLines: Boolean = true,
@@ -206,6 +209,11 @@ data class Config(
     val swipeUp: GestureAction = GestureAction.Drawer,
     val swipeDown: GestureAction = GestureAction.Notifications,
     val doubleTap: GestureAction = GestureAction.EditMode,
+    // Gesty dwoma palcami
+    val pinchIn: GestureAction = GestureAction.EditMode,
+    val pinchOut: GestureAction = GestureAction.None,
+    val twoFingerUp: GestureAction = GestureAction.None,
+    val twoFingerDown: GestureAction = GestureAction.QuickSettings,
     val haptics: Boolean = true,
     // Wygląd
     // Domyślnie czarno-biały interfejs jak w OpenPDF

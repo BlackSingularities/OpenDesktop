@@ -1013,6 +1013,8 @@ fun LauncherScreen(
                     // Ten sam rozmiar co ikona aplikacji na pulpicie
                     iconSizeFor(vm.cellSizePx.width.toDp(), vm.cellSizePx.height.toDp(), cfg.desktopIconScale, cfg.showLabels, desktopMode = true)
                 },
+                cellW = with(LocalDensity.current) { vm.cellSizePx.width.toDp() },
+                cellH = with(LocalDensity.current) { vm.cellSizePx.height.toDp() },
                 aiEnabled = vm.aiReady,
                 onDismiss = { openFolder = null },
                 onLaunch = { app, b -> launch(app, b) },

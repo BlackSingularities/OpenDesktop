@@ -109,6 +109,8 @@ fun FolderDialog(
     labelOf: (AppInfo) -> String,
     cfg: Config,
     iconSize: Dp,
+    cellW: Dp,
+    cellH: Dp,
     aiEnabled: Boolean,
     onDismiss: () -> Unit,
     onLaunch: (AppInfo, Rect) -> Unit,
@@ -137,11 +139,11 @@ fun FolderDialog(
     Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().clickable(interactionSource = null, indication = null) { close() }) {
             val density = LocalDensity.current
-            // Komórka dopasowana do ikony o rozmiarze takim jak na pulpicie
-            val cell = maxOf(78.dp, iconSize + if (cfg.showLabels) 30.dp else 14.dp)
+            // Komórki i odstępy takie same jak siatka pulpitu
+            val cell = cellH
             val footer = 34.dp
-            val panelW = minOf(cell * cols + 20.dp, maxWidth - 24.dp)
-            val panelH = minOf(cell * rows + 20.dp + footer, maxHeight * 0.7f)
+            val panelW = minOf(cellW * cols + 12.dp, maxWidth - 24.dp)
+            val panelH = minOf(cell * rows + 6.dp + footer, maxHeight * 0.7f)
             val wPx = with(density) { panelW.toPx() }
             val hPx = with(density) { panelH.toPx() }
             val screenW = with(density) { maxWidth.toPx() }
@@ -167,7 +169,7 @@ fun FolderDialog(
                     .background(panel.background)
                     .border(1.dp, panel.border, shape)
                     .clickable(interactionSource = null, indication = null) {}
-                    .padding(start = 10.dp, end = 10.dp, top = 10.dp),
+                    .padding(start = 6.dp, end = 6.dp, top = 6.dp),
             ) {
                 LazyVerticalGrid(GridCells.Fixed(cols), modifier = Modifier.weight(1f).fillMaxWidth()) {
                     items(list, key = { it.key }) { app ->

@@ -101,6 +101,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -196,6 +197,8 @@ fun LauncherScreen(
     var menu by remember { mutableStateOf<MenuTarget?>(null) }
     var selected by remember { mutableStateOf<String?>(null) }
     var openFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // Miejsce ikony folderu na ekranie — okienko otwiera się przy niej (Rect.Zero = na środku)
+    var folderAnchor by remember { mutableStateOf(Rect.Zero) }
     var folderPicker by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
     var primaryAppPicker by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
@@ -414,7 +417,7 @@ fun LauncherScreen(
                     title = item.label.ifBlank { "Folder" },
                     onDismiss = { menu = null },
                     actions = listOf(
-                        MenuAction("Otwórz folder", Icons.Rounded.FolderOpen) { openFolder = pageId to item.id },
+                        MenuAction("Otwórz folder", Icons.Rounded.FolderOpen) { folderAnchor = Rect.Zero; openFolder = pageId to item.id },
                         MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameFolder = pageId to item.id },
                         MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
                         MenuAction(
@@ -478,6 +481,7 @@ fun LauncherScreen(
                     if (item.primaryApp != null) {
                         appMap[item.primaryApp]?.let { launch(it, bounds) }
                     } else {
+                        folderAnchor = bounds
                         openFolder = pageId to item.id
                     }
                 }
@@ -493,8 +497,9 @@ fun LauncherScreen(
             menu = MenuTarget.Desktop(pageId, item.id)
         }
 
-        override fun onOpenFolder(pageId: String, item: DesktopItem) {
+        override fun onOpenFolder(pageId: String, item: DesktopItem, bounds: Rect) {
             menu = null
+            folderAnchor = bounds
             openFolder = pageId to item.id
         }
 
@@ -804,6 +809,7 @@ fun LauncherScreen(
         } else {
             FolderDialog(
                 folder = folder,
+                anchor = folderAnchor,
                 apps = appMap,
                 labelOf = labelOf,
                 cfg = cfg,
@@ -1041,15 +1047,24 @@ private fun EditTopBar(
     onHome: () -> Unit,
     onDone: () -> Unit,
 ) {
+    // Ta sama belka co dolny pasek edycji: numer ekranu i kompaktowe przyciski
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Ekran ${page + 1} z $count", color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f))
-        ToolButton(Icons.AutoMirrored.Rounded.ArrowBack, "W lewo", enabled = page > 0, onClick = onMoveLeft)
-        ToolButton(Icons.AutoMirrored.Rounded.ArrowForward, "W prawo", enabled = page < count - 1, onClick = onMoveRight)
-        ToolButton(Icons.Rounded.Home, if (isHome) "Główny" else "Ustaw główny", highlighted = isHome, onClick = onHome)
-        ToolButton(Icons.Rounded.Check, "Gotowe", highlighted = true, onClick = onDone)
+        Column(Modifier.weight(1.3f).padding(start = 12.dp)) {
+            Text("EKRAN", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+            Text("${page + 1} z $count", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+        BigToolButton(Icons.AutoMirrored.Rounded.ArrowBack, "W lewo", enabled = page > 0, onClick = onMoveLeft)
+        BigToolButton(Icons.AutoMirrored.Rounded.ArrowForward, "W prawo", enabled = page < count - 1, onClick = onMoveRight)
+        BigToolButton(Icons.Rounded.Home, if (isHome) "Główny" else "Ustaw główny", highlighted = isHome, onClick = onHome)
+        BigToolButton(Icons.Rounded.Check, "Gotowe", highlighted = true, onClick = onDone)
     }
 }
 
@@ -1098,17 +1113,26 @@ private fun ToolButton(icon: ImageVector, label: String, enabled: Boolean = true
 }
 
 @Composable
-private fun RowScope.BigToolButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun RowScope.BigToolButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    highlighted: Boolean = false,
+) {
+    val fg = if (highlighted) Color.Black else Color.White
     Column(
         Modifier
             .weight(1f)
             .clip(RoundedCornerShape(18.dp))
-            .pointerInput(Unit) { detectTapGestures { onClick() } }
+            .background(if (highlighted) Color.White else Color.Transparent)
+            .then(if (enabled) Modifier.pointerInput(onClick) { detectTapGestures { onClick() } } else Modifier)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.35f }
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, label, tint = Color.White, modifier = Modifier.size(22.dp))
+        Icon(icon, label, tint = fg, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(3.dp))
-        Text(label, color = Color.White, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Text(label, color = fg, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }

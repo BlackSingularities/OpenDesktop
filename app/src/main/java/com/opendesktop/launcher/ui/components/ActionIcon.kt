@@ -53,7 +53,8 @@ fun ActionIcon(
         if (a == SystemAction.OpenDrawer) {
             // Klasyczny przycisk szuflady: biała kula z sześcioma kropkami (2 × 3)
             Canvas(Modifier.size(iconSize)) {
-                val s = if (pressed) 0.9f else 1f
+                // 0.84 – ikony aplikacji mają wewnętrzny margines, pełne koło wyglądałoby na większe
+                val s = if (pressed) 0.76f else 0.84f
                 val r = size.minDimension / 2 * s
                 drawCircle(Color.White, r)
                 val dot = r * 0.11f
@@ -64,7 +65,7 @@ fun ActionIcon(
             }
         } else {
             Box(
-                Modifier.size(iconSize).clip(CircleShape).background(Color.White.copy(alpha = if (pressed) 0.32f else 0.2f)),
+                Modifier.size(iconSize).padding(iconSize * 0.08f).clip(CircleShape).background(Color.White.copy(alpha = if (pressed) 0.32f else 0.2f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(a.icon, contentDescription = label.ifBlank { a.label }, tint = Color.White, modifier = Modifier.size(iconSize * 0.5f))

@@ -11,7 +11,14 @@ import com.opendesktop.launcher.ui.theme.Palette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -88,9 +95,14 @@ import com.opendesktop.launcher.ui.components.itemGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Folder jako małe okienko przy swojej ikonie: lekkie „szkło”, małe zaokrąglenie, siatka ikon,
+ * a na dole subtelna (edytowalna) nazwa i mały plus. [anchor] = Rect.Zero → na środku ekranu.
+ */
 @Composable
 fun FolderDialog(
     folder: DesktopItem,
+    anchor: Rect,
     apps: Map<String, AppInfo>,
     labelOf: (AppInfo) -> String,
     cfg: Config,
@@ -106,102 +118,113 @@ fun FolderDialog(
     var name by remember(folder.id) { mutableStateOf(folder.label) }
     var menuKey by remember { mutableStateOf<String?>(null) }
     val appear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = 500f)) }
-    val shown = appear.value
-    Dialog(onDismissRequest = { onRename(name); onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clickable(interactionSource = null, indication = null) { onRename(name); onDismiss() },
-            contentAlignment = Alignment.Center,
-        ) {
-            // Styl OpenPDF: ciemny panel, nazwa w polu-grupie, okrągłe przyciski akcji
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Palette.PanelHigh.copy(alpha = 0.97f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                modifier = Modifier
-                    .padding(20.dp)
-                    .widthIn(max = 460.dp)
-                    .graphicsLayer { scaleX = 0.9f + 0.1f * shown; scaleY = 0.9f + 0.1f * shown; alpha = shown }
-                    .clickable(interactionSource = null, indication = null) {},
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(
-                        "FOLDER", color = Palette.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
-                    )
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Palette.Group).padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        BasicTextField(
-                            value = name,
-                            onValueChange = { name = it.take(30) },
-                            singleLine = true,
-                            textStyle = TextStyle(color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                            cursorBrush = SolidColor(Color.White),
-                            modifier = Modifier.weight(1f),
-                            decorationBox = { inner ->
-                                if (name.isEmpty()) Text("Nazwa folderu", color = Palette.TextFaint, fontSize = 18.sp)
-                                inner()
-                            },
-                        )
-                        if (aiEnabled) FolderRoundButton(Icons.Rounded.AutoAwesome, "Zaproponuj nazwę (AI)") { onSuggestName { name = it } }
-                        Spacer(Modifier.width(6.dp))
-                        FolderRoundButton(Icons.Rounded.Add, "Dodaj aplikacje", onClick = onAddApps)
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 600f)) }
+    val list = folder.apps.mapNotNull { apps[it] }
+    val cols = when {
+        list.size <= 4 -> 2
+        list.size <= 9 -> 3
+        else -> 4
+    }
+    val rows = ((list.size + cols - 1) / cols).coerceAtLeast(1)
+    val ink = Color(0xFF202124)
+    fun close() { onRename(name); onDismiss() }
+
+    Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        BoxWithConstraints(Modifier.fillMaxSize().clickable(interactionSource = null, indication = null) { close() }) {
+            val density = LocalDensity.current
+            val cell = 78.dp
+            val footer = 34.dp
+            val panelW = cell * cols + 20.dp
+            val panelH = minOf(cell * rows + 20.dp + footer, maxHeight * 0.7f)
+            val wPx = with(density) { panelW.toPx() }
+            val hPx = with(density) { panelH.toPx() }
+            val screenW = with(density) { maxWidth.toPx() }
+            val screenH = with(density) { maxHeight.toPx() }
+            val margin = with(density) { 12.dp.toPx() }
+            val cx = if (anchor == Rect.Zero) screenW / 2 else anchor.center.x
+            val cy = if (anchor == Rect.Zero) screenH / 2 else anchor.center.y
+            val x = (cx - wPx / 2).coerceIn(margin, (screenW - wPx - margin).coerceAtLeast(margin))
+            val y = (cy - hPx / 2).coerceIn(margin * 3, (screenH - hPx - margin * 3).coerceAtLeast(margin * 3))
+            val shape = RoundedCornerShape(6.dp)
+            Column(
+                Modifier
+                    .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                    .size(panelW, panelH)
+                    .graphicsLayer {
+                        // Wyrasta z ikony folderu
+                        transformOrigin = TransformOrigin(((cx - x) / wPx).coerceIn(0f, 1f), ((cy - y) / hPx).coerceIn(0f, 1f))
+                        val s = 0.6f + 0.4f * appear.value
+                        scaleX = s; scaleY = s
+                        alpha = appear.value.coerceIn(0f, 1f)
                     }
-                    Spacer(Modifier.height(8.dp))
-                    LazyVerticalGrid(
-                        GridCells.Fixed(4),
-                        modifier = Modifier.heightIn(max = 420.dp),
-                        contentPadding = PaddingValues(bottom = 4.dp),
-                    ) {
-                        items(folder.apps.mapNotNull { apps[it] }, key = { it.key }) { app ->
-                            var bounds by remember { mutableStateOf(Rect.Zero) }
-                            var pressed by remember { mutableStateOf(false) }
-                            Box(Modifier.padding(vertical = 10.dp)) {
-                                AppIcon(
-                                    app.icon, labelOf(app), 54.dp, cfg.iconShape, true,
-                                    pressed = pressed, labelSize = cfg.labelSize,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .onGloballyPositioned { bounds = it.boundsInRoot() }
-                                        .itemGestures(
-                                            key = app.key,
-                                            onPress = { pressed = it },
-                                            onTap = { onLaunch(app, bounds) },
-                                            onLongPress = { menuKey = app.key },
+                    .clip(shape)
+                    .background(Color.White.copy(alpha = 0.74f))
+                    .border(1.dp, Color.White.copy(alpha = 0.6f), shape)
+                    .clickable(interactionSource = null, indication = null) {}
+                    .padding(start = 10.dp, end = 10.dp, top = 10.dp),
+            ) {
+                LazyVerticalGrid(GridCells.Fixed(cols), modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    items(list, key = { it.key }) { app ->
+                        var bounds by remember { mutableStateOf(Rect.Zero) }
+                        var pressed by remember { mutableStateOf(false) }
+                        Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
+                            AppIcon(
+                                app.icon, labelOf(app), 52.dp, cfg.iconShape, cfg.showLabels,
+                                pressed = pressed, labelSize = 11f, labelColor = ink, shadow = false,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .onGloballyPositioned { bounds = it.boundsInRoot() }
+                                    .itemGestures(
+                                        key = app.key,
+                                        onPress = { pressed = it },
+                                        onTap = { onLaunch(app, bounds) },
+                                        onLongPress = { menuKey = app.key },
+                                    ),
+                            )
+                            if (menuKey == app.key) {
+                                Box(Modifier.align(Alignment.Center)) {
+                                    ActionMenu(
+                                        title = labelOf(app),
+                                        onDismiss = { menuKey = null },
+                                        actions = listOf(
+                                            MenuAction("Wyjmij na pulpit", Icons.Rounded.Logout) { onRemoveApp(app.key, true) },
+                                            MenuAction("Usuń z folderu", Icons.Rounded.Close) { onRemoveApp(app.key, false) },
+                                            MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { onInfo(app) },
                                         ),
-                                )
-                                if (menuKey == app.key) {
-                                    Box(Modifier.align(Alignment.Center)) {
-                                        ActionMenu(
-                                            title = labelOf(app),
-                                            onDismiss = { menuKey = null },
-                                            actions = listOf(
-                                                MenuAction("Wyjmij na pulpit", Icons.Rounded.Logout) { onRemoveApp(app.key, true) },
-                                                MenuAction("Usuń z folderu", Icons.Rounded.Close) { onRemoveApp(app.key, false) },
-                                                MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { onInfo(app) },
-                                            ),
-                                        )
-                                    }
+                                    )
                                 }
                             }
                         }
                     }
                 }
+                // Stopka: subtelna nazwa i mały plus
+                Row(Modifier.fillMaxWidth().height(footer), verticalAlignment = Alignment.CenterVertically) {
+                    BasicTextField(
+                        value = name,
+                        onValueChange = { name = it.take(30) },
+                        singleLine = true,
+                        textStyle = TextStyle(color = ink.copy(alpha = 0.55f), fontSize = 13.sp),
+                        cursorBrush = SolidColor(ink),
+                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                        decorationBox = { inner ->
+                            if (name.isEmpty()) Text("Nazwa folderu", color = ink.copy(alpha = 0.35f), fontSize = 13.sp)
+                            inner()
+                        },
+                    )
+                    if (aiEnabled) {
+                        Icon(
+                            Icons.Rounded.AutoAwesome, "Zaproponuj nazwę (AI)", tint = ink.copy(alpha = 0.45f),
+                            modifier = Modifier.size(30.dp).clip(CircleShape).clickable { onSuggestName { name = it } }.padding(6.dp),
+                        )
+                    }
+                    Icon(
+                        Icons.Rounded.Add, "Dodaj aplikacje", tint = ink.copy(alpha = 0.55f),
+                        modifier = Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onAddApps).padding(5.dp),
+                    )
+                }
             }
         }
     }
-}
-
-@Composable
-private fun FolderRoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Box(
-        Modifier.size(38.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(20.dp)) }
 }
 
 private class WidgetEntry(

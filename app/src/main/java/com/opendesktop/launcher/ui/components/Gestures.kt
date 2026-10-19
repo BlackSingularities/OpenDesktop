@@ -76,22 +76,27 @@ fun Modifier.itemGestures(
             }
             long()
             var dragging = false
-            while (true) {
-                val ev = awaitPointerEvent()
-                val c = ev.changes.firstOrNull { it.id == down.id } ?: break
-                if (!c.pressed) {
+            // finally: przeciąganie kończy się zawsze, także gdy element zniknie z ekranu w trakcie
+            // (anulowana korutyna) – inaczej podgląd ikony „zamarza”, a pulpit blokuje gesty
+            try {
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!c.pressed) {
+                        c.consume()
+                        break
+                    }
+                    if (!dragging && (c.position - down.position).getDistance() > slop) {
+                        dragging = true
+                        press(false)
+                        dragStart()
+                    }
                     c.consume()
-                    break
                 }
-                if (!dragging && (c.position - down.position).getDistance() > slop) {
-                    dragging = true
-                    press(false)
-                    dragStart()
-                }
-                c.consume()
+            } finally {
+                press(false)
+                if (dragging) dragEnd()
             }
-            press(false)
-            if (dragging) dragEnd()
         }
     }
 }

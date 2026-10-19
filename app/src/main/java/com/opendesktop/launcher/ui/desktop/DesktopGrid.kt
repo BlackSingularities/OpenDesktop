@@ -76,7 +76,7 @@ import kotlin.math.roundToInt
 interface DesktopCallbacks {
     fun onItemTap(pageId: String, item: DesktopItem, bounds: Rect)
     fun onItemLongPress(pageId: String, item: DesktopItem)
-    fun onOpenFolder(pageId: String, item: DesktopItem)
+    fun onOpenFolder(pageId: String, item: DesktopItem, bounds: Rect)
     fun onDragStart(pageId: String, item: DesktopItem, bounds: Rect)
     fun onDragEnd()
     fun onResize(pageId: String, item: DesktopItem, w: Int, h: Int)
@@ -248,7 +248,7 @@ private fun DesktopItemSlot(
             onDragEnd = { callbacks.onDragEnd() },
             // Przesunięcie w górę na folderze otwiera folder (także gdy dotknięcie uruchamia główną aplikację)
             onSwipeUp = if (item.type == ItemType.Folder && !editMode) {
-                { callbacks.onOpenFolder(pageId, item) }
+                { callbacks.onOpenFolder(pageId, item, bounds) }
             } else null,
         )
         val cellW = cw * resize.width

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -46,8 +47,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.opendesktop.launcher.data.AppInfo
 import com.opendesktop.launcher.data.IconShape
+import com.opendesktop.launcher.data.SystemAction
 
 data class MenuAction(
     val label: String,
@@ -99,6 +102,18 @@ fun ActionMenu(
             )
         }
     }
+}
+
+@Composable
+private fun PickerHeader(title: String) {
+    Text(
+        title.uppercase(),
+        color = MaterialTheme.colorScheme.primary,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.4.sp,
+        modifier = Modifier.padding(start = 6.dp, top = 8.dp, bottom = 2.dp),
+    )
 }
 
 @Composable
@@ -183,6 +198,8 @@ fun AppPickerDialog(
     initial: Set<String>,
     shape: IconShape,
     single: Boolean = false,
+    /** Skróty akcji do wyboru obok aplikacji (np. w doku); wybrane wracają jako [SystemAction.dockKey]. */
+    actions: List<SystemAction> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (Set<String>) -> Unit,
 ) {
@@ -191,6 +208,22 @@ fun AppPickerDialog(
     val filtered = remember(query, apps) {
         apps.filter { query.isBlank() || labelOf(it).contains(query, true) || it.packageName.contains(query, true) }
             .sortedBy { labelOf(it).lowercase() }
+    }
+    val filteredActions = remember(query, actions) { actions.filter { query.isBlank() || it.label.contains(query, true) } }
+
+    @Composable
+    fun Pickable(key: String, content: @Composable () -> Unit) {
+        val sel = key in chosen
+        Box(
+            Modifier
+                .padding(3.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (sel) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent)
+                .then(if (sel) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp)) else Modifier)
+                .clickable { if (single) onConfirm(setOf(key)) else chosen = if (sel) chosen - key else chosen + key }
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) { content() }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -209,27 +242,17 @@ fun AppPickerDialog(
                     modifier = Modifier.heightIn(max = 420.dp),
                     contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
+                    if (filteredActions.isNotEmpty()) {
+                        item(key = "h_actions", span = { GridItemSpan(maxLineSpan) }) { PickerHeader("Akcje") }
+                        items(filteredActions, key = { it.dockKey }) { a ->
+                            Pickable(a.dockKey) {
+                                ActionIcon(a, a.label, 40.dp, showLabel = true, labelSize = 11f, pressed = false)
+                            }
+                        }
+                        item(key = "h_apps", span = { GridItemSpan(maxLineSpan) }) { PickerHeader("Aplikacje") }
+                    }
                     items(filtered, key = { it.key }) { app ->
-                        val sel = app.key in chosen
-                        Box(
-                            Modifier
-                                .padding(3.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (sel) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent)
-                                .then(
-                                    if (sel) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
-                                    else Modifier
-                                )
-                                .clickable {
-                                    if (single) {
-                                        onConfirm(setOf(app.key))
-                                    } else {
-                                        chosen = if (sel) chosen - app.key else chosen + app.key
-                                    }
-                                }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                        Pickable(app.key) {
                             AppIcon(app.icon, labelOf(app), 40.dp, shape, true, labelColor = MaterialTheme.colorScheme.onSurface, labelSize = 11f, shadow = false)
                         }
                     }

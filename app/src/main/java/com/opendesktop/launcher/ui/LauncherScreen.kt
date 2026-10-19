@@ -879,17 +879,17 @@ fun LauncherScreen(
 
     if (dockPicker) {
         AppPickerDialog(
-            title = "Aplikacje w doku (max ${cfg.dockCount})",
+            title = "Dok (max ${cfg.dockCount})",
             apps = apps,
             labelOf = labelOf,
             initial = ws.dock.toSet(),
             shape = cfg.iconShape,
+            actions = SystemAction.entries,
             onDismiss = { dockPicker = false },
             onConfirm = { keys ->
-                // Skróty akcji w doku nie są na liście aplikacji — zostają na swoich miejscach
-                val ordered = ws.dock.filter { it in keys || SystemAction.fromDockKey(it) != null } + keys.filter { it !in ws.dock }
+                val ordered = ws.dock.filter { it in keys } + keys.filter { it !in ws.dock }
                 vm.store.updateWorkspace { it.copy(dock = ordered.take(cfg.dockCount)) }
-                if (ordered.size > cfg.dockCount) vm.toast("Dok mieści ${cfg.dockCount} aplikacji")
+                if (ordered.size > cfg.dockCount) vm.toast("Dok mieści ${cfg.dockCount} elementów")
                 dockPicker = false
             },
         )

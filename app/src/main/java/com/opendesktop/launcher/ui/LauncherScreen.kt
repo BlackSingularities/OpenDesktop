@@ -330,9 +330,13 @@ fun LauncherScreen(
             runCatching { wm.setWallpaperOffsetSteps(0f, 0f); wm.setWallpaperOffsets(token, 0.5f, 0.5f) }
             return@LaunchedEffect
         }
-        runCatching { wm.setWallpaperOffsetSteps(1f / (n - 1), 0f) }
+        // Pełna szerokość tapety dopiero przy 5 ekranach; przy mniejszej liczbie tapeta przesuwa się
+        // proporcjonalnie mniej, wokół środka (2 ekrany – 25% szerokości, 3 – 50%)
+        val span = ((n - 1) / 4f).coerceAtMost(1f)
+        val start = 0.5f - span / 2
+        runCatching { wm.setWallpaperOffsetSteps(span / (n - 1), 0f) }
         snapshotFlow { (pagerState.currentPage + pagerState.currentPageOffsetFraction) / (n - 1) }
-            .collect { x -> runCatching { wm.setWallpaperOffsets(token, x.coerceIn(0f, 1f), 0.5f) } }
+            .collect { x -> runCatching { wm.setWallpaperOffsets(token, start + span * x.coerceIn(0f, 1f), 0.5f) } }
     }
 
     // ------------------------------------------------------------------ cel upuszczenia

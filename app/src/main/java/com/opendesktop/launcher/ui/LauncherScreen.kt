@@ -158,6 +158,9 @@ import com.opendesktop.launcher.ui.desktop.DropZone
 import com.opendesktop.launcher.ui.desktop.FolderDialog
 import com.opendesktop.launcher.ui.desktop.PageIndicator
 import com.opendesktop.launcher.ui.desktop.SearchStyleDialog
+import com.opendesktop.launcher.ui.desktop.GadgetStyleDialog
+import com.opendesktop.launcher.ui.desktop.openGadgetTarget
+import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.ui.desktop.WidgetPicker
 import com.opendesktop.launcher.ui.desktop.pageTransition
 import com.opendesktop.launcher.ui.drawer.AppDrawer
@@ -234,6 +237,7 @@ fun LauncherScreen(
     var folderPicker by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
     var searchStyleFor by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
+    var gadgetStyleFor by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var primaryAppPicker by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var assignFor by remember { mutableStateOf<AppInfo?>(null) }
     var renameApp by remember { mutableStateOf<AppInfo?>(null) }
@@ -504,6 +508,7 @@ fun LauncherScreen(
                     title = when (item.type) {
                         ItemType.Clock -> "Zegar"
                         ItemType.Search -> "Wyszukiwarka"
+                        ItemType.Gadget -> item.gadget?.label ?: "Widżet"
                         ItemType.Action -> item.label.ifBlank { item.systemAction?.label ?: "Akcja" }
                         else -> "Widżet"
                     },
@@ -512,6 +517,7 @@ fun LauncherScreen(
                         resize,
                         // Wygląd nie zmienia układu – dostępny także przy blokadzie
                         if (item.type == ItemType.Search) MenuAction("Wygląd…", Icons.Rounded.Palette) { searchStyleFor = pageId to item.id } else null,
+                        if (item.type == ItemType.Gadget) MenuAction("Dostosuj…", Icons.Rounded.Palette) { gadgetStyleFor = pageId to item.id } else null,
                         if (item.type == ItemType.Widget && vm.widgetHasConfiguration(item)) {
                             MenuAction("Skonfiguruj", Icons.Rounded.Settings) { ctx.findActivity()?.let { vm.configureWidget(it, item) } }
                         } else null,
@@ -564,6 +570,7 @@ fun LauncherScreen(
                 }
                 ItemType.Clock -> SystemActions.openClock(ctx)
                 ItemType.Search -> openDrawer(focus = true)
+                ItemType.Gadget -> { if (item.gadget == GadgetKind.Note) gadgetStyleFor = pageId to item.id else openGadgetTarget(ctx, item.gadget) }
                 ItemType.Widget -> Unit
                 ItemType.Action -> item.systemAction?.let(::runAction)
             }
@@ -577,6 +584,7 @@ fun LauncherScreen(
                 ItemType.Folder -> item.label.ifBlank { "Folder" }
                 ItemType.Clock -> "Zegar"
                 ItemType.Search -> "Wyszukiwarka"
+                ItemType.Gadget -> item.gadget?.label
                 ItemType.Action -> item.label.ifBlank { item.systemAction?.label }
                 ItemType.Widget -> "Widżet"
             }
@@ -1092,6 +1100,19 @@ fun LauncherScreen(
         } else searchStyleFor = null
     }
 
+    gadgetStyleFor?.let { (pageId, itemId) ->
+        val item = ws.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
+        val kind = item?.gadget
+        if (item != null && kind != null) {
+            GadgetStyleDialog(
+                kind = kind,
+                initial = item.gadgetStyle,
+                onDismiss = { gadgetStyleFor = null },
+                onSave = { st -> vm.setGadgetStyle(pageId, itemId, st); gadgetStyleFor = null },
+            )
+        } else gadgetStyleFor = null
+    }
+
     renameApp?.let { app ->
         TextInputDialog(
             title = "Nazwa aplikacji",
@@ -1151,7 +1172,9 @@ fun LauncherScreen(
             spanOf = { vm.widgetSpan(it) },
             onDismiss = { widgetPicker = false },
             onPickBuiltin = { id ->
-                vm.addBuiltinWidget(if (id == "clock") ItemType.Clock else ItemType.Search, pagerState.currentPage)
+                val kind = GadgetKind.entries.firstOrNull { "gadget:${it.name}" == id }
+                if (kind != null) vm.addGadget(kind, pagerState.currentPage)
+                else vm.addBuiltinWidget(if (id == "clock") ItemType.Clock else ItemType.Search, pagerState.currentPage)
                 widgetPicker = false
             },
             onPick = { info ->

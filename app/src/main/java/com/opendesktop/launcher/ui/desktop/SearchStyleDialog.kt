@@ -150,7 +150,7 @@ fun SearchStyleDialog(initial: SearchStyle, aiEnabled: Boolean, onDismiss: () ->
 }
 
 @Composable
-private fun Label(text: String) {
+internal fun Label(text: String) {
     Text(
         text,
         color = Palette.TextDim,
@@ -160,7 +160,7 @@ private fun Label(text: String) {
 }
 
 @Composable
-private fun Swatches(colors: List<Long>, selected: Long, onPick: (Long) -> Unit) {
+internal fun Swatches(colors: List<Long>, selected: Long, onPick: (Long) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         colors.forEach { c ->
             val color = Color(c)

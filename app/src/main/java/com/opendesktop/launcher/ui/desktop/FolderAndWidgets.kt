@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.aspectRatio
+import com.opendesktop.launcher.data.GadgetKind
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -267,7 +270,7 @@ fun WidgetPicker(
     val builtins = listOf(
         WidgetEntry(null, "clock", "Zegar z datą", "OpenDesktop", 4 to 2),
         WidgetEntry(null, "search", "Pasek wyszukiwania", "OpenDesktop", 5 to 1),
-    )
+    ) + GadgetKind.entries.map { WidgetEntry(null, "gadget:${it.name}", it.label, "OpenDesktop", it.w to it.h) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = Palette.Panel, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -283,7 +286,9 @@ fun WidgetPicker(
                 )
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     item {
-                        WidgetGroup("OpenDesktop", builtins) { e -> onPickBuiltin(e.builtin!!) }
+                        val q = query.trim()
+                        val shown = if (q.isEmpty()) builtins else builtins.filter { it.label.contains(q, true) || "opendesktop".contains(q, true) }
+                        if (shown.isNotEmpty()) WidgetGroup("OpenDesktop", shown) { e -> onPickBuiltin(e.builtin!!) }
                     }
                     val q = query.trim()
                     val filtered = groups.mapNotNull { (app, list) ->
@@ -344,6 +349,14 @@ private fun WidgetCard(e: WidgetEntry, onClick: () -> Unit) {
                 img != null -> Image(img, null, Modifier.fillMaxSize().padding(8.dp), contentScale = ContentScale.Fit)
                 e.builtin == "clock" -> Icon(Icons.Rounded.Schedule, null, tint = Color.White, modifier = Modifier.size(48.dp))
                 e.builtin == "search" -> Icon(Icons.Rounded.Search, null, tint = Color.White, modifier = Modifier.size(48.dp))
+                e.builtin?.startsWith("gadget:") == true -> {
+                    // Żywy podgląd wbudowanego widżetu w proporcjach jego domyślnego rozmiaru
+                    val kind = GadgetKind.valueOf(e.builtin!!.removePrefix("gadget:"))
+                    val ratio = (kind.w.toFloat() / kind.h).coerceIn(0.8f, 4f)
+                    Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.Center) {
+                        GadgetWidget(kind, kind.defaultStyle().copy(textScale = 0.9f, padding = 8), Modifier.fillMaxHeight().aspectRatio(ratio, matchHeightConstraintsFirst = true))
+                    }
+                }
             }
         }
         Spacer(Modifier.height(8.dp))

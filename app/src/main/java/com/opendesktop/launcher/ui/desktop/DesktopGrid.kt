@@ -355,6 +355,7 @@ private fun DesktopItemSlot(
             }
             ItemType.Clock -> ClockWidget(Modifier.fillMaxSize().then(gestures))
             ItemType.Search -> SearchWidget(Modifier.fillMaxSize().then(gestures), aiEnabled, item.searchStyle)
+            ItemType.Gadget -> GadgetWidget(item.gadget, item.gadgetStyle, Modifier.fillMaxSize().then(gestures))
             ItemType.Action -> ActionIcon(
                 action = item.systemAction,
                 label = item.label,

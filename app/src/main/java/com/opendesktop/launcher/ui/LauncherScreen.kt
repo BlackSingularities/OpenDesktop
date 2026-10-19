@@ -297,7 +297,7 @@ fun LauncherScreen(
             val p = drag.payload ?: return@derivedStateOf null
             val ptr = drag.pointer
             drag.zoneBounds.entries.firstOrNull { it.value.contains(ptr) }?.let { return@derivedStateOf DropTarget.Zone(it.key) }
-            if (cfg.dockEnabled && drag.dockBounds.contains(ptr) && p.item.type == ItemType.App) {
+            if (cfg.dockEnabled && drag.dockBounds.contains(ptr) && (p.item.type == ItemType.App || p.item.type == ItemType.Action)) {
                 val slot = drag.dockBounds.width / cfg.dockCount
                 return@derivedStateOf DropTarget.Dock(((ptr.x - drag.dockBounds.left) / slot).toInt().coerceIn(0, cfg.dockCount - 1))
             }

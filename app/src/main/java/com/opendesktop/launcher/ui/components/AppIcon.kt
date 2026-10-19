@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,6 +94,8 @@ fun AppIcon(
     labelSize: Float = 12f,
     maxLines: Int = 1,
     shadow: Boolean = true,
+    /** Plakietka rysowana na ikonie (np. znaczek folderu w rogu). */
+    badge: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     val scale by animateFloatAsState(if (pressed) 0.86f else 1f, spring(dampingRatio = 0.45f, stiffness = 700f), label = "press")
     Column(
@@ -117,6 +120,7 @@ fun AppIcon(
             } else {
                 Box(Modifier.fillMaxSize().clip(CircleShape).background(Color.White.copy(alpha = 0.15f)))
             }
+            badge?.invoke(this)
         }
         if (showLabel) {
             Text(

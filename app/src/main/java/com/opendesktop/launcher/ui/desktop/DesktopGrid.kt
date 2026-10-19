@@ -23,12 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.OpenInFull
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -62,6 +58,7 @@ import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.data.ItemType
 import com.opendesktop.launcher.data.Page
 import com.opendesktop.launcher.data.SystemAction
+import com.opendesktop.launcher.ui.components.ActionIcon
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.FolderIcon
 import com.opendesktop.launcher.ui.components.iconSizeFor
@@ -72,6 +69,7 @@ import kotlin.math.roundToInt
 interface DesktopCallbacks {
     fun onItemTap(pageId: String, item: DesktopItem, bounds: Rect)
     fun onItemLongPress(pageId: String, item: DesktopItem)
+    fun onOpenFolder(pageId: String, item: DesktopItem)
     fun onDragStart(pageId: String, item: DesktopItem, bounds: Rect)
     fun onDragEnd()
     fun onResize(pageId: String, item: DesktopItem, w: Int, h: Int)
@@ -238,8 +236,9 @@ private fun DesktopItemSlot(
             onLongPress = { callbacks.onItemLongPress(pageId, item) },
             onDragStart = { callbacks.onDragStart(pageId, item, bounds) },
             onDragEnd = { callbacks.onDragEnd() },
-            onSwipeUp = if (item.type == ItemType.Folder) {
-                { callbacks.onItemLongPress(pageId, item) } // Swipe w górę na folderze otwiera folder
+            // Przesunięcie w górę na folderze otwiera folder (także gdy dotknięcie uruchamia główną aplikację)
+            onSwipeUp = if (item.type == ItemType.Folder && !editMode) {
+                { callbacks.onOpenFolder(pageId, item) }
             } else null,
         )
         val cellW = cw * resize.width
@@ -259,7 +258,33 @@ private fun DesktopItemSlot(
                 )
             }
             ItemType.Folder -> {
-                FolderIcon(
+                val primary = item.primaryApp?.let { apps[it] }
+                if (primary != null) {
+                    // Folder z główną aplikacją: jej ikona + znaczek folderu w prawym dolnym rogu
+                    val size = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true)
+                    AppIcon(
+                        icon = primary.icon,
+                        label = item.label.ifBlank { labelOf(primary) },
+                        iconSize = size,
+                        shape = cfg.iconShape,
+                        showLabel = cfg.showLabels,
+                        labelSize = cfg.labelSize,
+                        pressed = pressed || mergeTarget,
+                        modifier = Modifier.fillMaxSize().then(gestures),
+                        badge = {
+                            Box(
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = size * 0.1f, y = size * 0.1f)
+                                    .size(size * 0.42f)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF1C1C1C))
+                                    .border(1.5.dp, Color.White, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) { Icon(Icons.Rounded.Folder, "Folder", tint = Color.White, modifier = Modifier.size(size * 0.24f)) }
+                        },
+                    )
+                } else FolderIcon(
                     icons = item.apps.take(4).map { apps[it]?.icon },
                     label = item.label,
                     iconSize = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
@@ -277,28 +302,15 @@ private fun DesktopItemSlot(
             }
             ItemType.Clock -> ClockWidget(Modifier.fillMaxSize().then(gestures))
             ItemType.Search -> SearchWidget(Modifier.fillMaxSize().then(gestures), aiEnabled)
-            ItemType.Action -> {
-                val size = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true)
-                Box(Modifier.fillMaxSize().then(gestures), contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier.size(size).clip(CircleShape).background(Color.White.copy(alpha = if (pressed) 0.32f else 0.2f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = when (item.systemAction) {
-                                SystemAction.OpenDrawer -> Icons.Rounded.Apps
-                                SystemAction.OpenSearch -> Icons.Rounded.Search
-                                SystemAction.OpenNotifications -> Icons.Rounded.Notifications
-                                SystemAction.OpenQuickSettings -> Icons.Rounded.Tune
-                                SystemAction.OpenSettings, null -> Icons.Rounded.Settings
-                            },
-                            contentDescription = item.label,
-                            tint = Color.White,
-                            modifier = Modifier.size(size * 0.5f),
-                        )
-                    }
-                }
-            }
+            ItemType.Action -> ActionIcon(
+                action = item.systemAction,
+                label = item.label,
+                iconSize = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
+                showLabel = cfg.showLabels,
+                labelSize = cfg.labelSize,
+                pressed = pressed,
+                modifier = Modifier.fillMaxSize().then(gestures),
+            )
         }
         if (editMode && selected) {
             ResizeHandle(
@@ -370,6 +382,9 @@ fun Dock(
     onDragEnd: () -> Unit,
     onAdd: () -> Unit,
     menu: @Composable (AppInfo) -> Unit,
+    onActionTap: (SystemAction) -> Unit = {},
+    onActionLongPress: (SystemAction) -> Unit = {},
+    actionMenu: @Composable (SystemAction) -> Unit = {},
 ) {
     val slots = cfg.dockCount
     val dragKey = drag.payload?.takeIf { it.source == DragSource.Dock }?.item?.app
@@ -387,11 +402,35 @@ fun Dock(
             .padding(vertical = 10.dp, horizontal = 4.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            val visible = keys.mapNotNull { apps[it] }
+            // Wpisy doku: aplikacje albo skróty akcji systemowych
+            val visible = keys.filter { it in apps || SystemAction.fromDockKey(it) != null }
             for (i in 0 until slots) {
-                val app = visible.getOrNull(i)
+                val entry = visible.getOrNull(i)
+                val app = entry?.let { apps[it] }
+                val action = entry?.let { SystemAction.fromDockKey(it) }
                 Box(Modifier.weight(1f).height(if (cfg.dockLabels) 78.dp else 60.dp), contentAlignment = Alignment.Center) {
-                    if (app != null) key(app.key) {
+                    if (action != null) key(entry) {
+                        var pressed by remember { mutableStateOf(false) }
+                        ActionIcon(
+                            action = action,
+                            label = action.label,
+                            iconSize = (52.dp * cfg.iconScale).coerceIn(36.dp, 64.dp),
+                            showLabel = cfg.dockLabels,
+                            labelSize = cfg.labelSize,
+                            pressed = pressed,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .itemGestures(
+                                    key = entry,
+                                    onPress = { pressed = it },
+                                    onTap = { if (!editMode) onActionTap(action) },
+                                    onLongPress = { onActionLongPress(action) },
+                                    onDragStart = {},
+                                    onDragEnd = {},
+                                ),
+                        )
+                        if (menuKey == entry) Box(Modifier.align(Alignment.Center)) { actionMenu(action) }
+                    } else if (app != null) key(app.key) {
                         var bounds by remember { mutableStateOf(Rect.Zero) }
                         var pressed by remember { mutableStateOf(false) }
                         AppIcon(
@@ -478,6 +517,11 @@ fun DragPreview(
             ItemType.Folder -> FolderIcon(
                 item.apps.take(4).map { apps[it]?.icon }, item.label,
                 iconSizeFor(wDp / item.w, hDp / item.h, cfg.desktopIconScale, cfg.showLabels, desktopMode = true), cfg.iconShape, false, Modifier.fillMaxSize(),
+            )
+            ItemType.Action -> ActionIcon(
+                item.systemAction, "",
+                iconSizeFor(wDp / item.w.coerceAtLeast(1), hDp / item.h.coerceAtLeast(1), cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
+                showLabel = false, labelSize = cfg.labelSize, pressed = false, modifier = Modifier.fillMaxSize(),
             )
             else -> Box(
                 Modifier

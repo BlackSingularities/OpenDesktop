@@ -25,8 +25,15 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -144,6 +151,68 @@ fun DrawerGrid(sections: List<DrawerSection>, columns: Int, cb: DrawerCallbacks,
     }
 }
 
+/**
+ * Perspektywa 3D: zwykła siatka, ale rzędy przy górnej i dolnej krawędzi odchylają się w głąb,
+ * maleją i ściskają — jakby lista była nawinięta na bęben. Liczone w warstwie graficznej.
+ */
+@Composable
+fun DrawerPerspective(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+    val rows = remember(apps, columns) { apps.chunked(columns) }
+    val state = rememberLazyListState()
+    val iconSize = if (columns >= 6) 50.dp else 58.dp
+    LazyColumn(
+        state = state,
+        contentPadding = PaddingValues(top = 24.dp, bottom = padding.calculateBottomPadding()),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        itemsIndexed(rows, key = { _, r -> r.first().key }) { _, row ->
+            val rowKey = row.first().key
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .graphicsLayer {
+                        val info = state.layoutInfo
+                        val item = info.visibleItemsInfo.firstOrNull { it.key == rowKey } ?: return@graphicsLayer
+                        val h = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1).toFloat()
+                        val top = (item.offset - info.viewportStartOffset).toFloat()
+                        val center = (top + item.size / 2f) / h
+                        val zone = 0.2f
+                        cameraDistance = 7f * density
+                        when {
+                            center > 1f - zone -> {
+                                // Dół: rząd kładzie się w głąb (górna krawędź ucieka do tyłu)
+                                val t = ((center - (1f - zone)) / zone).coerceIn(0f, 1.6f)
+                                transformOrigin = TransformOrigin(0.5f, 0f)
+                                rotationX = 62f * t.coerceAtMost(1f)
+                                val s = 1f - 0.32f * t.coerceAtMost(1.3f)
+                                scaleX = s; scaleY = s
+                                translationY = -item.size * 0.55f * t * t
+                                alpha = (1.2f - 0.6f * t).coerceIn(0f, 1f)
+                            }
+                            center < zone -> {
+                                val t = ((zone - center) / zone).coerceIn(0f, 1.6f)
+                                transformOrigin = TransformOrigin(0.5f, 1f)
+                                rotationX = -62f * t.coerceAtMost(1f)
+                                val s = 1f - 0.32f * t.coerceAtMost(1.3f)
+                                scaleX = s; scaleY = s
+                                translationY = item.size * 0.55f * t * t
+                                alpha = (1.2f - 0.6f * t).coerceIn(0f, 1f)
+                            }
+                        }
+                    },
+            ) {
+                for (c in 0 until columns) {
+                    val app = row.getOrNull(c)
+                    Box(Modifier.weight(1f).padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                        if (app != null) key(app.key) { DrawerCell(app, cb, iconSize) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun DrawerList(sections: List<DrawerSection>, cb: DrawerCallbacks, padding: PaddingValues) {
     LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize()) {
@@ -169,7 +238,7 @@ private fun ListRow(app: AppInfo, cb: DrawerCallbacks) {
             AppIcon(app.icon, "", 44.dp, cb.shape, false, pressed = pressed)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val cats = cb.categoriesOf(app)
                 if (cats.isNotEmpty()) {
                     Text(
@@ -260,9 +329,12 @@ fun DrawerAlphabet(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingVal
 }
 
 @Composable
-fun DrawerPages(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks) {
+fun DrawerPages(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, fixedRows: Int = 0) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val rows = ((maxHeight - 40.dp) / 104.dp).toInt().coerceAtLeast(3)
+        // fixedRows = 0 → tyle wierszy, ile się zmieści; inaczej wiersze ściskane do zadanej liczby
+        val rows = if (fixedRows > 0) fixedRows else ((maxHeight - 40.dp) / 104.dp).toInt().coerceAtLeast(3)
+        val rowH = if (fixedRows > 0) (maxHeight - 28.dp) / fixedRows else 104.dp
+        val iconSize = minOf(54.dp, rowH * 0.55f)
         val perPage = columns * rows
         val pages = remember(apps, perPage) { apps.chunked(perPage) }
         val state = rememberPagerState { pages.size }
@@ -271,11 +343,11 @@ fun DrawerPages(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks) {
                 val list = pages[p]
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Top) {
                     for (r in 0 until rows) {
-                        Row(Modifier.fillMaxWidth().height(104.dp)) {
+                        Row(Modifier.fillMaxWidth().height(rowH)) {
                             for (c in 0 until columns) {
                                 val app = list.getOrNull(r * columns + c)
                                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                                    if (app != null) key(app.key) { DrawerCell(app, cb, 54.dp) }
+                                    if (app != null) key(app.key) { DrawerCell(app, cb, iconSize) }
                                 }
                             }
                         }
@@ -394,17 +466,42 @@ fun DrawerCompact(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, paddin
     }
 }
 
+/** Częste na górze: wyróżniony pasek najczęściej używanych, pod nim pełna siatka. */
 @Composable
-fun DrawerSearchBar(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+fun DrawerSearchBar(apps: List<AppInfo>, usage: Map<String, Int>, columns: Int, cb: DrawerCallbacks, padding: PaddingValues) {
+    val frequent = remember(apps, usage, columns) {
+        apps.filter { (usage[it.key] ?: 0) > 0 }.sortedByDescending { usage[it.key] ?: 0 }.take(columns)
+    }
     LazyVerticalGrid(
         GridCells.Fixed(columns),
         contentPadding = padding,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
     ) {
+        if (frequent.isNotEmpty()) {
+            item(key = "freq", span = { GridItemSpan(maxLineSpan) }) {
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(22.dp))
+                        .background(Color.White.copy(alpha = 0.08f)).padding(vertical = 8.dp),
+                ) {
+                    Text(
+                        "NAJCZĘŚCIEJ UŻYWANE", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.4.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp),
+                    )
+                    Row(Modifier.fillMaxWidth()) {
+                        for (c in 0 until columns) {
+                            val app = frequent.getOrNull(c)
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                if (app != null) key("f_${app.key}") { DrawerCell(app, cb, 50.dp, Modifier.padding(vertical = 4.dp)) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         items(apps, key = { it.key }) { app ->
-            DrawerCell(app, cb, 52.dp, Modifier.padding(vertical = 6.dp))
+            DrawerCell(app, cb, 52.dp, Modifier.padding(vertical = 8.dp))
         }
     }
 }
@@ -425,7 +522,7 @@ fun DrawerMaterial(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingVal
                     AppIcon(app.icon, "", 52.dp, cb.shape, false, pressed = pressed)
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val cats = cb.categoriesOf(app)
                         if (cats.isNotEmpty()) {
                             Text(
@@ -455,79 +552,56 @@ fun DraweriOS(apps: List<AppInfo>, columns: Int, cb: DrawerCallbacks, padding: P
     }
 }
 
+/** Pozioma siatka: ciągłe przewijanie w bok; liczba wierszy z ustawień (0 = ile się zmieści). */
 @Composable
-fun DrawerHorizontal(apps: List<AppInfo>, rows: Int, cb: DrawerCallbacks) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val columns = ((maxWidth - 32.dp) / 80.dp).toInt().coerceAtLeast(3)
-        val perScreen = rows * columns
-        val screens = remember(apps, perScreen) { apps.chunked(perScreen) }
-
-        HorizontalPager(
-            state = rememberPagerState { screens.size },
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
-        ) { page ->
-            val screenApps = screens[page]
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
-                for (row in 0 until rows) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        for (col in 0 until columns) {
-                            val app = screenApps.getOrNull(row * columns + col)
-                            Box(Modifier.weight(1f).height(100.dp), contentAlignment = Alignment.Center) {
-                                if (app != null) key(app.key) { DrawerCell(app, cb, 56.dp) }
-                            }
-                        }
-                    }
-                }
+fun DrawerHorizontal(apps: List<AppInfo>, fixedRows: Int, cb: DrawerCallbacks) {
+    BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = 24.dp)) {
+        val rows = if (fixedRows > 0) fixedRows else (maxHeight / 100.dp).toInt().coerceAtLeast(3)
+        val cellH = maxHeight / rows
+        val iconSize = minOf(56.dp, cellH * 0.55f)
+        LazyHorizontalGrid(
+            GridCells.Fixed(rows),
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(apps, key = { it.key }) { app ->
+                DrawerCell(app, cb, iconSize, Modifier.width(maxWidth / 5).height(cellH))
             }
         }
     }
 }
 
+/**
+ * Przepływ: mozaika w kolumnach o różnej wysokości. Rozmiar kafelka zależy od tego, jak często
+ * aplikacja jest używana względem najczęściej używanej (trzy progi).
+ */
 @Composable
 fun DrawerFlow(apps: List<AppInfo>, usage: Map<String, Int>, cb: DrawerCallbacks, padding: PaddingValues) {
-    val sizes = remember(apps, usage) {
-        apps.map { app ->
-            val u = usage[app.key] ?: 0
-            when {
-                u > 50 -> 2
-                u > 20 -> 1
-                else -> 1
+    val maxUse = remember(usage) { (usage.values.maxOrNull() ?: 0).coerceAtLeast(1) }
+    LazyVerticalStaggeredGrid(
+        StaggeredGridCells.Fixed(3),
+        contentPadding = padding,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalItemSpacing = 8.dp,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+    ) {
+        items(apps, key = { it.key }) { app ->
+            val ratio = (usage[app.key] ?: 0).toFloat() / maxUse
+            val level = when {
+                ratio > 0.5f -> 2
+                ratio > 0.15f -> 1
+                else -> 0
             }
-        }
-    }
-
-    LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
-        items(apps.chunked(3).size) { rowIndex ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val startIdx = rowIndex * 3
-                for (i in 0 until 3) {
-                    val idx = startIdx + i
-                    if (idx < apps.size) {
-                        val app = apps[idx]
-                        val size = sizes[idx]
-                        Box(
-                            Modifier.weight(size.toFloat()).height((60 + size * 20).dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            DrawerTouchable(app, cb, Modifier.fillMaxSize()) { pressed ->
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(Color.White.copy(alpha = if (pressed) 0.16f else 0.08f))
-                                        .padding(8.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    AppIcon(app.icon, if (cb.showLabels) cb.label(app) else "", (36 + size * 12).dp, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize)
-                                }
-                            }
-                        }
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                    }
+            DrawerTouchable(app, cb, Modifier.fillMaxWidth().height((88 + level * 34).dp)) { pressed ->
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(lerp(Color(app.color), Color.Black, if (pressed) 0.7f else 0.55f))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppIcon(app.icon, cb.label(app), (40 + level * 14).dp, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize)
                 }
             }
         }

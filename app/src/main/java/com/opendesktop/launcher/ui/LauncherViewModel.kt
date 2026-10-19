@@ -27,6 +27,7 @@ import com.opendesktop.launcher.data.OpenRouter
 import com.opendesktop.launcher.data.Page
 import com.opendesktop.launcher.data.RepoHit
 import com.opendesktop.launcher.data.ShortcutEntry
+import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.UpdateInfo
 import com.opendesktop.launcher.data.Updater
 import com.opendesktop.launcher.data.Workspace
@@ -188,6 +189,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         toast("Dodano na pulpit")
     }
 
+    fun addActionToDesktop(action: SystemAction, pageIndex: Int) {
+        store.updateWorkspace { ws ->
+            val (w2, spot) = ws.place(pageIndex, 1, 1)
+            w2.updatePage(spot.first) { p ->
+                p.copy(items = p.items + DesktopItem(type = ItemType.Action, x = spot.second, y = spot.third, systemAction = action, label = action.label))
+            }
+        }
+        toast("Dodano na pulpit")
+    }
+
     fun addBuiltinWidget(type: ItemType, pageIndex: Int) {
         val (w, h) = when (type) {
             ItemType.Clock -> cols.coerceAtMost(4).coerceAtLeast(2) to 2
@@ -312,8 +323,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 }
             }
             is DropTarget.Dock -> {
-                val key = moving.app ?: return
-                if (moving.type != ItemType.App) return
+                val key = when (moving.type) {
+                    ItemType.App -> moving.app
+                    ItemType.Action -> moving.systemAction?.dockKey
+                    else -> null
+                } ?: return
                 val dock = workspace.value.dock
                 if (p.source != DragSource.Dock && dock.size >= config.value.dockCount && key !in dock) {
                     toast("Dok jest pełny")
@@ -376,8 +390,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             if (it.id != folderId) it
             else when (rest.size) {
                 0 -> null
-                1 -> it.copy(type = ItemType.App, app = rest.first(), apps = emptyList(), label = "")
-                else -> it.copy(apps = rest)
+                // Czysta ikona aplikacji — bez resztek folderu (główna aplikacja, rozmiar)
+                1 -> DesktopItem(id = it.id, type = ItemType.App, x = it.x, y = it.y, app = rest.first())
+                else -> it.copy(apps = rest, primaryApp = it.primaryApp?.takeIf { p -> p in rest })
             }
         }
         if (toDesktop) {
@@ -391,9 +406,27 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         ws.updatePage(pageId) { it.copy(items = items) }
     }
 
-    fun ungroup(pageId: String, folderId: String) {
-        val folder = workspace.value.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == folderId } ?: return
-        folder.apps.drop(1).forEach { removeFromFolder(pageId, folderId, it, toDesktop = true) }
+    /** Rozkłada folder na osobne ikony w jednej zmianie: pierwsza w miejscu folderu, reszta obok. */
+    fun ungroup(pageId: String, folderId: String) = store.updateWorkspace { ws ->
+        val page = ws.pages.firstOrNull { it.id == pageId } ?: return@updateWorkspace ws
+        val folder = page.items.firstOrNull { it.id == folderId && it.type == ItemType.Folder } ?: return@updateWorkspace ws
+        val keys = folder.apps.distinct()
+        if (keys.isEmpty()) return@updateWorkspace ws.updatePage(pageId) { p -> p.copy(items = p.items - folder) }
+        val items = (page.items - folder).toMutableList()
+        items += DesktopItem(type = ItemType.App, x = folder.x, y = folder.y, app = keys.first())
+        val overflow = mutableListOf<String>()
+        for (key in keys.drop(1)) {
+            val spot = GridOps.findFree(items, 1, 1, cols, rows, folder.x, folder.y)
+            if (spot != null) items += DesktopItem(type = ItemType.App, x = spot.first, y = spot.second, app = key)
+            else overflow += key
+        }
+        var w = ws.updatePage(pageId) { it.copy(items = items) }
+        // Nie zmieściło się na tej stronie — na kolejne wolne miejsca
+        for (key in overflow) {
+            val (w2, s) = w.place(0, 1, 1)
+            w = w2.updatePage(s.first) { p -> p.copy(items = p.items + DesktopItem(type = ItemType.App, x = s.second, y = s.third, app = key)) }
+        }
+        w
     }
 
     fun setFolderPrimaryApp(pageId: String, folderId: String, appKey: String?) = store.updateWorkspace { ws ->

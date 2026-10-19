@@ -19,22 +19,24 @@ enum class PageTransition(val label: String) {
     Carousel("Karuzela 3D"),
     Accordion("Akordeon"),
     Wave("Fala"),
+    Random("Losowe"),
 }
 
 @Serializable
 enum class DrawerStyle(val label: String, val description: String) {
     Grid("Siatka", "Klasyczna pionowa siatka z sekcjami"),
+    Perspective("Perspektywa 3D", "Siatka zawijająca się w głąb u góry i dołu, jak bęben"),
     List("Lista", "Duże wiersze z nazwą i kategoriami"),
     Pages("Strony poziome", "Siatka przewijana stronami w bok"),
     Alphabet("Alfabet", "Lista z literami i szybkim przewijaniem"),
     Categories("Zakładki kategorii", "Każda kategoria to osobna karta — przesuwaj w bok"),
     Tiles("Kafelki", "Kolorowe kafelki, najczęściej używane są większe"),
     Compact("Kompaktowy", "Gęsta siatka małych ikon bez odstępów"),
-    SearchBar("Pasek wyszukiwania", "Siatka z górnym paskiem wyszukiwania i ikonami"),
+    SearchBar("Częste na górze", "Pasek najczęściej używanych nad pełną siatką"),
     Material("Material Design", "Nowoczesny styl z kartami i akcjami szybkimi"),
     iOS("iOS Style", "Styl przypominający szufladę iPhone"),
-    Horizontal("Pozioma siatka", "Przewijanie w bok, wiersze z góry na dół"),
-    Flow("Przepływ", "Dynamicznie rozmieszczone ikony różnych rozmiarów"),
+    Horizontal("Pozioma siatka", "Ciągłe przewijanie w bok, bez dzielenia na strony"),
+    Flow("Przepływ", "Mozaika — częściej używane aplikacje mają większe kafelki"),
     Carousel("Karuzela 3D", "Okładki obracające się w przestrzeni"),
     Helix("Helisa 4D", "Spirala aplikacji, kręci się przy przewijaniu"),
     Sphere("Kula 3D", "Aplikacje na obracającej się kuli"),
@@ -42,7 +44,7 @@ enum class DrawerStyle(val label: String, val description: String) {
     Bubbles("Bąbelki", "Plaster miodu z efektem soczewki jak w zegarku"),
     Cylinder("Cylinder 3D", "Aplikacje na obracającym się cylindrze"),
     Wave("Fala", "Ikony układające się w falę przy przewijaniu"),
-    Stack("Stos", "Karty układające się jedna na drugiej"),
+    Stack("Stos", "Lista kart, które u góry chowają się jedna pod drugą"),
 }
 
 @Serializable
@@ -97,12 +99,21 @@ enum class GestureAction(val label: String) {
 enum class ItemType { App, Folder, Widget, Clock, Search, Action }
 
 @Serializable
-enum class SystemAction {
-    OpenDrawer,
-    OpenSearch,
-    OpenNotifications,
-    OpenQuickSettings,
-    OpenSettings
+enum class SystemAction(val label: String) {
+    OpenDrawer("Szuflada aplikacji"),
+    OpenSearch("Wyszukiwanie"),
+    OpenNotifications("Powiadomienia"),
+    OpenQuickSettings("Szybkie ustawienia"),
+    OpenSettings("Ustawienia launchera");
+
+    /** Klucz akcji w doku (dok przechowuje listę kluczy obok kluczy aplikacji). */
+    val dockKey: String get() = "$ACTION_PREFIX$name"
+
+    companion object {
+        private const val ACTION_PREFIX = "action:"
+        fun fromDockKey(key: String): SystemAction? =
+            if (key.startsWith(ACTION_PREFIX)) entries.firstOrNull { it.name == key.removePrefix(ACTION_PREFIX) } else null
+    }
 }
 
 @Serializable
@@ -182,6 +193,8 @@ data class Config(
     val drawerStyle: DrawerStyle = DrawerStyle.Grid,
     val drawerSort: DrawerSort = DrawerSort.Name,
     val drawerColumns: Int = 5,
+    /** Wiersze w stylu „Strony”; 0 = automatycznie. */
+    val drawerRows: Int = 0,
     val drawerOpacity: Float = 0.86f,
     val drawerAnimation: DrawerAnimation = DrawerAnimation.Slide,
     val drawerCategoryChips: Boolean = true,
@@ -196,8 +209,9 @@ data class Config(
     val doubleTap: GestureAction = GestureAction.EditMode,
     val haptics: Boolean = true,
     // Wygląd
-    val accent: Long = 0xFF8AB4FF,
-    val dynamicColor: Boolean = true,
+    // Domyślnie czarno-biały interfejs jak w OpenPDF
+    val accent: Long = 0xFFFFFFFF,
+    val dynamicColor: Boolean = false,
     val autoTheme: Boolean = false,
     val darkModeStartHour: Int = 20,
     val darkModeEndHour: Int = 7,

@@ -21,7 +21,8 @@ fun Modifier.pageTransition(page: Int, state: PagerState, transition: PageTransi
     val w = size.width
     cameraDistance = 14f * density
     when (transition) {
-        PageTransition.Slide -> Unit
+        // Losowe jest rozwijane do konkretnego efektu w LauncherScreen; tu tylko zabezpieczenie
+        PageTransition.Slide, PageTransition.Random -> Unit
         PageTransition.Cube -> {
             transformOrigin = TransformOrigin(if (p < 0) 1f else 0f, 0.5f)
             rotationY = 90f * p

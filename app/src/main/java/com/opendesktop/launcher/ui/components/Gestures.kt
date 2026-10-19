@@ -53,6 +53,8 @@ fun Modifier.itemGestures(
                         delta != null && delta.getDistance() > slop -> {
                             // Wykryj swipe w górę: ruch pionowy > poziomy i kierunek w górę
                             if (swipeUp != null && -delta.y > kotlin.math.abs(delta.x) && -delta.y > slop * 2) {
+                                // Konsumujemy, żeby ten sam ruch nie otworzył też szuflady
+                                c.consume()
                                 swipeDetected = true
                                 3
                             } else 2

@@ -48,10 +48,12 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Dock
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Wallpaper
@@ -109,6 +111,7 @@ import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.data.DrawerAnimation
 import com.opendesktop.launcher.data.GestureAction
 import com.opendesktop.launcher.data.ItemType
+import com.opendesktop.launcher.data.PageTransition
 import com.opendesktop.launcher.data.ShortcutEntry
 import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.SystemActions
@@ -116,6 +119,7 @@ import com.opendesktop.launcher.data.findActivity
 import com.opendesktop.launcher.ui.categories.AssignCategoriesDialog
 import com.opendesktop.launcher.ui.categories.CategoriesScreen
 import com.opendesktop.launcher.ui.components.ActionMenu
+import com.opendesktop.launcher.ui.components.icon
 import com.opendesktop.launcher.ui.components.AppPickerDialog
 import com.opendesktop.launcher.ui.components.MenuAction
 import com.opendesktop.launcher.ui.components.MenuShortcut
@@ -196,6 +200,7 @@ fun LauncherScreen(
     var renameApp by remember { mutableStateOf<AppInfo?>(null) }
     var dockPicker by remember { mutableStateOf(false) }
     var widgetPicker by remember { mutableStateOf(false) }
+    var actionPicker by remember { mutableStateOf(false) }
     var confirmRemovePage by remember { mutableStateOf<Int?>(null) }
     var searchFocus by remember { mutableIntStateOf(0) }
     var showOnboarding by remember { mutableStateOf(false) }
@@ -226,6 +231,16 @@ fun LauncherScreen(
             GestureAction.Notifications -> SystemActions.expandNotifications(ctx)
             GestureAction.EditMode -> { vibrate(); editMode = true }
             GestureAction.Settings -> overlay = Overlay.Settings
+        }
+    }
+
+    fun runAction(a: SystemAction) {
+        when (a) {
+            SystemAction.OpenDrawer -> openDrawer()
+            SystemAction.OpenSearch -> openDrawer(focus = true)
+            SystemAction.OpenNotifications -> SystemActions.expandNotifications(ctx)
+            SystemAction.OpenQuickSettings -> SystemActions.openQuickSettings(ctx)
+            SystemAction.OpenSettings -> overlay = Overlay.Settings
         }
     }
 
@@ -390,6 +405,7 @@ fun LauncherScreen(
                     title = item.label.ifBlank { "Folder" },
                     onDismiss = { menu = null },
                     actions = listOf(
+                        MenuAction("Otwórz folder", Icons.Rounded.FolderOpen) { openFolder = pageId to item.id },
                         MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameFolder = pageId to item.id },
                         MenuAction("Dodaj aplikacje", Icons.Rounded.Add) { folderPicker = pageId to item.id },
                         MenuAction(
@@ -405,6 +421,7 @@ fun LauncherScreen(
                     title = when (item.type) {
                         ItemType.Clock -> "Zegar"
                         ItemType.Search -> "Wyszukiwarka"
+                        ItemType.Action -> item.label.ifBlank { item.systemAction?.label ?: "Akcja" }
                         else -> "Widżet"
                     },
                     onDismiss = { menu = null },
@@ -458,22 +475,18 @@ fun LauncherScreen(
                 ItemType.Clock -> SystemActions.openClock(ctx)
                 ItemType.Search -> openDrawer(focus = true)
                 ItemType.Widget -> Unit
-                ItemType.Action -> {
-                    when (item.systemAction) {
-                        SystemAction.OpenDrawer -> openDrawer()
-                        SystemAction.OpenSearch -> openDrawer(focus = true)
-                        SystemAction.OpenNotifications -> SystemActions.expandNotifications(ctx)
-                        SystemAction.OpenQuickSettings -> SystemActions.openQuickSettings(ctx)
-                        SystemAction.OpenSettings -> overlay = Overlay.Settings
-                        null -> Unit
-                    }
-                }
+                ItemType.Action -> item.systemAction?.let(::runAction)
             }
         }
 
         override fun onItemLongPress(pageId: String, item: DesktopItem) {
             vibrate()
             menu = MenuTarget.Desktop(pageId, item.id)
+        }
+
+        override fun onOpenFolder(pageId: String, item: DesktopItem) {
+            menu = null
+            openFolder = pageId to item.id
         }
 
         override fun onDragStart(pageId: String, item: DesktopItem, bounds: Rect) {
@@ -601,6 +614,13 @@ fun LauncherScreen(
                     )
                 }
                 val editScale = if (editMode) 0.9f else 1f
+                // Przy „Losowe” nowy efekt po każdym zatrzymaniu strony, stały w trakcie przesuwania
+                var transition by remember { mutableStateOf(cfg.transition) }
+                LaunchedEffect(pagerState.settledPage, cfg.transition) {
+                    transition = if (cfg.transition == PageTransition.Random) {
+                        PageTransition.entries.filter { it != PageTransition.Random && it != transition }.random()
+                    } else cfg.transition
+                }
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
@@ -614,7 +634,7 @@ fun LauncherScreen(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .pageTransition(i, pagerState, cfg.transition)
+                            .pageTransition(i, pagerState, transition)
                             .then(
                                 if (editMode) Modifier
                                     .padding(horizontal = 6.dp)
@@ -667,11 +687,21 @@ fun LauncherScreen(
                         onDragEnd = { endDrag() },
                         onAdd = { dockPicker = true },
                         menu = dockMenu,
+                        onActionTap = ::runAction,
+                        onActionLongPress = { a -> vibrate(); menu = MenuTarget.Dock(a.dockKey) },
+                        actionMenu = { a ->
+                            ActionMenu(
+                                title = a.label,
+                                onDismiss = { menu = null },
+                                actions = listOf(MenuAction("Usuń z doku", Icons.Rounded.DeleteOutline) { vm.removeFromDock(a.dockKey) }),
+                            )
+                        },
                     )
                 }
                 AnimatedVisibility(editMode && !drag.active, enter = fadeIn() + slideInVertically { it }, exit = fadeOut() + slideOutVertically { it }) {
                     EditToolbar(
                         onWidgets = { widgetPicker = true },
+                        onActions = { actionPicker = true },
                         onWallpaper = { SystemActions.openWallpaperPicker(ctx) },
                         onAddPage = { val idx = vm.addPage(pagerState.currentPage); scope.launch { delay(50); pagerState.animateScrollToPage(idx) } },
                         onRemovePage = {
@@ -856,11 +886,32 @@ fun LauncherScreen(
             shape = cfg.iconShape,
             onDismiss = { dockPicker = false },
             onConfirm = { keys ->
-                val ordered = ws.dock.filter { it in keys } + keys.filter { it !in ws.dock }
+                // Skróty akcji w doku nie są na liście aplikacji — zostają na swoich miejscach
+                val ordered = ws.dock.filter { it in keys || SystemAction.fromDockKey(it) != null } + keys.filter { it !in ws.dock }
                 vm.store.updateWorkspace { it.copy(dock = ordered.take(cfg.dockCount)) }
                 if (ordered.size > cfg.dockCount) vm.toast("Dok mieści ${cfg.dockCount} aplikacji")
                 dockPicker = false
             },
+        )
+    }
+
+    if (actionPicker) {
+        AlertDialog(
+            onDismissRequest = { actionPicker = false },
+            title = { Text("Skróty akcji") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SystemAction.entries.forEach { a ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(a.icon, null, Modifier.size(22.dp))
+                            Text(a.label, Modifier.weight(1f).padding(start = 12.dp))
+                            TextButton(onClick = { vm.addActionToDesktop(a, pagerState.currentPage); actionPicker = false }) { Text("Pulpit") }
+                            TextButton(onClick = { vm.addToDock(a.dockKey); actionPicker = false }) { Text("Dok") }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { actionPicker = false }) { Text("Zamknij") } },
         )
     }
 
@@ -996,6 +1047,7 @@ private fun EditTopBar(
 @Composable
 private fun EditToolbar(
     onWidgets: () -> Unit,
+    onActions: () -> Unit,
     onWallpaper: () -> Unit,
     onAddPage: () -> Unit,
     onRemovePage: () -> Unit,
@@ -1009,6 +1061,7 @@ private fun EditToolbar(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
         BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets)
+        BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions)
         BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper)
         BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
         BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage)

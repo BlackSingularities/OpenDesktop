@@ -27,7 +27,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Check
@@ -223,9 +223,11 @@ fun AppDrawer(
                         )
                     }
                 }
+                // Jeden przycisk: sortowanie, ukryte, motyw, kategorie i ustawienia w jednym menu
                 Box {
-                    IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Rounded.Sort, "Sortowanie", tint = Color.White) }
+                    IconButton(onClick = { sortMenu = true }) { Icon(Icons.Rounded.MoreVert, "Menu szuflady", tint = Color.White) }
                     DropdownMenu(sortMenu, { sortMenu = false }) {
+                        Text("Sortowanie", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
                         DrawerSort.entries.forEach { s ->
                             DropdownMenuItem(
                                 text = { Text(s.label) },
@@ -239,10 +241,23 @@ fun AppDrawer(
                             leadingIcon = { Icon(if (showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null) },
                             onClick = { showHidden = !showHidden; sortMenu = false },
                         )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Motyw szuflady…") },
+                            leadingIcon = { Icon(Icons.Rounded.Dashboard, null) },
+                            onClick = { sortMenu = false; styleMenu = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Kategorie") },
+                            leadingIcon = { Icon(Icons.Rounded.Category, null) },
+                            onClick = { sortMenu = false; onOpenCategories() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Ustawienia") },
+                            leadingIcon = { Icon(Icons.Rounded.Settings, null) },
+                            onClick = { sortMenu = false; onOpenSettings() },
+                        )
                     }
-                }
-                Box {
-                    IconButton(onClick = { styleMenu = true }) { Icon(Icons.Rounded.Dashboard, "Motyw szuflady", tint = Color.White) }
                     DropdownMenu(styleMenu, { styleMenu = false }) {
                         DrawerStyle.entries.forEach { s ->
                             DropdownMenuItem(
@@ -258,8 +273,6 @@ fun AppDrawer(
                         }
                     }
                 }
-                IconButton(onClick = onOpenCategories) { Icon(Icons.Rounded.Category, "Kategorie", tint = Color.White) }
-                IconButton(onClick = onOpenSettings) { Icon(Icons.Rounded.Settings, "Ustawienia", tint = Color.White) }
             }
 
             // Filtr kategorii
@@ -305,8 +318,9 @@ fun AppDrawer(
                 EmptyResult(query, ctx)
             } else when (cfg.drawerStyle) {
                 DrawerStyle.Grid -> DrawerGrid(sections, cfg.drawerColumns, cb, padding)
+                DrawerStyle.Perspective -> DrawerPerspective(visible, cfg.drawerColumns, cb, padding)
                 DrawerStyle.List -> DrawerList(sections, cb, padding)
-                DrawerStyle.Pages -> DrawerPages(visible, cfg.drawerColumns, cb)
+                DrawerStyle.Pages -> DrawerPages(visible, cfg.drawerColumns, cb, cfg.drawerRows)
                 DrawerStyle.Alphabet -> DrawerAlphabet(visible, cb, padding)
                 DrawerStyle.Categories -> {
                     val tabs = remember(visible, ws.categories) {
@@ -321,10 +335,10 @@ fun AppDrawer(
                 }
                 DrawerStyle.Tiles -> DrawerTiles(visible, ws.usage, cb, padding)
                 DrawerStyle.Compact -> DrawerCompact(visible, cfg.drawerColumns.coerceAtLeast(6), cb, padding)
-                DrawerStyle.SearchBar -> DrawerSearchBar(visible, cfg.drawerColumns, cb, padding)
+                DrawerStyle.SearchBar -> DrawerSearchBar(visible, ws.usage, cfg.drawerColumns, cb, padding)
                 DrawerStyle.Material -> DrawerMaterial(visible, cb, padding)
                 DrawerStyle.iOS -> DraweriOS(visible, cfg.drawerColumns, cb, padding)
-                DrawerStyle.Horizontal -> DrawerHorizontal(visible, 4, cb)
+                DrawerStyle.Horizontal -> DrawerHorizontal(visible, cfg.drawerRows, cb)
                 DrawerStyle.Flow -> DrawerFlow(visible, ws.usage, cb, padding)
                 DrawerStyle.Carousel -> DrawerCarousel(visible, cb)
                 DrawerStyle.Helix -> DrawerHelix(visible, cb)
@@ -333,7 +347,7 @@ fun AppDrawer(
                 DrawerStyle.Bubbles -> DrawerBubbles(visible, cb)
                 DrawerStyle.Cylinder -> DrawerCylinder(visible, cb)
                 DrawerStyle.Wave -> DrawerWave(visible, cb, padding)
-                DrawerStyle.Stack -> DrawerStack(visible, cb)
+                DrawerStyle.Stack -> DrawerStack(visible, cb, padding)
             }
         }
     }

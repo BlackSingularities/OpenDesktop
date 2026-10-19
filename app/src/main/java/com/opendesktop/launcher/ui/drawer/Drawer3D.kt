@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -78,6 +81,28 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 private fun Modifier.rootPosition(f: (Offset) -> Unit) = onGloballyPositioned { f(it.positionInRoot()) }
+
+/** Współrzędne osiowe (q, r) kolejnych komórek heksagonalnej spirali od środka. */
+private fun hexSpiral(n: Int): List<Pair<Int, Int>> {
+    val out = ArrayList<Pair<Int, Int>>(n)
+    if (n == 0) return out
+    out += 0 to 0
+    val dirs = listOf(1 to 0, 1 to -1, 0 to -1, -1 to 0, -1 to 1, 0 to 1)
+    var ring = 1
+    while (out.size < n) {
+        var q = -ring; var r = ring // start: kierunek 4 × ring
+        for (side in 0 until 6) {
+            repeat(ring) {
+                if (out.size < n) out += q to r
+                q += dirs[side].first; r += dirs[side].second
+            }
+        }
+        ring++
+    }
+    return out
+}
+
+private fun hexToPx(q: Int, r: Int, cell: Float) = Offset(cell * (q + r / 2f), cell * 0.866f * r)
 
 /** Punkt po rzutowaniu — używany do rysowania i trafiania palcem. */
 private class Projected(val app: AppInfo, val x: Float, val y: Float, val size: Float, val depth: Float, val alpha: Float)
@@ -147,12 +172,14 @@ fun DrawerCarousel(apps: List<AppInfo>, cb: DrawerCallbacks) {
             }
             Spacer(Modifier.height(18.dp))
             val current = apps.getOrNull(state.currentPage)
-            Text(
-                current?.let(cb.label).orEmpty(),
-                color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
-                style = TextStyle(shadow = LabelShadow), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
+            if (cb.showLabels) {
+                Text(
+                    current?.let(cb.label).orEmpty(),
+                    color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
+                    style = TextStyle(shadow = LabelShadow), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+            }
             Text(
                 "${state.currentPage + 1} / ${apps.size}",
                 color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp,
@@ -220,7 +247,7 @@ fun DrawerHelix(apps: List<AppInfo>, cb: DrawerCallbacks) {
             holder.items = list.filter { it.depth > -0.2f }
             for (p in list) {
                 drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
-                if (p.depth > 0.75f) {
+                if (p.depth > 0.75f && cb.showLabels) {
                     labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (iconPx * 2.2f).toInt())) }, p, cb.label(p.app), p.alpha)
                 }
             }
@@ -317,7 +344,7 @@ fun DrawerSphere(apps: List<AppInfo>, cb: DrawerCallbacks) {
             holder.items = list.filter { it.depth > 0f }
             for (p in list) {
                 drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
-                if (p.depth > 0.88f) {
+                if (p.depth > 0.88f && cb.showLabels) {
                     labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (baseIcon * 2.4f).toInt())) }, p, cb.label(p.app), p.alpha)
                 }
             }
@@ -387,7 +414,7 @@ fun DrawerWheel(apps: List<AppInfo>, cb: DrawerCallbacks) {
                 holder.items = list
                 for (p in list.sortedBy { it.depth }) drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
             }
-            if (focused != null) {
+            if (focused != null && cb.showLabels) {
                 val style = TextStyle(color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, shadow = LabelShadow)
                 Column(Modifier.align(Alignment.CenterStart).padding(start = 24.dp).fillMaxWidth(0.5f)) {
                     Text(cb.label(focused), style = style, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -413,8 +440,13 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     val layouts = remember(apps) { HashMap<String, TextLayoutResult>() }
-    val stepDeg = 18f
-    LaunchedEffect(apps.size) { scroll.updateBounds(0f, (apps.size - 1).coerceAtLeast(0).toFloat()) }
+    // Cylinder: na każdym pierścieniu kilka aplikacji dookoła; poziomy gest obraca, pionowy przewija pierścienie
+    val yaw = remember { Animatable(0f) }
+    val perRing = 9
+    val rings = (apps.size + perRing - 1) / perRing
+    val rowPx = with(density) { 82.dp.toPx() }
+    val yawPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() } * 0.42f
+    LaunchedEffect(rings) { scroll.updateBounds(0f, (rings - 1).coerceAtLeast(0).toFloat()) }
 
     BoxWithConstraints(
         Modifier
@@ -423,46 +455,56 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
             .canvasGestures(
                 onTap = { p -> holder.hit(p)?.let { h -> cb.onTap(h.app, Rect(Offset(h.x - h.size / 2, h.y - h.size / 2) + origin, androidx.compose.ui.geometry.Size(h.size, h.size))) } },
                 onLongPress = { p -> holder.hit(p)?.let { h -> anchor = h.app to (Offset(h.x, h.y) + origin); cb.onLongPress(h.app) } },
-                onDrag = { d -> scope.launch { scroll.snapTo(scroll.value - d.y / 60f) } },
+                onDrag = { d ->
+                    scope.launch { yaw.snapTo(yaw.value + d.x / yawPx) }
+                    scope.launch { scroll.snapTo(scroll.value - d.y / rowPx) }
+                },
                 onFling = { v ->
+                    scope.launch { yaw.animateDecay(v.x / yawPx, exponentialDecay(frictionMultiplier = 2f)) }
                     scope.launch {
-                        scroll.animateDecay(-v.y / 60f, exponentialDecay(frictionMultiplier = 1.5f))
+                        scroll.animateDecay(-v.y / rowPx, exponentialDecay(frictionMultiplier = 1.6f))
                         scroll.animateTo(scroll.value.roundToInt().toFloat(), spring(dampingRatio = 0.8f))
                     }
                 },
             ),
     ) {
         val wPx = with(density) { maxWidth.toPx() }
-        val hPx = with(density) { maxHeight.toPx() }
-        val radius = wPx * 0.35f
-        val iconPx = with(density) { 54.dp.toPx() }
-        val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
+        val radius = wPx * 0.40f
+        val iconPx = with(density) { 50.dp.toPx() }
+        val style = TextStyle(color = Color.White, fontSize = 11.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
+        val step = (2 * PI / perRing).toFloat()
 
         Canvas(Modifier.fillMaxSize()) {
             val s = scroll.value
             val cx = size.width / 2
-            val cy = size.height / 2
-            val visible = 8
-            val from = (s.toInt() - visible).coerceAtLeast(0)
-            val to = (s.toInt() + visible).coerceAtMost(apps.lastIndex)
+            val cy = size.height * 0.42f
             val list = ArrayList<Projected>()
-
-            for (i in from..to) {
-                val d = i - s
-                val theta = d * stepDeg * PI.toFloat() / 180f
-                val z = cos(theta)
-                val y = cy + d * 70f
-                val x = cx + sin(theta) * radius
-                val k = 0.6f + 0.4f * (z + 1) / 2
-                val fade = (1f - abs(d) / (visible + 1)).coerceIn(0f, 1f)
-                list += Projected(apps[i], x, y, iconPx * k, z, (0.3f + 0.7f * (z + 1) / 2) * fade)
+            val visibleRings = (size.height / rowPx / 2 + 2).toInt()
+            val fromRing = (s.toInt() - visibleRings).coerceAtLeast(0)
+            val toRing = (s.toInt() + visibleRings).coerceAtMost(rings - 1)
+            for (r in fromRing..toRing) {
+                val dy = r - s
+                // Pierścienie poza środkiem lekko się zwężają — złudzenie walca widzianego z boku
+                val ringScale = 1f - 0.06f * abs(dy).coerceAtMost(4f)
+                val fade = (1f - abs(dy) / (visibleRings + 0.5f)).coerceIn(0f, 1f)
+                for (c in 0 until perRing) {
+                    val i = r * perRing + c
+                    if (i > apps.lastIndex) break
+                    // Co drugi pierścień przesunięty o pół kroku — ciaśniejsze, „cegiełkowe” ułożenie
+                    val theta = c * step + yaw.value + if (r % 2 == 1) step / 2 else 0f
+                    val z = cos(theta)
+                    val x = cx + sin(theta) * radius * ringScale
+                    val y = cy + dy * rowPx
+                    val k = 0.5f + 0.5f * (z + 1) / 2
+                    list += Projected(apps[i], x, y, iconPx * k * ringScale, z, ((0.15f + 0.85f * (z + 1) / 2) * fade).coerceIn(0f, 1f))
+                }
             }
             list.sortBy { it.depth }
-            holder.items = list.filter { it.depth > -0.3f }
+            holder.items = list.filter { it.depth > 0f }
             for (p in list) {
                 drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
-                if (p.depth > 0.7f && cb.showLabels) {
-                    labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (iconPx * 2.2f).toInt())) }, p, cb.label(p.app), p.alpha)
+                if (p.depth > 0.55f && cb.showLabels) {
+                    labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (iconPx * 1.7f).toInt())) }, p, cb.label(p.app), p.alpha)
                 }
             }
         }
@@ -472,26 +514,37 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
 
 // ------------------------------------------------------------------------- Wave
 
+/**
+ * Fala: przesunięcie wiersza w bok zależy od jego położenia na ekranie, więc przy przewijaniu
+ * przez listę przechodzi płynna fala. Liczone w warstwie graficznej — bez rekompozycji.
+ */
 @Composable
 fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
-    val scrollState = rememberLazyListState()
+    val state = rememberLazyListState()
+    val density = LocalDensity.current
+    val amp = with(density) { 22.dp.toPx() }
     LazyColumn(
-        state = scrollState,
+        state = state,
         contentPadding = padding,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
     ) {
         items(apps, key = { it.key }) { app ->
-            val index = apps.indexOf(app)
-            val offset = remember { Animatable(0f) }
-
-            LaunchedEffect(scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset) {
-                val visible = scrollState.firstVisibleItemIndex
-                val distance = abs(index - visible)
-                val targetOffset = sin(distance * 0.5f) * 20f
-                offset.animateTo(targetOffset, spring(dampingRatio = 0.7f))
-            }
-
-            DrawerTouchable(app, cb, Modifier.fillMaxWidth().offset(x = offset.value.dp)) { pressed ->
+            DrawerTouchable(
+                app, cb,
+                Modifier.fillMaxWidth().graphicsLayer {
+                    val info = state.layoutInfo
+                    val item = info.visibleItemsInfo.firstOrNull { it.key == app.key }
+                    if (item != null) {
+                        val h = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1).toFloat()
+                        val y = (item.offset + item.size / 2f) / h
+                        translationX = sin(y * 2f * PI.toFloat()) * amp
+                        val edge = (minOf(y, 1f - y) * 6f).coerceIn(0f, 1f)
+                        alpha = 0.35f + 0.65f * edge
+                        val s = 0.9f + 0.1f * edge
+                        scaleX = s; scaleY = s
+                    }
+                },
+            ) { pressed ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -514,100 +567,59 @@ fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues)
 
 // ------------------------------------------------------------------------- Stack
 
+/**
+ * Stos kart: zwykła przewijana lista kart, ale karta wyjeżdżająca u góry zatrzymuje się,
+ * maleje i blednie, a kolejne nasuwają się na nią — jak przekładane karty w portfelu.
+ */
 @Composable
-fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks) {
-    var currentIndex by remember { mutableStateOf(0) }
-    val scope = rememberCoroutineScope()
-
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val cardHeight = 400.dp
-        val cardWidth = minOf(maxWidth - 48.dp, 360.dp)
-
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            for (i in 0 until minOf(3, apps.size - currentIndex)) {
-                val app = apps.getOrNull(currentIndex + i) ?: continue
-                val offset = (i * 12).dp
-                val scale = 1f - i * 0.05f
-
-                Box(
-                    Modifier
-                        .width(cardWidth)
-                        .height(cardHeight)
-                        .offset(y = offset)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            alpha = 1f - i * 0.2f
+fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues) {
+    val state = rememberLazyListState()
+    LazyColumn(
+        state = state,
+        contentPadding = padding,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+    ) {
+        itemsIndexed(apps, key = { _, a -> a.key }) { index, app ->
+            DrawerTouchable(
+                app, cb,
+                Modifier
+                    .fillMaxWidth()
+                    .zIndex(index.toFloat())
+                    .graphicsLayer {
+                        val item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == app.key } ?: return@graphicsLayer
+                        val top = item.offset.toFloat()
+                        if (top < 0f) {
+                            // Karta „przyklejona” u góry: kompensujemy przewinięcie i chowamy ją pod następne
+                            val t = (-top / item.size).coerceIn(0f, 1f)
+                            translationY = -top - t * 18f
+                            val s = 1f - 0.08f * t
+                            scaleX = s; scaleY = s
+                            alpha = 1f - t
                         }
-                        .clip(RoundedCornerShape(32.dp))
-                        .background(Color.White.copy(alpha = 0.1f - i * 0.02f))
-                        .then(
-                            if (i == 0) Modifier.pointerInput(Unit) {
-                                detectTapGestures(
-                                    onTap = {
-                                        val bounds = Rect(Offset.Zero, androidx.compose.ui.geometry.Size(cardWidth.toPx(), cardHeight.toPx()))
-                                        cb.onTap(app, bounds)
-                                    },
-                                    onLongPress = { cb.onLongPress(app) },
-                                )
-                            } else Modifier
-                        ),
-                    contentAlignment = Alignment.Center,
+                    },
+            ) { pressed ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(84.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xFF1C1C1C))
+                        .background(Color.White.copy(alpha = if (pressed) 0.12f else 0f))
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        AppIcon(app.icon, "", 120.dp, cb.shape, false)
-                        if (cb.showLabels) {
-                            Spacer(Modifier.height(24.dp))
+                    AppIcon(app.icon, "", 52.dp, cb.shape, false, pressed = pressed)
+                    Spacer(Modifier.width(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val cats = cb.categoriesOf(app)
+                        if (cats.isNotEmpty()) {
                             Text(
-                                cb.label(app),
-                                color = Color.White,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 2,
-                                textAlign = TextAlign.Center,
-                                overflow = TextOverflow.Ellipsis,
+                                cats.joinToString("  ") { (it.emoji + " " + it.name).trim() },
+                                color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
-                    }
-                }
-            }
-
-            Row(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (currentIndex > 0) {
-                    Box(
-                        Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .clickable { currentIndex-- },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("←", color = Color.White, fontSize = 24.sp)
-                    }
-                }
-                if (currentIndex < apps.size - 1) {
-                    Box(
-                        Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .clickable { currentIndex++ },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("→", color = Color.White, fontSize = 24.sp)
                     }
                 }
             }
@@ -623,13 +635,13 @@ fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {
     var anchor by remember { mutableStateOf<Pair<AppInfo, Offset>?>(null) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
-    val cell = with(density) { 74.dp.toPx() }
-    val perRow = 7
-    val rowsCount = (apps.size + perRow - 1) / perRow
-    val gridW = perRow * cell
-    val gridH = rowsCount * cell * 0.87f
-    LaunchedEffect(apps.size) {
-        pan.updateBounds(Offset(-gridW / 2, -gridH / 2), Offset(gridW / 2, gridH / 2))
+    val measurer = rememberTextMeasurer()
+    val cell = with(density) { 60.dp.toPx() }
+    // Plaster miodu jak w zegarku: spirala heksagonalna od środka — pierwsze aplikacje listy w centrum
+    val coords = remember(apps.size) { hexSpiral(apps.size) }
+    val extent = remember(coords) { coords.maxOfOrNull { (q, r) -> hexToPx(q, r, 1f).getDistance() } ?: 0f } * cell
+    LaunchedEffect(extent) {
+        pan.updateBounds(Offset(-extent, -extent), Offset(extent, extent))
     }
     BoxWithConstraints(
         Modifier
@@ -642,30 +654,35 @@ fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {
                 onFling = { v -> scope.launch { pan.animateDecay(Offset(-v.x, -v.y), exponentialDecay(frictionMultiplier = 1.8f)) } },
             ),
     ) {
+        val style = TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, shadow = LabelShadow)
         Canvas(Modifier.fillMaxSize()) {
             val cx = size.width / 2
             val cy = size.height / 2
-            val maxR = minOf(size.width, size.height) * 0.62f
+            // Łagodna soczewka: pełny rozmiar w środku, przy krawędziach ok. 40%
+            val maxR = minOf(size.width, size.height) * 0.55f
             val list = ArrayList<Projected>()
             for (i in apps.indices) {
-                val r = i / perRow
-                val c = i % perRow
-                val bx = (c - (perRow - 1) / 2f + if (r % 2 == 1) 0.5f else 0f) * cell
-                val by = (r - (rowsCount - 1) / 2f) * cell * 0.87f
-                val px = bx - pan.value.x
-                val py = by - pan.value.y
-                val d = sqrt(px * px + py * py)
-                val t = (d / maxR).coerceIn(0f, 1.3f)
-                val k = (1f - t * t * 0.62f).coerceIn(0.12f, 1f)
-                // Soczewka: przyciąga dalsze bąbelki do środka
-                val pull = 0.78f + 0.22f * k
+                val (q, r) = coords[i]
+                val b = hexToPx(q, r, cell)
+                val px = b.x - pan.value.x
+                val py = b.y - pan.value.y
+                val t = (sqrt(px * px + py * py) / maxR).coerceIn(0f, 1.6f)
+                val k = (1f - 0.38f * t * t).coerceIn(0.32f, 1f)
+                val pull = 0.86f + 0.14f * k
                 val x = cx + px * pull
                 val y = cy + py * pull
                 if (x < -cell || x > size.width + cell || y < -cell || y > size.height + cell) continue
-                list += Projected(apps[i], x, y, cell * 0.84f * k, k, k.coerceIn(0.3f, 1f))
+                list += Projected(apps[i], x, y, cell * 0.9f * k, k, (0.35f + 0.65f * k).coerceIn(0f, 1f))
             }
             holder.items = list
             for (p in list) drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+            // Podpis tylko aplikacji najbliżej środka
+            if (cb.showLabels) {
+                list.minByOrNull { (it.x - cx) * (it.x - cx) + (it.y - cy) * (it.y - cy) }?.let { c ->
+                    val layout = measurer.measure(cb.label(c.app), style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (size.width * 0.6f).toInt()))
+                    drawText(layout, topLeft = Offset(cx - layout.size.width / 2f, size.height - layout.size.height - 24f))
+                }
+            }
         }
         CanvasMenuAnchor(anchor, cb, origin)
     }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Column
@@ -107,6 +108,7 @@ fun FolderDialog(
     apps: Map<String, AppInfo>,
     labelOf: (AppInfo) -> String,
     cfg: Config,
+    iconSize: Dp,
     aiEnabled: Boolean,
     onDismiss: () -> Unit,
     onLaunch: (AppInfo, Rect) -> Unit,
@@ -135,9 +137,10 @@ fun FolderDialog(
     Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().clickable(interactionSource = null, indication = null) { close() }) {
             val density = LocalDensity.current
-            val cell = 78.dp
+            // Komórka dopasowana do ikony o rozmiarze takim jak na pulpicie
+            val cell = maxOf(78.dp, iconSize + if (cfg.showLabels) 30.dp else 14.dp)
             val footer = 34.dp
-            val panelW = cell * cols + 20.dp
+            val panelW = minOf(cell * cols + 20.dp, maxWidth - 24.dp)
             val panelH = minOf(cell * rows + 20.dp + footer, maxHeight * 0.7f)
             val wPx = with(density) { panelW.toPx() }
             val hPx = with(density) { panelH.toPx() }
@@ -172,8 +175,8 @@ fun FolderDialog(
                         var pressed by remember { mutableStateOf(false) }
                         Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
                             AppIcon(
-                                app.icon, labelOf(app), 52.dp * cfg.desktopIconScale.coerceAtMost(1.3f), cfg.iconShape, cfg.showLabels,
-                                pressed = pressed, labelSize = 11f, labelColor = ink, shadow = !panel.light,
+                                app.icon, labelOf(app), iconSize, cfg.iconShape, cfg.showLabels,
+                                pressed = pressed, labelSize = cfg.labelSize, labelColor = ink, shadow = !panel.light,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .onGloballyPositioned { bounds = it.boundsInRoot() }

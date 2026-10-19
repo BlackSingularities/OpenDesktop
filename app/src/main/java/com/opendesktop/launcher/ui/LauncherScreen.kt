@@ -115,6 +115,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import com.opendesktop.launcher.ui.components.iconSizeFor
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -1008,6 +1009,10 @@ fun LauncherScreen(
                 apps = appMap,
                 labelOf = labelOf,
                 cfg = cfg,
+                iconSize = with(LocalDensity.current) {
+                    // Ten sam rozmiar co ikona aplikacji na pulpicie
+                    iconSizeFor(vm.cellSizePx.width.toDp(), vm.cellSizePx.height.toDp(), cfg.desktopIconScale, cfg.showLabels, desktopMode = true)
+                },
                 aiEnabled = vm.aiReady,
                 onDismiss = { openFolder = null },
                 onLaunch = { app, b -> launch(app, b) },

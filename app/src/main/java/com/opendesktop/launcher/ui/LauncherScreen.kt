@@ -107,6 +107,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -745,9 +747,46 @@ fun LauncherScreen(
                         PageTransition.entries.filter { it != PageTransition.Random && it != transition }.random()
                     } else cfg.transition
                 }
+                // Pętla ekranów: przeciągnięcie dalej za skrajnym ekranem przenosi na drugi koniec
+                val loopOn by rememberUpdatedState(cfg.pageLoop && ws.pages.size > 1)
+                val loopThreshold = with(LocalDensity.current) { 56.dp.toPx() }
+                val loopConnection = remember(pagerState) {
+                    object : NestedScrollConnection {
+                        var over = 0f
+                        var flinging = false
+                        var wrapTo = -1
+
+                        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                            if (!flinging) over += available.x
+                            return Offset.Zero
+                        }
+
+                        override suspend fun onPreFling(available: Velocity): Velocity {
+                            val last = pagerState.pageCount - 1
+                            wrapTo = when {
+                                !loopOn -> -1
+                                over < -loopThreshold && pagerState.currentPage == last -> 0
+                                over > loopThreshold && pagerState.currentPage == 0 -> last
+                                else -> -1
+                            }
+                            over = 0f
+                            flinging = true
+                            return Velocity.Zero
+                        }
+
+                        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                            flinging = false
+                            val target = wrapTo
+                            wrapTo = -1
+                            if (target >= 0) scope.launch { pagerState.animateScrollToPage(target) }
+                            return Velocity.Zero
+                        }
+                    }
+                }
                 Box(
                     Modifier
                         .weight(1f)
+                        .nestedScroll(loopConnection)
                         // Gesty dwoma palcami: uszczypnięcie, rozsunięcie, przesunięcie w górę/dół.
                         // Faza Initial – przy dwóch palcach ani ikony, ani przewijanie ekranów nie reagują
                         .pointerInput(editMode, cfg.pinchIn, cfg.pinchOut, cfg.twoFingerUp, cfg.twoFingerDown) {

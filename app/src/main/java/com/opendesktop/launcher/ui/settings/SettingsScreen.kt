@@ -62,7 +62,7 @@ private enum class Section(val title: String, val icon: ImageVector, val summary
     Gestures("Gesty", Icons.Rounded.Gesture, "Przesunięcia, dotknięcia, wibracje"),
     Look("Wygląd", Icons.Rounded.Palette, "Kolory, kształt ikon, menu, tapeta"),
     Effects("Efekty i animacje", Icons.Rounded.Animation, "Naciśnięcia, cząsteczki, parallax"),
-    Ai("Sztuczna inteligencja", Icons.Rounded.AutoAwesome, "Klucz OpenRouter i model"),
+    Ai("Sztuczna inteligencja", Icons.Rounded.AutoAwesome, "Dostawca (OpenRouter, OpenAI, Claude…), klucz i model"),
     Updates("Aktualizacje", Icons.Rounded.SystemUpdate, "Repozytorium i sprawdzanie"),
     Backup("Kopia zapasowa", Icons.Rounded.CloudSync, "Google Drive, eksport, import"),
 }
@@ -473,52 +473,78 @@ private fun EffectsSection(cfg: Config, set: Setter) {
 @Composable
 private fun AiSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
     val ctx = LocalContext.current
+    val provider = cfg.aiProvider
     var keyVisible by remember { mutableStateOf(false) }
-    var keyStatus by remember { mutableStateOf<String?>(null) }
+    var keyStatus by remember(provider) { mutableStateOf<String?>(null) }
     var modelPicker by remember { mutableStateOf(false) }
+    var providerPicker by remember { mutableStateOf(false) }
+    Group {
+        ActionRow(Icons.Rounded.Dns, "Dostawca", provider.label, chevron = true) { providerPicker = true }
+    }
     Text(
-        "Klucz API z openrouter.ai/keys. Przechowywany tylko na tym urządzeniu i nie trafia do kopii zapasowej.",
+        when (provider) {
+            AiProvider.Custom -> "Serwer zgodny z API OpenAI – np. Ollama (http://IP:11434/v1), LM Studio, vLLM. Klucz tylko, jeśli serwer go wymaga."
+            else -> "Klucz API ${provider.label}. Każdy dostawca ma osobny klucz i model. Klucze są tylko na tym urządzeniu i nie trafiają do kopii zapasowej."
+        },
         color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(horizontal = 6.dp),
     )
     Group {
-        Column(Modifier.padding(10.dp)) {
-            OutlinedTextField(
-                value = cfg.openRouterKey,
-                onValueChange = { v -> set { it.copy(openRouterKey = v.trim()) }; keyStatus = null },
-                label = { Text("Klucz API") },
-                placeholder = { Text("sk-or-v1-…") },
-                singleLine = true,
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (provider == AiProvider.Custom) {
+                DialogTextField(
+                    value = cfg.aiBaseUrl,
+                    onValueChange = { v -> set { it.copy(aiBaseUrl = v.trim()) }; keyStatus = null },
+                    label = "Adres serwera",
+                    placeholder = "http://192.168.1.10:11434/v1",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                )
+            }
+            DialogTextField(
+                value = cfg.aiKey(),
+                onValueChange = { v -> set { it.withAiKey(v.trim()) }; keyStatus = null },
+                label = if (provider.needsKey) "Klucz API" else "Klucz API (opcjonalnie)",
+                placeholder = provider.keyHint,
                 visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
+                trailing = {
                     IconButton(onClick = { keyVisible = !keyVisible }) {
-                        Icon(if (keyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null)
+                        Icon(if (keyVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = Palette.TextDim)
                     }
                 },
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.White,
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
-                    focusedLabelColor = Color.White,
-                    unfocusedLabelColor = Palette.TextDim,
-                    cursorColor = Color.White,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                ),
-                modifier = Modifier.fillMaxWidth(),
             )
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PillButton("Sprawdź klucz", enabled = cfg.openRouterKey.isNotBlank()) { keyStatus = "Sprawdzam…"; vm.testKey { keyStatus = it } }
-                PillButton("Zdobądź klucz", primary = false) { SystemActions.openUrl(ctx, "https://openrouter.ai/keys") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val canTest = (!provider.needsKey || cfg.aiKey().isNotBlank()) && (provider != AiProvider.Custom || cfg.aiBaseUrl.isNotBlank())
+                PillButton(if (provider == AiProvider.Custom) "Sprawdź połączenie" else "Sprawdź klucz", enabled = canTest) {
+                    keyStatus = "Sprawdzam…"; vm.testKey { keyStatus = it }
+                }
+                if (provider.keysUrl.isNotBlank()) PillButton("Zdobądź klucz", primary = false) { SystemActions.openUrl(ctx, provider.keysUrl) }
             }
-            keyStatus?.let { Text(it, color = Palette.TextDim, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp)) }
+            keyStatus?.let { Text(it, color = Palette.TextDim, fontSize = 13.sp) }
         }
     }
     Group {
-        ActionRow(Icons.Rounded.Memory, "Model", cfg.aiModelName.ifBlank { cfg.aiModel.ifBlank { "Nie wybrano – dotknij, aby wybrać" } }, chevron = true) {
+        ActionRow(Icons.Rounded.Memory, "Model", cfg.aiModelLabel().ifBlank { "Nie wybrano – dotknij, aby wybrać" }, chevron = true) {
             vm.loadModels()
             modelPicker = true
         }
+    }
+    if (providerPicker) {
+        val all = AiProvider.entries
+        ChoiceDialog(
+            title = "Dostawca AI",
+            options = all.map { it.label },
+            selected = all.indexOf(provider),
+            descriptions = all.map { p ->
+                val model = cfg.aiModelLabel(p)
+                when {
+                    p.needsKey && cfg.aiKey(p).isBlank() -> "Brak klucza"
+                    model.isBlank() -> "Klucz zapisany · bez modelu"
+                    else -> "Model: $model"
+                }
+            },
+            onDismiss = { providerPicker = false },
+            onSelect = { i -> set { it.copy(aiProvider = all[i]) } },
+        )
     }
     if (modelPicker) ModelPickerDialog(vm, onDismiss = { modelPicker = false })
 }

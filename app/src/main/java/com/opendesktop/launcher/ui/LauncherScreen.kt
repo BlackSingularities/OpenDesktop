@@ -99,6 +99,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -716,10 +720,15 @@ fun LauncherScreen(
                 },
         ) {
             // Postęp wejścia w edycję (0–1): pomniejszenie, karty ekranów, siatka i przyciemnienie
-            val edit by animateFloatAsState(if (editMode) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 420f), label = "edit")
+            // Sprężyna lekko przestrzeliwuje poza 0–1 – wartość przycinamy, inaczej ujemny odstęp
+            // (padding/height) przy wyjściu z edycji wysypywał aplikację. Postęp czytany jest leniwie
+            // (w rysowaniu i układzie), więc animacja nie przebudowuje pulpitu w każdej klatce.
+            val editAnim = animateFloatAsState(if (editMode) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 420f), label = "edit")
+            val edit: () -> Float = remember { { editAnim.value.coerceIn(0f, 1f) } }
+            val editVisible by remember { derivedStateOf { editAnim.value > 0.001f } }
             // Paski edycji podczas przeciągania tylko znikają (bez zmiany układu) – siatka nie skacze pod palcem
             val barsAlpha by animateFloatAsState(if (drag.active) 0f else 1f, label = "editBars")
-            if (edit > 0.001f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = edit }.background(Color.Black.copy(alpha = 0.3f)))
+            if (editVisible) Box(Modifier.fillMaxSize().graphicsLayer { alpha = edit() }.background(Color.Black.copy(alpha = 0.3f)))
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 AnimatedVisibility(
@@ -739,7 +748,6 @@ fun LauncherScreen(
                     )
                 }
                 // Lekkie pomniejszenie – sąsiednie ekrany ledwie wystają zza krawędzi
-                val editScale = 1f - 0.05f * edit
                 // Przy „Losowe” nowy efekt po każdym zatrzymaniu strony, stały w trakcie przesuwania
                 var transition by remember { mutableStateOf(cfg.transition) }
                 LaunchedEffect(pagerState.settledPage, cfg.transition) {
@@ -832,7 +840,7 @@ fun LauncherScreen(
                     state = pagerState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer { scaleX = editScale; scaleY = editScale },
+                        .graphicsLayer { val s = 1f - 0.05f * edit(); scaleX = s; scaleY = s },
                     beyondViewportPageCount = ws.pages.size,
                     userScrollEnabled = !drag.active,
                     key = { i -> ws.pages.getOrNull(i)?.id ?: i },
@@ -843,19 +851,32 @@ fun LauncherScreen(
                             .fillMaxSize()
                             .pageTransition(i, pagerState, transition)
                             .then(
-                                if (edit > 0.001f) Modifier
+                                if (editVisible) Modifier
                                     .padding(horizontal = 4.dp)
+                                    .drawBehind {
+                                        val e = edit()
+                                        val home = cfg.defaultPage == i
+                                        val r = CornerRadius(28.dp.toPx())
+                                        val bw = (if (home) 1.5.dp else 1.dp).toPx()
+                                        drawRoundRect(Color.White.copy(alpha = 0.07f * e), cornerRadius = r)
+                                        drawRoundRect(
+                                            Color.White.copy(alpha = e * if (home) 0.55f else 0.18f),
+                                            topLeft = Offset(bw / 2, bw / 2),
+                                            size = Size(size.width - bw, size.height - bw),
+                                            cornerRadius = r,
+                                            style = Stroke(bw),
+                                        )
+                                    }
                                     .clip(RoundedCornerShape(28.dp))
-                                    .background(Color.White.copy(alpha = 0.07f * edit))
-                                    .border(
-                                        if (cfg.defaultPage == i) 1.5.dp else 1.dp,
-                                        Color.White.copy(alpha = edit * if (cfg.defaultPage == i) 0.55f else 0.18f),
-                                        RoundedCornerShape(28.dp),
-                                    )
                                 else Modifier
                             )
+                            .padding(start = 6.dp, end = 6.dp, top = 4.dp)
                             // Poza edycją pulpit sięga tuż nad dok – bez dolnego marginesu
-                            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp * edit),
+                            .layout { m, c ->
+                                val bottom = (4.dp.toPx() * edit()).roundToInt()
+                                val p = m.measure(c.offset(vertical = -bottom))
+                                layout(p.width, p.height + bottom) { p.place(0, 0) }
+                            },
                     ) {
                         DesktopGrid(
                             page = page,
@@ -864,6 +885,7 @@ fun LauncherScreen(
                             labelOf = labelOf,
                             editMode = editMode,
                             editProgress = edit,
+                            editVisible = editVisible,
                             selectedId = selected,
                             menuItemId = (menu as? MenuTarget.Desktop)?.takeIf { it.pageId == page.id }?.itemId,
                             drag = drag,
@@ -887,8 +909,7 @@ fun LauncherScreen(
                     val indicatorAlpha by animateFloatAsState(if (indicatorShown || cfg.pageIndicatorAlways) 1f else 0f, label = "pageIndicator")
                     PageIndicator(
                         count = ws.pages.size,
-                        current = pagerState.currentPage,
-                        fraction = pagerState.currentPageOffsetFraction,
+                        position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
                         homeIndex = cfg.defaultPage,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -911,7 +932,7 @@ fun LauncherScreen(
                         .zIndex(1f)
                         .layout { m, c ->
                             val p = m.measure(c)
-                            val shift = (cfg.dockOffset.dp.toPx() * (1f - edit)).roundToInt()
+                            val shift = (cfg.dockOffset.dp.toPx() * (1f - edit())).roundToInt()
                             layout(p.width, (p.height - shift).coerceAtLeast(0)) { p.place(0, 0) }
                         },
                 ) {
@@ -968,7 +989,11 @@ fun LauncherScreen(
                 // Dok schodzi nisko – zostaje tylko część paska nawigacji (gest/przyciski nie zachodzą
                 // na ikony); bez doku pełny odstęp. W edycji pasek narzędzi sam sięga do dołu ekranu
                 val rest = if (cfg.dockEnabled) navBottom * 0.3f else navBottom
-                Spacer(Modifier.height(rest * (1f - edit)))
+                Spacer(Modifier.layout { m, c ->
+                    val h = (rest.toPx() * (1f - edit())).roundToInt().coerceAtLeast(0)
+                    val p = m.measure(c)
+                    layout(p.width, h) { }
+                })
             }
         }
 

@@ -71,6 +71,9 @@ sealed interface UpdateState {
     data class Error(val message: String) : UpdateState
 }
 
+/** Komunikat z przyciskiem „Cofnij” po usunięciu czegoś z pulpitu. */
+data class UndoOffer(val message: String, val id: Long = System.nanoTime())
+
 sealed interface AiJob {
     data object Idle : AiJob
     data class Running(val message: String) : AiJob
@@ -108,6 +111,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val aiSearchBusy = MutableStateFlow(false)
     private var aiSearchJob: Job? = null
 
+    val undo = MutableStateFlow<UndoOffer?>(null)
+    private var undoSnapshot: Workspace? = null
+    /** Widżety systemowe usuwamy z hosta dopiero, gdy minie czas na cofnięcie. */
+    private var pendingWidgetDeletes: List<Int> = emptyList()
+    private var undoJob: Job? = null
+
+    private var shortcutCache: List<android.content.pm.ShortcutInfo> = emptyList()
+    private var shortcutCacheTime = 0L
+
     private val cols get() = config.value.columns
     private val rows get() = config.value.rows
 
@@ -135,6 +147,46 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun toast(msg: String) {
         _messages.tryEmit(msg)
+    }
+
+    // ---------------------------------------------------------------- cofanie
+
+    private fun offerUndo(message: String, before: Workspace, widgets: List<Int> = emptyList()) {
+        commitPendingWidgets()
+        undoSnapshot = before
+        pendingWidgetDeletes = widgets
+        undo.value = UndoOffer(message)
+        undoJob?.cancel()
+        undoJob = viewModelScope.launch {
+            delay(UNDO_TIMEOUT_MS)
+            dismissUndo()
+        }
+    }
+
+    fun undoLast() {
+        val snapshot = undoSnapshot ?: return
+        undoJob?.cancel()
+        store.updateWorkspace { snapshot }
+        pendingWidgetDeletes = emptyList()
+        undoSnapshot = null
+        undo.value = null
+    }
+
+    fun dismissUndo() {
+        undoJob?.cancel()
+        commitPendingWidgets()
+        undoSnapshot = null
+        undo.value = null
+    }
+
+    private fun commitPendingWidgets() {
+        pendingWidgetDeletes.forEach { runCatching { widgetHost.deleteAppWidgetId(it) } }
+        pendingWidgetDeletes = emptyList()
+    }
+
+    override fun onCleared() {
+        commitPendingWidgets()
+        super.onCleared()
     }
 
     // ---------------------------------------------------------------- aplikacje
@@ -316,9 +368,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun removeItem(pageId: String, itemId: String) {
-        val item = workspace.value.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
-        if (item?.type == ItemType.Widget && item.widgetId >= 0) runCatching { widgetHost.deleteAppWidgetId(item.widgetId) }
+        val before = workspace.value
+        val item = before.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId } ?: return
         store.updateWorkspace { it.withoutItem(pageId, itemId) }
+        val message = when (item.type) {
+            ItemType.Folder -> "Usunięto folder"
+            ItemType.Widget, ItemType.Clock, ItemType.Search, ItemType.Gadget -> "Usunięto widżet"
+            else -> "Usunięto z pulpitu"
+        }
+        offerUndo(message, before, if (item.type == ItemType.Widget && item.widgetId >= 0) listOf(item.widgetId) else emptyList())
     }
 
     /** Zmiana rozmiaru z dowolnej krawędzi – lewa i górna przesuwają też początek elementu. */
@@ -401,7 +459,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             is DropTarget.Zone -> when (t.zone) {
                 DropZone.Remove -> when (p.source) {
                     DragSource.Desktop -> p.fromPageId?.let { removeItem(it, moving.id) }
-                    DragSource.Dock -> store.updateWorkspace { it.copy(dock = it.dock - (moving.app ?: "")) }
+                    DragSource.Dock -> removeFromDock(moving.app ?: "")
                     DragSource.Drawer -> setHidden(moving.app ?: return, true).also { toast("Ukryto w szufladzie") }
                 }
                 DropZone.Uninstall -> app(moving.app)?.let(::uninstall)
@@ -441,7 +499,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** Usuwa aplikację z folderu; folder z jedną aplikacją zamienia się z powrotem w ikonę. */
-    fun removeFromFolder(pageId: String, folderId: String, key: String, toDesktop: Boolean) = store.updateWorkspace { ws ->
+    fun removeFromFolder(pageId: String, folderId: String, key: String, toDesktop: Boolean) {
+        val before = workspace.value
+        removeFromFolderNow(pageId, folderId, key, toDesktop)
+        if (!toDesktop) offerUndo("Usunięto z folderu", before)
+    }
+
+    private fun removeFromFolderNow(pageId: String, folderId: String, key: String, toDesktop: Boolean) = store.updateWorkspace { ws ->
         val page = ws.pages.firstOrNull { it.id == pageId } ?: return@updateWorkspace ws
         val folder = page.items.firstOrNull { it.id == folderId } ?: return@updateWorkspace ws
         val rest = folder.apps - key
@@ -466,7 +530,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** Rozkłada folder na osobne ikony w jednej zmianie: pierwsza w miejscu folderu, reszta obok. */
-    fun ungroup(pageId: String, folderId: String) = store.updateWorkspace { ws ->
+    fun ungroup(pageId: String, folderId: String) {
+        val before = workspace.value
+        ungroupNow(pageId, folderId)
+        if (workspace.value !== before) offerUndo("Rozgrupowano folder", before)
+    }
+
+    private fun ungroupNow(pageId: String, folderId: String) = store.updateWorkspace { ws ->
         val page = ws.pages.firstOrNull { it.id == pageId } ?: return@updateWorkspace ws
         val folder = page.items.firstOrNull { it.id == folderId && it.type == ItemType.Folder } ?: return@updateWorkspace ws
         val keys = folder.apps.distinct()
@@ -506,7 +576,33 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         store.updateWorkspace { it.copy(dock = it.dock + key) }
     }
 
-    fun removeFromDock(key: String) = store.updateWorkspace { it.copy(dock = it.dock - key) }
+    fun removeFromDock(key: String) {
+        val before = workspace.value
+        if (key !in before.dock) return
+        store.updateWorkspace { it.copy(dock = it.dock - key) }
+        offerUndo("Usunięto z doku", before)
+    }
+
+    // ---------------------------------------------------------------- wyszukiwanie
+
+    /** Skróty aplikacji pasujące do zapytania (lista skrótów odświeżana co minutę). */
+    suspend fun findShortcuts(query: String, limit: Int = 4): List<ShortcutEntry> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.length < 2) return@withContext emptyList()
+        val now = System.currentTimeMillis()
+        if (now - shortcutCacheTime > 60_000) {
+            shortcutCache = repo.allShortcuts()
+            shortcutCacheTime = now
+        }
+        val hidden = workspace.value.hidden
+        val hiddenPackages = apps.value.filter { it.key in hidden }.map { it.packageName }.toSet()
+        shortcutCache
+            .filter { it.`package` !in hiddenPackages }
+            .filter { s -> listOfNotNull(s.shortLabel, s.longLabel).any { it.contains(q, ignoreCase = true) } }
+            .sortedByDescending { it.shortLabel?.startsWith(q, ignoreCase = true) == true }
+            .take(limit)
+            .map(repo::shortcutEntry)
+    }
 
     // ---------------------------------------------------------------- ekrany
 
@@ -804,38 +900,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         initializeDefaults()
     }
 
-    // ---------------------------------------------------------------- Google Drive
-
     fun completeOnboarding() {
         store.updateConfig { it.copy(onboardingDone = true) }
-    }
-
-    fun connectGoogleDrive() {
-        // TODO: Implement Google Drive connection flow
-        // Będzie wymagało Activity Result API
-        toast("Połączenie z Google Drive - wkrótce!")
-        completeOnboarding()
-    }
-
-    fun disconnectDrive() {
-        // TODO: Implement disconnect
-        toast("Rozłączono z Google Drive")
-    }
-
-    fun syncNow() {
-        viewModelScope.launch {
-            val success = store.syncToCloud()
-            if (success) toast("Zsynchronizowano z Google Drive")
-            else toast("Błąd synchronizacji")
-        }
-    }
-
-    fun createBackup() {
-        viewModelScope.launch {
-            val success = store.createCloudBackup()
-            if (success) toast("Utworzono backup w Google Drive")
-            else toast("Błąd tworzenia backupu")
-        }
     }
 
     // ---------------------------------------------------------------- pierwszy start
@@ -880,6 +946,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     companion object {
+        const val UNDO_TIMEOUT_MS = 5000L
+
         val palette = listOf(
             0xFF8AB4FF, 0xFFC58AFF, 0xFF7EE0C3, 0xFFFFD27E, 0xFFFF8A80, 0xFF80D8FF,
             0xFFB9F6CA, 0xFFFFAB91, 0xFFCFD8DC, 0xFFF48FB1, 0xFFA5D6A7, 0xFFFFE082,

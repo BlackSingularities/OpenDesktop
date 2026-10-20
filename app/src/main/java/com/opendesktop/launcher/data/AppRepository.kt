@@ -195,6 +195,25 @@ class AppRepository(
             }
     }.getOrDefault(emptyList())
 
+    /** Skróty wszystkich aplikacji (bez ikon) – do wyszukiwarki. Działa, gdy OpenDesktop jest domyślny. */
+    fun allShortcuts(): List<ShortcutInfo> = runCatching {
+        if (!launcherApps.hasShortcutHostPermission()) return emptyList()
+        val q = LauncherApps.ShortcutQuery().setQueryFlags(
+            LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+        )
+        launcherApps.profiles.flatMap { user -> runCatching { launcherApps.getShortcuts(q, user).orEmpty() }.getOrDefault(emptyList()) }
+            .filter { it.isEnabled }
+            .distinctBy { it.`package` + "/" + it.id }
+    }.getOrDefault(emptyList())
+
+    fun shortcutEntry(s: ShortcutInfo): ShortcutEntry {
+        val density = context.resources.displayMetrics.densityDpi
+        val icon = runCatching { launcherApps.getShortcutIconDrawable(s, density)?.toBitmap(96, 96)?.asImageBitmap() }.getOrNull()
+        return ShortcutEntry((s.shortLabel ?: s.longLabel ?: "").toString(), icon, s)
+    }
+
     fun startShortcut(s: ShortcutInfo) {
         runCatching { launcherApps.startShortcut(s, null, null) }
     }

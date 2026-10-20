@@ -15,6 +15,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.opendesktop.launcher.data.SystemActions
 import com.opendesktop.launcher.ui.LauncherScreen
 import com.opendesktop.launcher.ui.LauncherViewModel
 import com.opendesktop.launcher.ui.theme.OpenDesktopTheme
@@ -65,6 +66,29 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) homePressed.tryEmit(Unit)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        restoreHomeAfterUpdate()
+    }
+
+    /**
+     * Część systemów (np. MIUI/HyperOS, One UI) przy aktualizacji odbiera launcherowi rolę
+     * domyślnego ekranu głównego. Zapamiętujemy, że byliśmy domyślni, i po pierwszym starcie
+     * nowej wersji od razu prosimy systemowym okienkiem o przywrócenie – raz na wersję.
+     */
+    private fun restoreHomeAfterUpdate() {
+        val prefs = getSharedPreferences("home_role", MODE_PRIVATE)
+        val isDefault = SystemActions.isDefaultLauncher(this)
+        val version = BuildConfig.VERSION_CODE
+        val lastVersion = prefs.getInt("version", version)
+        val wasDefault = prefs.getBoolean("wasDefault", false)
+        prefs.edit().putInt("version", version).putBoolean("wasDefault", isDefault || (wasDefault && lastVersion != version)).apply()
+        if (!isDefault && wasDefault && lastVersion != version) {
+            Toast.makeText(this, "Aktualizacja wyłączyła OpenDesktop jako ekran główny – przywróć go", Toast.LENGTH_LONG).show()
+            SystemActions.requestDefaultLauncher(this)
+        }
     }
 
     override fun onStart() {

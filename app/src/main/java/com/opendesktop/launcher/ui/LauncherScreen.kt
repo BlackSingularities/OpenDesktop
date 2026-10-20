@@ -1090,7 +1090,6 @@ fun LauncherScreen(
                 onAddApps = { folderPicker = pageId to folderId },
                 onInfo = { vm.openDetails(it) },
                 onRowChange = { vm.setFolderRow(pageId, folderId, it) },
-                editMode = editMode,
             )
         }
     }

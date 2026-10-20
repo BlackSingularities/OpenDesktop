@@ -141,6 +141,7 @@ fun FolderDialog(
     onAddApps: () -> Unit,
     onInfo: (AppInfo) -> Unit,
     onRowChange: (Boolean) -> Unit = {},
+    editMode: Boolean = false,
 ) {
     var name by remember(folder.id) { mutableStateOf(folder.label) }
     var menuKey by remember { mutableStateOf<String?>(null) }
@@ -262,9 +263,10 @@ fun FolderDialog(
                             modifier = Modifier.size(30.dp).clip(CircleShape).clickable { onSuggestName { name = it } }.padding(6.dp),
                         )
                     }
-                    // Malutki przełącznik: jeden przewijany wiersz ↔ siatka (zapamiętany dla folderu)
+                    // Malutki przełącznik (tylko w edycji pulpitu): jeden przewijany wiersz ↔ siatka,
+                    // zapamiętany dla folderu
                     val toggleBg by animateColorAsState(if (row) ink.copy(alpha = 0.16f) else Color.Transparent, label = "rowToggle")
-                    Box(
+                    if (editMode) Box(
                         Modifier
                             .padding(end = 2.dp)
                             .size(24.dp)

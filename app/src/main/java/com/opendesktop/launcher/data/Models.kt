@@ -343,7 +343,14 @@ data class Config(
     val menuRadius: Float = 6f,
     val folderRadius: Float = 6f,
     val swipeTrails: Boolean = false,
-    // AI (OpenRouter)
+    // AI – dostawca i osobne klucze/modele dla każdego z nich (klucz: AiProvider.name).
+    // openRouterKey/aiModel/aiModelName to dawne pola OpenRoutera – czytane jako wartości zapasowe.
+    val aiProvider: AiProvider = AiProvider.OpenRouter,
+    val aiKeys: Map<String, String> = emptyMap(),
+    val aiModels: Map<String, String> = emptyMap(),
+    val aiModelNames: Map<String, String> = emptyMap(),
+    /** Adres serwera zgodnego z API OpenAI dla dostawcy „Własny” (np. Ollama, LM Studio). */
+    val aiBaseUrl: String = "",
     val openRouterKey: String = "",
     val aiModel: String = "",
     val aiModelName: String = "",

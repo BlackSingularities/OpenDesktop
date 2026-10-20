@@ -23,7 +23,12 @@ import com.opendesktop.launcher.data.Category
 import com.opendesktop.launcher.data.Config
 import com.opendesktop.launcher.data.DesktopItem
 import com.opendesktop.launcher.data.ItemType
-import com.opendesktop.launcher.data.OpenRouter
+import com.opendesktop.launcher.data.AiClient
+import com.opendesktop.launcher.data.AiEndpoint
+import com.opendesktop.launcher.data.AiProvider
+import com.opendesktop.launcher.data.aiKey
+import com.opendesktop.launcher.data.aiModelId
+import com.opendesktop.launcher.data.aiModelLabel
 import com.opendesktop.launcher.data.Page
 import com.opendesktop.launcher.data.RepoHit
 import com.opendesktop.launcher.data.SearchStyle
@@ -92,6 +97,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val models = MutableStateFlow<List<AiModel>>(emptyList())
     val modelsLoading = MutableStateFlow(false)
     val modelsError = MutableStateFlow<String?>(null)
+    /** Dostawca i adres, dla których pobrano [models] – zmiana któregoś wymusza ponowne pobranie. */
+    private var modelsSource: Pair<AiProvider, String>? = null
+    private var modelsJob: Job? = null
     val aiJob = MutableStateFlow<AiJob>(AiJob.Idle)
     val update = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val repoSearch = MutableStateFlow<List<RepoHit>>(emptyList())
@@ -614,26 +622,41 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     // ---------------------------------------------------------------- AI
 
     fun loadModels(force: Boolean = false) {
-        if (modelsLoading.value || (models.value.isNotEmpty() && !force)) return
-        viewModelScope.launch {
+        val e = AiEndpoint.of(config.value)
+        val source = e.provider to (e.baseUrl + "|" + e.key)
+        if (!force && source == modelsSource && (models.value.isNotEmpty() || modelsLoading.value)) return
+        modelsJob?.cancel()
+        modelsSource = source
+        models.value = emptyList()
+        modelsJob = viewModelScope.launch {
             modelsLoading.value = true
             modelsError.value = null
-            runCatching { OpenRouter.models() }
+            runCatching { AiClient.models(e) }
                 .onSuccess { models.value = it }
-                .onFailure { modelsError.value = it.message ?: "Nie udało się pobrać modeli" }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    modelsError.value = it.message ?: "Nie udało się pobrać modeli"
+                    modelsSource = null
+                }
             modelsLoading.value = false
         }
     }
 
     fun testKey(onResult: (String) -> Unit) {
-        val key = config.value.openRouterKey
-        if (key.isBlank()) return onResult("Wpisz klucz API")
+        val e = AiEndpoint.of(config.value)
+        if (e.provider.needsKey && e.key.isBlank()) return onResult("Wpisz klucz API")
         viewModelScope.launch {
-            onResult(runCatching { OpenRouter.checkKey(key) }.getOrElse { "Błąd: ${it.message}" })
+            onResult(runCatching { AiClient.checkKey(e) }.getOrElse { "Błąd: ${it.message}" })
         }
     }
 
-    val aiReady: Boolean get() = config.value.openRouterKey.isNotBlank() && config.value.aiModel.isNotBlank()
+    val aiReady: Boolean get() {
+        val c = config.value
+        val p = c.aiProvider
+        return c.aiModelId(p).isNotBlank() &&
+            (!p.needsKey || c.aiKey(p).isNotBlank()) &&
+            (p != AiProvider.Custom || c.aiBaseUrl.isNotBlank())
+    }
 
     private fun aiRefs(list: List<AppInfo> = apps.value) =
         list.distinctBy { it.packageName }.map { AiAppRef(it.packageName, labelOf(it)) }
@@ -641,18 +664,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun runAiCategorize(instructions: String, maxCategories: Int, multi: Boolean) {
         val cfg = config.value
         if (!aiReady) {
-            aiJob.value = AiJob.Error("Ustaw klucz OpenRouter i wybierz model w ustawieniach AI")
+            aiJob.value = AiJob.Error("Wybierz dostawcę, wpisz klucz i wybierz model w ustawieniach AI")
             return
         }
-        viewModelScope.launch {
-            aiJob.value = AiJob.Running("Model ${cfg.aiModelName.ifBlank { cfg.aiModel }} układa kategorie…")
+        aiCatJob?.cancel()
+        aiCatJob = viewModelScope.launch {
+            aiJob.value = AiJob.Running("Model ${cfg.aiModelLabel()} układa kategorie…")
             runCatching {
-                OpenRouter.categorize(
-                    cfg.openRouterKey, cfg.aiModel, aiRefs(), instructions, maxCategories, multi,
+                AiClient.categorize(
+                    AiEndpoint.of(cfg), aiRefs(), instructions, maxCategories, multi,
                     workspace.value.categories.map { it.name },
                 )
             }.onSuccess { aiJob.value = if (it.isEmpty()) AiJob.Error("Model nie zaproponował kategorii") else AiJob.Result(it) }
-                .onFailure { aiJob.value = AiJob.Error(it.message ?: "Błąd AI") }
+                .onFailure { if (it !is kotlinx.coroutines.CancellationException) aiJob.value = AiJob.Error(it.message ?: "Błąd AI") }
         }
     }
 
@@ -670,7 +694,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         toast("Zastosowano ${cats.size} kategorii od AI")
     }
 
+    private var aiCatJob: Job? = null
+
     fun dismissAi() {
+        aiCatJob?.cancel()
         aiJob.value = AiJob.Idle
     }
 
@@ -678,7 +705,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val cfg = config.value
         if (!aiReady) return toast("Skonfiguruj AI w ustawieniach")
         viewModelScope.launch {
-            runCatching { OpenRouter.folderName(cfg.openRouterKey, cfg.aiModel, labels) }
+            runCatching { AiClient.folderName(AiEndpoint.of(cfg), labels) }
                 .onSuccess { onResult(it) }
                 .onFailure { toast("AI: ${it.message}") }
         }
@@ -690,7 +717,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         aiSearchJob?.cancel()
         aiSearchJob = viewModelScope.launch {
             aiSearchBusy.value = true
-            runCatching { OpenRouter.findApp(cfg.openRouterKey, cfg.aiModel, aiRefs(), query) }
+            runCatching { AiClient.findApp(AiEndpoint.of(cfg), aiRefs(), query) }
                 .onSuccess { pkgs -> aiSearch.value = pkgs.mapNotNull { p -> apps.value.firstOrNull { it.packageName == p }?.key } }
                 .onFailure { toast("AI: ${it.message}") }
             aiSearchBusy.value = false

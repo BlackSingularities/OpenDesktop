@@ -69,6 +69,19 @@ import com.opendesktop.launcher.ui.LauncherViewModel
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.AppPickerDialog
 import com.opendesktop.launcher.ui.components.TextInputDialog
+import com.opendesktop.launcher.data.aiModelLabel
+import com.opendesktop.launcher.ui.settings.DarkDialog
+import com.opendesktop.launcher.ui.settings.DialogChip
+import com.opendesktop.launcher.ui.settings.DialogLoading
+import com.opendesktop.launcher.ui.settings.DialogNotice
+import com.opendesktop.launcher.ui.settings.DialogTextField
+import com.opendesktop.launcher.ui.settings.PillButton
+import com.opendesktop.launcher.ui.theme.Palette
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SwitchDefaults
 
 @Composable
 fun CategoriesScreen(vm: LauncherViewModel, onClose: () -> Unit) {
@@ -116,7 +129,7 @@ fun CategoriesScreen(vm: LauncherViewModel, onClose: () -> Unit) {
                             }
                         }
                         if (!vm.aiReady) {
-                            Text("AI wymaga klucza OpenRouter i wybranego modelu (Ustawienia → AI).", color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                            Text("AI wymaga dostawcy, klucza i wybranego modelu (Ustawienia → Sztuczna inteligencja).", color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                         }
                     }
                 }
@@ -184,13 +197,21 @@ fun CategoriesScreen(vm: LauncherViewModel, onClose: () -> Unit) {
     }
 
     if (confirmAuto) {
-        AlertDialog(
-            onDismissRequest = { confirmAuto = false },
-            title = { Text("Automatyczne kategorie") },
-            text = { Text("Kategorie zostaną utworzone na podstawie typu aplikacji i jej nazwy. Zastąpić obecne czy dołączyć do nich?") },
-            confirmButton = { TextButton(onClick = { vm.autoCategorize(replace = true); confirmAuto = false }) { Text("Zastąp") } },
-            dismissButton = { TextButton(onClick = { vm.autoCategorize(replace = false); confirmAuto = false }) { Text("Dołącz") } },
-        )
+        DarkDialog(
+            title = "Automatyczne kategorie",
+            icon = Icons.Rounded.AutoFixHigh,
+            onDismiss = { confirmAuto = false },
+            buttons = {
+                PillButton("Anuluj", primary = false) { confirmAuto = false }
+                PillButton("Dołącz", primary = false) { vm.autoCategorize(replace = false); confirmAuto = false }
+                PillButton("Zastąp") { vm.autoCategorize(replace = true); confirmAuto = false }
+            },
+        ) {
+            Text(
+                "Kategorie zostaną utworzone na podstawie typu aplikacji i jej nazwy. Zastąpić obecne czy dołączyć do nich?",
+                color = Palette.TextDim, fontSize = 14.sp, lineHeight = 19.sp,
+            )
+        }
     }
 
     if (aiDialog || ai !is AiJob.Idle) {
@@ -200,6 +221,7 @@ fun CategoriesScreen(vm: LauncherViewModel, onClose: () -> Unit) {
 
 @Composable
 private fun AiCategorizeDialog(vm: LauncherViewModel, job: AiJob, apps: List<AppInfo>, onDismiss: () -> Unit) {
+    val cfg by vm.config.collectAsStateWithLifecycle()
     var instructions by remember { mutableStateOf("") }
     var maxCats by remember { mutableFloatStateOf(10f) }
     var multi by remember { mutableStateOf(true) }
@@ -211,72 +233,97 @@ private fun AiCategorizeDialog(vm: LauncherViewModel, job: AiJob, apps: List<App
         "Według kolorów ikon",
         "Minimalistycznie – najwyżej 5 grup",
     )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Kategorie z AI") },
-        text = {
+    DarkDialog(
+        title = "Kategorie z AI",
+        subtitle = if (vm.aiReady) "${cfg.aiProvider.label} · ${cfg.aiModelLabel()}" else null,
+        icon = Icons.Rounded.AutoAwesome,
+        onDismiss = onDismiss,
+        // W trakcie generowania okno nie znika przypadkiem – wynik i tak by przepadł
+        dismissible = job !is AiJob.Running,
+        scrollable = job !is AiJob.Result,
+        buttons = {
             when (job) {
-                is AiJob.Running -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(28.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Text(job.message)
+                is AiJob.Running -> PillButton("Anuluj", primary = false, onClick = onDismiss)
+                is AiJob.Result -> {
+                    PillButton("Odrzuć", primary = false, onClick = onDismiss)
+                    PillButton("Zastosuj") { vm.applyAiResult(job.categories, replace); onDismiss() }
                 }
-                is AiJob.Error -> Text(job.message, color = MaterialTheme.colorScheme.error)
-                is AiJob.Result -> AiResultPreview(job.categories, apps)
-                AiJob.Idle -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("AI otrzyma listę ${apps.size} aplikacji (nazwy i pakiety) i zaproponuje kategorie.", fontSize = 13.sp)
-                    OutlinedTextField(
-                        instructions, { instructions = it },
-                        label = { Text("Twoje wskazówki (opcjonalnie)") },
-                        placeholder = { Text("np. osobno aplikacje do latania i do pracy") },
-                        modifier = Modifier.fillMaxWidth(), minLines = 2,
+                is AiJob.Error -> {
+                    PillButton("Zamknij", primary = false, onClick = onDismiss)
+                    PillButton("Spróbuj ponownie") { vm.dismissAi() }
+                }
+                AiJob.Idle -> {
+                    PillButton("Zamknij", primary = false, onClick = onDismiss)
+                    PillButton("Generuj", enabled = vm.aiReady) { vm.runAiCategorize(instructions, maxCats.toInt(), multi) }
+                }
+            }
+        },
+    ) {
+        when (job) {
+            is AiJob.Running -> DialogLoading(job.message)
+            is AiJob.Error -> DialogNotice(job.message, error = true)
+            is AiJob.Result -> {
+                Text("Propozycja: ${job.categories.size} kategorii", color = Palette.TextDim, fontSize = 13.sp)
+                AiResultPreview(job.categories, apps)
+                SwitchLine("Zastąp obecne kategorie", replace) { replace = it }
+            }
+            AiJob.Idle -> {
+                if (!vm.aiReady) DialogNotice("Wybierz dostawcę, wpisz klucz i wybierz model w Ustawienia → Sztuczna inteligencja.", error = true)
+                Text("AI otrzyma listę ${apps.size} aplikacji (nazwy i pakiety) i zaproponuje kategorie.", color = Palette.TextDim, fontSize = 13.sp)
+                DialogTextField(
+                    instructions, { instructions = it },
+                    label = "Twoje wskazówki (opcjonalnie)",
+                    placeholder = "np. osobno aplikacje do latania i do pracy",
+                    singleLine = false, minLines = 2,
+                )
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    presets.forEach { p -> DialogChip(p, instructions == p) { instructions = p } }
+                }
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Palette.Group).padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Maksymalnie kategorii", color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Text("${maxCats.toInt()}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                    Slider(
+                        maxCats, { maxCats = it }, valueRange = 3f..20f, steps = 16,
+                        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color.White, inactiveTrackColor = Color.White.copy(alpha = 0.15f), activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
                     )
-                    LazyColumn(Modifier.heightIn(max = 120.dp)) {
-                        items(presets) { p ->
-                            Text(
-                                "• $p", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.fillMaxWidth().clickable { instructions = p }.padding(vertical = 4.dp),
-                            )
-                        }
-                    }
-                    Text("Maksymalnie kategorii: ${maxCats.toInt()}", fontSize = 13.sp)
-                    Slider(maxCats, { maxCats = it }, valueRange = 3f..20f, steps = 16)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Aplikacja w wielu kategoriach", Modifier.weight(1f), fontSize = 13.sp)
-                        Switch(multi, { multi = it })
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Zastąp obecne kategorie", Modifier.weight(1f), fontSize = 13.sp)
-                        Switch(replace, { replace = it })
-                    }
+                    SwitchLine("Aplikacja w wielu kategoriach", multi) { multi = it }
+                    SwitchLine("Zastąp obecne kategorie", replace) { replace = it }
                 }
             }
-        },
-        confirmButton = {
-            when (job) {
-                AiJob.Idle -> TextButton(onClick = { vm.runAiCategorize(instructions, maxCats.toInt(), multi) }, enabled = vm.aiReady) { Text("Generuj") }
-                is AiJob.Result -> TextButton(onClick = { vm.applyAiResult(job.categories, replace); onDismiss() }) { Text("Zastosuj") }
-                is AiJob.Error -> TextButton(onClick = { vm.dismissAi() }) { Text("Spróbuj ponownie") }
-                is AiJob.Running -> Unit
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(if (job is AiJob.Result) "Odrzuć" else "Zamknij") } },
-    )
+        }
+    }
+}
+
+@Composable
+private fun SwitchLine(text: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable { onChange(!value) }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Switch(
+            value, onChange,
+            colors = SwitchDefaults.colors(checkedThumbColor = Palette.Ink, checkedTrackColor = Color.White, uncheckedThumbColor = Palette.TextDim, uncheckedTrackColor = Color.White.copy(alpha = 0.1f), uncheckedBorderColor = Color.White.copy(alpha = 0.2f)),
+        )
+    }
 }
 
 @Composable
 private fun AiResultPreview(cats: List<AiCategory>, apps: List<AppInfo>) {
     val byPkg = remember(apps) { apps.associateBy { it.packageName } }
-    LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items(cats) { c ->
-            Column {
-                Text("${c.emoji} ${c.name}".trim(), fontWeight = FontWeight.SemiBold)
-                val list = c.apps.mapNotNull { byPkg[it] }
+            val list = c.apps.mapNotNull { byPkg[it] }
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Palette.Group).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${c.emoji} ${c.name}".trim(), color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text("${list.size}", color = Palette.TextDim, fontSize = 12.sp)
+                }
                 Text(
                     list.joinToString { it.label }.ifBlank { "–" },
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    fontSize = 12.sp, color = Palette.TextDim, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp,
                 )
-                HorizontalDivider(Modifier.padding(top = 8.dp))
             }
         }
     }
@@ -287,43 +334,47 @@ private fun AiResultPreview(cats: List<AiCategory>, apps: List<AppInfo>) {
 fun AssignCategoriesDialog(vm: LauncherViewModel, app: AppInfo, ws: Workspace, onDismiss: () -> Unit) {
     var chosen by remember(app.key) { mutableStateOf(ws.assignments[app.key].orEmpty().toSet()) }
     var newName by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(app.icon, "", 36.dp, com.opendesktop.launcher.data.IconShape.System, false)
-                Spacer(Modifier.width(10.dp))
-                Text(ws.renamed[app.key] ?: app.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+    DarkDialog(
+        title = ws.renamed[app.key] ?: app.label,
+        subtitle = "Kategorie aplikacji",
+        onDismiss = onDismiss,
+        scrollable = false,
+        buttons = {
+            PillButton("Anuluj", primary = false, onClick = onDismiss)
+            PillButton("Zapisz") { vm.setAppCategories(app.key, chosen.toList()); onDismiss() }
         },
-        text = {
-            Column {
-                LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                    items(ws.categories, key = { it.id }) { c ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .clickable { chosen = if (c.id in chosen) chosen - c.id else chosen + c.id }
-                                .padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(c.id in chosen, { chosen = if (it) chosen + c.id else chosen - c.id })
-                            Text((c.emoji + "  " + c.name).trim())
-                        }
+    ) {
+        if (ws.categories.isEmpty()) DialogNotice("Brak kategorii – dodaj pierwszą poniżej.")
+        LazyColumn(Modifier.heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            items(ws.categories, key = { it.id }) { c ->
+                val on = c.id in chosen
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        .background(if (on) Color.White.copy(alpha = 0.14f) else Palette.Group)
+                        .clickable { chosen = if (on) chosen - c.id else chosen + c.id }
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        on, { chosen = if (it) chosen + c.id else chosen - c.id },
+                        colors = CheckboxDefaults.colors(checkedColor = Color.White, checkmarkColor = Palette.Ink, uncheckedColor = Palette.TextDim),
+                    )
+                    Text((c.emoji + "  " + c.name).trim(), color = Color.White, fontSize = 14.sp)
+                }
+            }
+        }
+        DialogTextField(
+            newName, { newName = it },
+            placeholder = "Nowa kategoria",
+            trailing = {
+                IconButton(onClick = {
+                    if (newName.isNotBlank()) {
+                        val id = vm.addCategory(newName, "")
+                        chosen = chosen + id
+                        newName = ""
                     }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(newName, { newName = it }, singleLine = true, placeholder = { Text("Nowa kategoria") }, modifier = Modifier.weight(1f))
-                    IconButton(onClick = {
-                        if (newName.isNotBlank()) {
-                            val id = vm.addCategory(newName, "")
-                            chosen = chosen + id
-                            newName = ""
-                        }
-                    }) { Icon(Icons.Rounded.Add, "Dodaj") }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { vm.setAppCategories(app.key, chosen.toList()); onDismiss() }) { Text("Zapisz") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Anuluj") } },
-    )
+                }) { Icon(Icons.Rounded.Add, "Dodaj", tint = Color.White) }
+            },
+        )
+    }
 }

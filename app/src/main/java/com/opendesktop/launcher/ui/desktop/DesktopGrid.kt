@@ -106,8 +106,13 @@ fun DesktopGrid(
     menu: @Composable (DesktopItem) -> Unit,
     onCellSize: (Size) -> Unit,
     modifier: Modifier = Modifier,
-    /** Postęp wejścia w edycję 0–1 (siatka pojawia się płynnie). */
-    editProgress: Float = if (editMode) 1f else 0f,
+    /**
+     * Postęp wejścia w edycję 0–1 (siatka pojawia się płynnie). Lambda czytana dopiero przy
+     * rysowaniu – animacja nie przebudowuje całej siatki w każdej klatce.
+     */
+    editProgress: () -> Float = { if (editMode) 1f else 0f },
+    /** Czy cokolwiek z wyglądu edycji jest jeszcze widoczne (także w trakcie animacji wyjścia). */
+    editVisible: Boolean = editMode,
 ) {
     val cols = cfg.columns
     val rows = cfg.rows
@@ -136,7 +141,7 @@ fun DesktopGrid(
         val cellPx = with(density) { Size(cw.toPx(), ch.toPx()) }
         onCellSize(cellPx)
 
-        if (editProgress > 0.001f && cfg.editGridLines) {
+        if (editVisible && cfg.editGridLines) {
             // Wolne komórki: delikatne wypełnienie i obrys; zajęte zostają czyste, żeby było widać,
             // gdzie jest miejsce. Kropki na przecięciach ułatwiają celowanie przy przeciąganiu.
             val occupied = remember(page.items, cols, rows) {
@@ -148,7 +153,7 @@ fun DesktopGrid(
                     }
                 }
             }
-            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = editProgress }) {
+            Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = editProgress() }) {
                 val inset = 4.dp.toPx()
                 val radius = CornerRadius(14.dp.toPx())
                 for (x in 0 until cols) for (y in 0 until rows) {
@@ -230,7 +235,7 @@ private fun DesktopItemSlot(
     ch: Dp,
     cellPx: Size,
     editMode: Boolean,
-    editProgress: Float,
+    editProgress: () -> Float,
     selected: Boolean,
     showMenu: Boolean,
     drag: DragController,
@@ -245,8 +250,6 @@ private fun DesktopItemSlot(
     var resize by remember(item.w, item.h) { mutableStateOf(IntSize(item.w, item.h)) }
     val isDragged = drag.payload?.item?.id == item.id
     val ghost by animateFloatAsState(if (isDragged) 0.25f else 1f, label = "ghost")
-    // Elementy w edycji lekko mniejsze – między nimi widać siatkę
-    val wiggle = 1f - 0.05f * editProgress
 
     // Elementy, których aplikacja zniknęła (odinstalowana), pomijamy
     if (item.type == ItemType.App && apps[item.app] == null && apps.isNotEmpty()) return
@@ -269,6 +272,8 @@ private fun DesktopItemSlot(
             .onGloballyPositioned { bounds = it.boundsInRoot() }
             .graphicsLayer {
                 alpha = ghost
+                // Elementy w edycji lekko mniejsze – między nimi widać siatkę
+                val wiggle = 1f - 0.05f * editProgress()
                 scaleX = wiggle; scaleY = wiggle
             }
     ) {
@@ -625,21 +630,32 @@ fun Dock(
     }
 }
 
+/**
+ * Kropki ekranów. Pozycja (strona + ułamek przesunięcia) czytana dopiero przy rysowaniu,
+ * więc przewijanie ekranów nie wywołuje przebudowy interfejsu w każdej klatce.
+ */
 @Composable
-fun PageIndicator(count: Int, current: Int, fraction: Float, homeIndex: Int, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        repeat(count) { i ->
-            val dist = kotlin.math.abs(i - (current + fraction)).coerceIn(0f, 1f)
-            val w = 6.dp + 14.dp * (1f - dist)
-            Box(
-                Modifier
-                    .padding(horizontal = 3.dp)
-                    .height(6.dp)
-                    .width(w)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.35f + 0.6f * (1f - dist)))
-                    .then(if (i == homeIndex) Modifier.border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape) else Modifier),
-            )
+fun PageIndicator(count: Int, position: () -> Float, homeIndex: Int, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.width(12.dp * count + 14.dp).height(6.dp)) {
+            val gap = 6.dp.toPx()
+            val h = size.height
+            val base = 6.dp.toPx()
+            val extra = 14.dp.toPx()
+            val pos = position()
+            var x = gap / 2
+            val ring = Stroke(1.dp.toPx())
+            for (i in 0 until count) {
+                val near = 1f - kotlin.math.abs(i - pos).coerceIn(0f, 1f)
+                val w = base + extra * near
+                val r = CornerRadius(h / 2)
+                drawRoundRect(Color.White.copy(alpha = 0.35f + 0.6f * near), Offset(x, 0f), Size(w, h), r)
+                if (i == homeIndex) {
+                    val o = ring.width / 2
+                    drawRoundRect(Color.White.copy(alpha = 0.9f), Offset(x + o, o), Size(w - ring.width, h - ring.width), r, style = ring)
+                }
+                x += w + gap
+            }
         }
     }
 }

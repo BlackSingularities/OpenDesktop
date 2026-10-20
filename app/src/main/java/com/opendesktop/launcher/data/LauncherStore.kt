@@ -206,16 +206,20 @@ class LauncherStore(
         }
     }
 
-    /** Kopia zapasowa bez klucza API i bez widżetów systemowych (ich identyfikatory nie przenoszą się). */
+    /** Kopia zapasowa bez kluczy API i bez widżetów systemowych (ich identyfikatory nie przenoszą się). */
     fun exportBackup(): String = json.encodeToString(
         Backup.serializer(),
-        Backup(config = _config.value.copy(openRouterKey = ""), workspace = _workspace.value),
+        Backup(config = _config.value.copy(openRouterKey = "", aiKeys = emptyMap()), workspace = _workspace.value),
     )
 
     fun importBackup(text: String) {
         val b = json.decodeFromString(Backup.serializer(), text)
-        val key = _config.value.openRouterKey
-        _config.value = b.config.copy(openRouterKey = key.ifBlank { b.config.openRouterKey })
+        // Klucze API zostają z tego urządzenia (kopia ich nie zawiera)
+        val cur = _config.value
+        _config.value = b.config.copy(
+            openRouterKey = cur.openRouterKey.ifBlank { b.config.openRouterKey },
+            aiKeys = b.config.aiKeys + cur.aiKeys.filterValues { it.isNotBlank() },
+        )
         _workspace.value = b.workspace.copy(
             pages = b.workspace.pages.map { p -> p.copy(items = p.items.filter { it.type != ItemType.Widget }) },
             initialized = true,

@@ -11,6 +11,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -265,17 +273,157 @@ fun PillButton(text: String, modifier: Modifier = Modifier, primary: Boolean = t
     ) { Text(text, color = fg, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1) }
 }
 
-/** Ciemne okno dialogowe w stylu OpenPDF. */
+/**
+ * Ciemne okno dialogowe w stylu OpenPDF – wspólne dla okienek aplikacji.
+ * [scrollable] = false, gdy treść ma własną przewijaną listę (LazyColumn); [titleAction] to np. „Odśwież”.
+ */
 @Composable
-fun DarkDialog(title: String, onDismiss: () -> Unit, buttons: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+fun DarkDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    buttons: @Composable RowScope.() -> Unit,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    scrollable: Boolean = true,
+    dismissible: Boolean = true,
+    titleAction: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = dismissible, dismissOnBackPress = dismissible),
+    ) {
         Column(
-            Modifier.padding(20.dp).widthIn(max = 520.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Palette.PanelHigh).padding(20.dp),
+            Modifier
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .widthIn(max = 520.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(Palette.PanelHigh)
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+                .padding(horizontal = 20.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp), content = content)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically, content = buttons)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) {
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = Palette.TextDim, lineHeight = 16.sp)
+                }
+                titleAction?.invoke()
+            }
+            Column(
+                Modifier.weight(1f, fill = false).then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content,
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+                content = buttons,
+            )
         }
+    }
+}
+
+/** Okrągły przycisk z ikoną do nagłówka okna (np. odświeżanie). */
+@Composable
+fun DialogIconButton(icon: ImageVector, description: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        Modifier.size(38.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)).clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, description, tint = if (enabled) Color.White else Palette.TextFaint, modifier = Modifier.size(18.dp)) }
+}
+
+/** Pole tekstowe w stylu ciemnych okien: zaokrąglone, z białym akcentem. */
+@Composable
+fun DialogTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String? = null,
+    leadingIcon: ImageVector? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        label = label?.let { { Text(it) } },
+        placeholder = placeholder?.let { { Text(it, color = Palette.TextFaint) } },
+        leadingIcon = leadingIcon?.let { { Icon(it, null, tint = Palette.TextDim) } },
+        trailingIcon = trailing,
+        singleLine = singleLine,
+        minLines = minLines,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Color.White.copy(alpha = 0.7f),
+            unfocusedBorderColor = Color.White.copy(alpha = 0.16f),
+            focusedContainerColor = Color.White.copy(alpha = 0.04f),
+            unfocusedContainerColor = Color.White.copy(alpha = 0.04f),
+            focusedLabelColor = Color.White,
+            unfocusedLabelColor = Palette.TextDim,
+            cursorColor = Color.White,
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+        ),
+    )
+}
+
+/** Chip filtra/wyboru: biały, gdy zaznaczony. */
+@Composable
+fun DialogChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Palette.Accent else Color.White.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) { Text(text, color = if (selected) Palette.Ink else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
+}
+
+/** Stan ładowania wewnątrz okna: kółko i opis, wyśrodkowane. */
+@Composable
+fun DialogLoading(text: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier.fillMaxWidth().padding(vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        CircularProgressIndicator(Modifier.size(32.dp), color = Color.White, trackColor = Color.White.copy(alpha = 0.12f), strokeWidth = 3.dp)
+        Text(text, color = Palette.TextDim, fontSize = 14.sp, textAlign = TextAlign.Center)
+    }
+}
+
+/** Komunikat w oknie (błąd lub informacja) na zaokrąglonym tle. */
+@Composable
+fun DialogNotice(text: String, modifier: Modifier = Modifier, error: Boolean = false) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (error) Palette.Danger.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.06f))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (error) Icons.Rounded.ErrorOutline else Icons.Rounded.Info, null,
+            tint = if (error) Palette.Danger else Palette.TextDim, modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(text, color = if (error) Color.White else Palette.TextDim, fontSize = 13.sp, lineHeight = 18.sp)
     }
 }

@@ -67,7 +67,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Logout
@@ -133,11 +132,9 @@ fun FolderDialog(
     iconSize: Dp,
     cellW: Dp,
     cellH: Dp,
-    aiEnabled: Boolean,
     onDismiss: () -> Unit,
     onLaunch: (AppInfo, Rect) -> Unit,
     onRename: (String) -> Unit,
-    onSuggestName: ((String) -> Unit) -> Unit,
     onRemoveApp: (String, Boolean) -> Unit,
     onAddApps: () -> Unit,
     onInfo: (AppInfo) -> Unit,
@@ -260,12 +257,6 @@ fun FolderDialog(
                             inner()
                         },
                     )
-                    if (aiEnabled) {
-                        Icon(
-                            Icons.Rounded.AutoAwesome, "Zaproponuj nazwę (AI)", tint = ink.copy(alpha = 0.45f),
-                            modifier = Modifier.size(30.dp).clip(CircleShape).clickable { onSuggestName { name = it } }.padding(6.dp),
-                        )
-                    }
                     // Malutki przełącznik: jeden przewijany wiersz ↔ siatka, zapamiętany dla folderu
                     val toggleBg by animateColorAsState(if (row) ink.copy(alpha = 0.16f) else Color.Transparent, label = "rowToggle")
                     Box(

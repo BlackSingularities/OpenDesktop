@@ -39,6 +39,7 @@ import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.UpdateInfo
 import com.opendesktop.launcher.data.Updater
 import com.opendesktop.launcher.data.Workspace
+import com.opendesktop.launcher.domain.AppKeyMigration
 import com.opendesktop.launcher.domain.AutoCategories
 import com.opendesktop.launcher.domain.GridOps
 import com.opendesktop.launcher.ui.desktop.DragPayload
@@ -117,6 +118,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repo.loaded.first { it }
             if (!workspace.value.initialized) initializeDefaults()
+        }
+        viewModelScope.launch {
+            // Aplikacja zmieniła komponent startowy (np. nowa ikona Duolingo) – przepinamy klucze
+            apps.collect { list ->
+                val ws = workspace.value
+                val migrated = withContext(Dispatchers.Default) { AppKeyMigration.migrate(ws, list) }
+                if (migrated !== ws) store.updateWorkspace { cur -> if (cur === ws) migrated else AppKeyMigration.migrate(cur, list) }
+            }
         }
         viewModelScope.launch {
             delay(5000)
@@ -699,16 +708,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun dismissAi() {
         aiCatJob?.cancel()
         aiJob.value = AiJob.Idle
-    }
-
-    fun suggestFolderName(labels: List<String>, onResult: (String) -> Unit) {
-        val cfg = config.value
-        if (!aiReady) return toast("Skonfiguruj AI w ustawieniach")
-        viewModelScope.launch {
-            runCatching { AiClient.folderName(AiEndpoint.of(cfg), labels) }
-                .onSuccess { onResult(it) }
-                .onFailure { toast("AI: ${it.message}") }
-        }
     }
 
     fun aiFindApp(query: String) {

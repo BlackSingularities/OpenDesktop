@@ -1106,11 +1106,9 @@ fun LauncherScreen(
                 },
                 cellW = with(LocalDensity.current) { vm.cellSizePx.width.toDp() },
                 cellH = with(LocalDensity.current) { vm.cellSizePx.height.toDp() },
-                aiEnabled = vm.aiReady,
                 onDismiss = { openFolder = null },
                 onLaunch = { app, b -> launch(app, b) },
                 onRename = { name -> if (name != folder.label) vm.renameItem(pageId, folderId, name) },
-                onSuggestName = { set -> vm.suggestFolderName(folder.apps.mapNotNull { appMap[it]?.let(labelOf) }, set) },
                 onRemoveApp = { key, toDesktop -> vm.removeFromFolder(pageId, folderId, key, toDesktop) },
                 onAddApps = { folderPicker = pageId to folderId },
                 onInfo = { vm.openDetails(it) },
@@ -1163,11 +1161,6 @@ fun LauncherScreen(
             title = "Nazwa folderu",
             initial = folder?.label.orEmpty(),
             onDismiss = { renameFolder = null },
-            extra = if (vm.aiReady && folder != null) { set ->
-                TextButton(onClick = { vm.suggestFolderName(folder.apps.mapNotNull { appMap[it]?.let(labelOf) }, set) }) {
-                    Text("✨ Zaproponuj nazwę (AI)")
-                }
-            } else null,
             onConfirm = { name, _ -> vm.renameItem(pageId, folderId, name); renameFolder = null },
         )
     }

@@ -290,16 +290,6 @@ object AiClient {
             .filter { it.name.isNotBlank() }
     }
 
-    suspend fun folderName(e: AiEndpoint, labels: List<String>): String {
-        val text = chat(
-            e,
-            "Wymyślasz krótkie (1–2 słowa) nazwy folderów na pulpicie telefonu. Odpowiedz samą nazwą, bez cudzysłowów.",
-            "Aplikacje w folderze: ${labels.joinToString()}",
-            temperature = 0.5,
-        )
-        return text.lineSequence().first().trim().trim('"', '\'', '.', '*').take(24)
-    }
-
     /** Wybiera aplikację pasującą do opisu („czym zapłacę za parking?”). */
     suspend fun findApp(e: AiEndpoint, apps: List<AiAppRef>, query: String): List<String> {
         val text = chat(

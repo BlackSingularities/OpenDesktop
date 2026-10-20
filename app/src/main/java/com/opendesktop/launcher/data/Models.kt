@@ -265,6 +265,8 @@ data class Config(
     val defaultPage: Int = 0,
     val wallpaperScroll: Boolean = true,
     val showPageIndicator: Boolean = true,
+    /** Przewijanie ekranów w pętli: za ostatnim jest pierwszy, przed pierwszym ostatni. */
+    val pageLoop: Boolean = false,
     /** Blokada układu: bez przeciągania, zmiany rozmiaru i usuwania elementów. */
     val layoutLocked: Boolean = false,
     /** Wskaźnik ekranów widoczny stale, a nie tylko podczas przewijania. */

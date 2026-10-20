@@ -111,6 +111,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -712,6 +718,7 @@ fun LauncherScreen(
             // Paski edycji podczas przeciągania tylko znikają (bez zmiany układu) – siatka nie skacze pod palcem
             val barsAlpha by animateFloatAsState(if (drag.active) 0f else 1f, label = "editBars")
             if (edit > 0.001f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = edit }.background(Color.Black.copy(alpha = 0.3f)))
+            val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 AnimatedVisibility(
                     editMode,
@@ -808,7 +815,8 @@ fun LauncherScreen(
                                     )
                                 else Modifier
                             )
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                            // Poza edycją pulpit sięga tuż nad dok – bez dolnego marginesu
+                            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp * edit),
                     ) {
                         DesktopGrid(
                             page = page,
@@ -856,8 +864,18 @@ fun LauncherScreen(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
                 )
                 }
-                // Dok przesunięty z ustawień – może zejść aż na pasek nawigacji (rysowany nad nim)
-                if (cfg.dockEnabled) Box(Modifier.offset(y = cfg.dockOffset.dp).zIndex(1f)) {
+                // Dok przesunięty z ustawień – może zejść aż na pasek nawigacji (rysowany nad nim).
+                // Przesunięcie zmienia zajmowaną wysokość, więc pulpit nad dokiem rośnie o zwolnione
+                // miejsce; w edycji dok wraca na swoje miejsce nad paskiem narzędzi
+                if (cfg.dockEnabled) Box(
+                    Modifier
+                        .zIndex(1f)
+                        .layout { m, c ->
+                            val p = m.measure(c)
+                            val shift = (cfg.dockOffset.dp.toPx() * (1f - edit)).roundToInt()
+                            layout(p.width, (p.height - shift).coerceAtLeast(0)) { p.place(0, 0) }
+                        },
+                ) {
                     Dock(
                         keys = ws.dock,
                         apps = appMap,
@@ -890,6 +908,7 @@ fun LauncherScreen(
                     exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
                 ) {
                     EditToolbar(
+                        bottomInset = navBottom,
                         onWidgets = { widgetPicker = true },
                         onActions = { actionPicker = true },
                         onWallpaper = { SystemActions.openWallpaperPicker(ctx) },
@@ -908,9 +927,9 @@ fun LauncherScreen(
                     )
                 }
                 // Dok schodzi nisko – zostaje tylko część paska nawigacji (gest/przyciski nie zachodzą
-                // na ikony); w edycji i bez doku pełny odstęp
-                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                Spacer(Modifier.height(if (cfg.dockEnabled && !editMode) navBottom * 0.3f else navBottom))
+                // na ikony); bez doku pełny odstęp. W edycji pasek narzędzi sam sięga do dołu ekranu
+                val rest = if (cfg.dockEnabled) navBottom * 0.3f else navBottom
+                Spacer(Modifier.height(rest * (1f - edit)))
             }
         }
 
@@ -1031,6 +1050,7 @@ fun LauncherScreen(
                 onRemoveApp = { key, toDesktop -> vm.removeFromFolder(pageId, folderId, key, toDesktop) },
                 onAddApps = { folderPicker = pageId to folderId },
                 onInfo = { vm.openDetails(it) },
+                onRowChange = { vm.setFolderRow(pageId, folderId, it) },
             )
         }
     }
@@ -1291,33 +1311,77 @@ private fun EditTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            Modifier.height(44.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TopBarIcon(Icons.AutoMirrored.Rounded.ArrowBack, "Przesuń ekran w lewo", enabled = page > 0, onClick = onMoveLeft)
-            Column(Modifier.padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Ekran", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                Text("${page + 1} / $count", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-            TopBarIcon(Icons.AutoMirrored.Rounded.ArrowForward, "Przesuń ekran w prawo", enabled = page < count - 1, onClick = onMoveRight)
-        }
+        PageMover(page, count, onMoveLeft, onMoveRight)
         Spacer(Modifier.weight(1f))
         TopBarPill(Icons.Rounded.Home, if (isHome) "Główny" else "Ustaw główny", highlighted = isHome, onClick = onHome)
         TopBarPill(Icons.Rounded.Check, "Gotowe", highlighted = true, onClick = onDone)
     }
 }
 
+/**
+ * Przesuwanie bieżącego ekranu w kolejności: pigułka w stylu pozostałych przycisków paska,
+ * okrągłe strzałki po bokach, a w środku numer i mapka ekranów – bieżący jako wydłużona
+ * kreska, więc po przesunięciu widać, jak zmienia miejsce.
+ */
+@Composable
+private fun PageMover(page: Int, count: Int, onMoveLeft: () -> Unit, onMoveRight: () -> Unit) {
+    Row(
+        Modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(horizontal = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TopBarIcon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Przesuń ekran w lewo", enabled = page > 0, onClick = onMoveLeft)
+        Column(
+            Modifier.padding(horizontal = 8.dp).widthIn(min = 44.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Ekran ${page + 1}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.height(4.dp))
+            if (count <= 8) {
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    for (i in 0 until count) {
+                        val current = i == page
+                        val w by animateDpAsState(if (current) 14.dp else 5.dp, spring(dampingRatio = 0.7f, stiffness = 500f), label = "pageMark")
+                        Box(
+                            Modifier
+                                .size(w, 5.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color.White.copy(alpha = if (current) 1f else 0.3f)),
+                        )
+                    }
+                }
+            } else {
+                Text("z $count", color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        TopBarIcon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Przesuń ekran w prawo", enabled = page < count - 1, onClick = onMoveRight)
+    }
+}
+
 @Composable
 private fun TopBarIcon(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    // Okrągły przycisk z lekkim tłem; po naciśnięciu jaśnieje i lekko się zmniejsza
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (pressed) 0.88f else 1f, spring(stiffness = 900f), label = "arrowPress")
     Box(
         Modifier
-            .size(36.dp)
+            .size(34.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else 0.3f }
             .clip(CircleShape)
-            .then(if (enabled) Modifier.pointerInput(onClick) { detectTapGestures { onClick() } } else Modifier)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.3f },
+            .background(Color.White.copy(alpha = if (pressed) 0.3f else 0.14f))
+            .then(
+                if (enabled) Modifier.pointerInput(onClick) {
+                    detectTapGestures(
+                        onPress = { pressed = true; tryAwaitRelease(); pressed = false },
+                        onTap = { onClick() },
+                    )
+                } else Modifier
+            ),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(20.dp)) }
+    ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(22.dp)) }
 }
 
 @Composable
@@ -1340,6 +1404,7 @@ private fun TopBarPill(icon: ImageVector, label: String, highlighted: Boolean, o
 
 @Composable
 private fun EditToolbar(
+    bottomInset: Dp,
     onWidgets: () -> Unit,
     onActions: () -> Unit,
     onWallpaper: () -> Unit,
@@ -1348,14 +1413,14 @@ private fun EditToolbar(
     onSettings: () -> Unit,
     onLock: () -> Unit,
 ) {
-    // Jedna wspólna belka, przyciski dzielą szerokość po równo – bez przewijania
+    // Belka wtopiona w dół ekranu: na całą szerokość, bez odstępu, tło sięga pod pasek
+    // nawigacji; zaokrąglone tylko górne rogi. Przyciski dzielą szerokość po równo
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(Color.Black.copy(alpha = 0.6f))
+            .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 4.dp + bottomInset),
     ) {
         BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets)
         BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions)

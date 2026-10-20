@@ -4,6 +4,24 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.pm.PackageManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.ViewColumn
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.CircleShape
@@ -122,12 +140,15 @@ fun FolderDialog(
     onRemoveApp: (String, Boolean) -> Unit,
     onAddApps: () -> Unit,
     onInfo: (AppInfo) -> Unit,
+    onRowChange: (Boolean) -> Unit = {},
 ) {
     var name by remember(folder.id) { mutableStateOf(folder.label) }
     var menuKey by remember { mutableStateOf<String?>(null) }
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 600f)) }
     val list = folder.apps.mapNotNull { apps[it] }
+    // Układ zapamiętany dla folderu; lokalny stan, żeby przełączenie było natychmiastowe
+    var row by remember(folder.id) { mutableStateOf(folder.folderRow) }
     val cols = when {
         list.size <= 4 -> 2
         list.size <= 9 -> 3
@@ -145,8 +166,16 @@ fun FolderDialog(
             // Komórki i odstępy takie same jak siatka pulpitu
             val cell = cellH
             val footer = 34.dp
-            val panelW = minOf(cellW * cols + 12.dp, maxWidth - 24.dp)
-            val panelH = minOf(cell * rows + 6.dp + footer, maxHeight * 0.7f)
+            // Wiersz: tyle komórek, ile się zmieści, dalej przewijanie; siatka jak dotąd.
+            // Rozmiar okienka przechodzi płynnie między układami
+            val rowBar = if (cellW * list.size + 12.dp > maxWidth - 24.dp) 7.dp else 0.dp
+            val targetW = if (row) minOf(cellW * list.size.coerceAtLeast(1) + 12.dp, maxWidth - 24.dp)
+            else minOf(cellW * cols + 12.dp, maxWidth - 24.dp)
+            val targetH = if (row) cell + rowBar + footer + 6.dp
+            else minOf(cell * rows + 6.dp + footer, maxHeight * 0.7f)
+            val sizeSpec = spring<Dp>(dampingRatio = 0.82f, stiffness = 520f)
+            val panelW by animateDpAsState(targetW, sizeSpec, label = "folderW")
+            val panelH by animateDpAsState(targetH, sizeSpec, label = "folderH")
             val wPx = with(density) { panelW.toPx() }
             val hPx = with(density) { panelH.toPx() }
             val screenW = with(density) { maxWidth.toPx() }
@@ -174,41 +203,46 @@ fun FolderDialog(
                     .clickable(interactionSource = null, indication = null) {}
                     .padding(start = 6.dp, end = 6.dp, top = 6.dp),
             ) {
-                LazyVerticalGrid(GridCells.Fixed(cols), modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    items(list, key = { it.key }) { app ->
-                        var bounds by remember { mutableStateOf(Rect.Zero) }
-                        var pressed by remember { mutableStateOf(false) }
-                        Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
-                            AppIcon(
-                                app.icon, labelOf(app), iconSize, cfg.iconShape, cfg.showLabels,
-                                pressed = pressed, labelSize = cfg.labelSize, labelColor = ink, shadow = !panel.light,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .onGloballyPositioned { bounds = it.boundsInRoot() }
-                                    .itemGestures(
-                                        key = app.key,
-                                        onPress = { pressed = it },
-                                        onTap = { onLaunch(app, bounds) },
-                                        onLongPress = { menuKey = app.key },
+                // Pojedyncza komórka – wspólna dla siatki i wiersza
+                val appCell: @Composable (AppInfo, Modifier) -> Unit = { app, cellModifier ->
+                    var bounds by remember { mutableStateOf(Rect.Zero) }
+                    var pressed by remember { mutableStateOf(false) }
+                    Box(cellModifier.height(cell), contentAlignment = Alignment.Center) {
+                        AppIcon(
+                            app.icon, labelOf(app), iconSize, cfg.iconShape, cfg.showLabels,
+                            pressed = pressed, labelSize = cfg.labelSize, labelColor = ink, shadow = !panel.light,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onGloballyPositioned { bounds = it.boundsInRoot() }
+                                .itemGestures(
+                                    key = app.key,
+                                    onPress = { pressed = it },
+                                    onTap = { onLaunch(app, bounds) },
+                                    onLongPress = { menuKey = app.key },
+                                ),
+                        )
+                        if (menuKey == app.key) {
+                            Box(Modifier.align(Alignment.Center)) {
+                                ActionMenu(
+                                    title = labelOf(app),
+                                    onDismiss = { menuKey = null },
+                                    actions = listOf(
+                                        MenuAction("Wyjmij na pulpit", Icons.Rounded.Logout) { onRemoveApp(app.key, true) },
+                                        MenuAction("Usuń z folderu", Icons.Rounded.Close) { onRemoveApp(app.key, false) },
+                                        MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { onInfo(app) },
                                     ),
-                            )
-                            if (menuKey == app.key) {
-                                Box(Modifier.align(Alignment.Center)) {
-                                    ActionMenu(
-                                        title = labelOf(app),
-                                        onDismiss = { menuKey = null },
-                                        actions = listOf(
-                                            MenuAction("Wyjmij na pulpit", Icons.Rounded.Logout) { onRemoveApp(app.key, true) },
-                                            MenuAction("Usuń z folderu", Icons.Rounded.Close) { onRemoveApp(app.key, false) },
-                                            MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { onInfo(app) },
-                                        ),
-                                    )
-                                }
+                                )
                             }
                         }
                     }
                 }
-                // Stopka: subtelna nazwa i mały plus
+                Crossfade(row, Modifier.weight(1f).fillMaxWidth(), animationSpec = tween(220), label = "folderLayout") { asRow ->
+                    if (asRow) FolderRow(list, cellW, rowBar, ink, appCell)
+                    else LazyVerticalGrid(GridCells.Fixed(cols), modifier = Modifier.fillMaxSize()) {
+                        items(list, key = { it.key }) { app -> appCell(app, Modifier) }
+                    }
+                }
+                // Stopka: subtelna nazwa, przełącznik układu i mały plus
                 Row(Modifier.fillMaxWidth().height(footer), verticalAlignment = Alignment.CenterVertically) {
                     BasicTextField(
                         value = name,
@@ -228,6 +262,29 @@ fun FolderDialog(
                             modifier = Modifier.size(30.dp).clip(CircleShape).clickable { onSuggestName { name = it } }.padding(6.dp),
                         )
                     }
+                    // Malutki przełącznik: jeden przewijany wiersz ↔ siatka (zapamiętany dla folderu)
+                    val toggleBg by animateColorAsState(if (row) ink.copy(alpha = 0.16f) else Color.Transparent, label = "rowToggle")
+                    Box(
+                        Modifier
+                            .padding(end = 2.dp)
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(toggleBg)
+                            .clickable {
+                                row = !row
+                                onRowChange(row)
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Crossfade(row, label = "rowIcon") { r ->
+                            Icon(
+                                if (r) Icons.Rounded.GridView else Icons.Rounded.ViewColumn,
+                                if (r) "Pokaż jako siatkę" else "Pokaż w jednym wierszu",
+                                tint = ink.copy(alpha = if (r) 0.8f else 0.5f),
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                    }
                     Icon(
                         Icons.Rounded.Add, "Dodaj aplikacje", tint = ink.copy(alpha = 0.55f),
                         modifier = Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onAddApps).padding(5.dp),
@@ -235,6 +292,77 @@ fun FolderDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * Folder w jednym wierszu: komórki tej samej szerokości co na pulpicie, przewijanie w poziomie
+ * z dociąganiem do pełnych ikon, krawędzie zanikają tam, gdzie jest jeszcze coś do przewinięcia,
+ * a pod spodem cienki pasek pokazuje, którą część wiersza widać.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FolderRow(
+    list: List<AppInfo>,
+    cellW: Dp,
+    barH: Dp,
+    ink: Color,
+    appCell: @Composable (AppInfo, Modifier) -> Unit,
+) {
+    val state = rememberLazyListState()
+    val fadeL by animateFloatAsState(if (state.canScrollBackward) 1f else 0f, label = "fadeL")
+    val fadeR by animateFloatAsState(if (state.canScrollForward) 1f else 0f, label = "fadeR")
+    val scrollable = state.canScrollBackward || state.canScrollForward
+    val barAlpha by animateFloatAsState(if (scrollable) 1f else 0f, label = "rowBar")
+    Column(Modifier.fillMaxSize()) {
+        LazyRow(
+            state = state,
+            flingBehavior = rememberSnapFlingBehavior(state),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    // Maska krawędzi: przezroczystość tylko po stronie, w którą można przewinąć
+                    val f = (28.dp.toPx() / size.width).coerceAtMost(0.3f)
+                    drawRect(
+                        Brush.horizontalGradient(
+                            0f to Color.Black.copy(alpha = 1f - fadeL),
+                            f to Color.Black,
+                            1f - f to Color.Black,
+                            1f to Color.Black.copy(alpha = 1f - fadeR),
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        ) {
+            items(list, key = { it.key }) { app -> appCell(app, Modifier.width(cellW)) }
+        }
+        // Pasek przewijania: tor i suwak proporcjonalny do widocznej części wiersza
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(barH)
+                .graphicsLayer { alpha = barAlpha }
+                .drawBehind {
+                    val info = state.layoutInfo
+                    val itemPx = cellW.toPx()
+                    val total = (itemPx * list.size).coerceAtLeast(1f)
+                    val view = info.viewportSize.width.toFloat().coerceAtLeast(1f)
+                    if (total <= view) return@drawBehind
+                    val trackW = size.width * 0.4f
+                    val trackX = (size.width - trackW) / 2
+                    val h = 3.dp.toPx()
+                    val y = (size.height - h) / 2
+                    val r = CornerRadius(h / 2)
+                    drawRoundRect(ink.copy(alpha = 0.15f), Offset(trackX, y), Size(trackW, h), r)
+                    val scrolled = state.firstVisibleItemIndex * itemPx + state.firstVisibleItemScrollOffset
+                    val thumbW = (trackW * view / total).coerceAtLeast(h * 3)
+                    val thumbX = trackX + (trackW - thumbW) * (scrolled / (total - view)).coerceIn(0f, 1f)
+                    drawRoundRect(ink.copy(alpha = 0.55f), Offset(thumbX, y), Size(thumbW, h), r)
+                },
+        )
     }
 }
 

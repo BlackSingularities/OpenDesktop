@@ -254,11 +254,11 @@ private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
             pick.choose("Animacja otwierania", DrawerAnimation.entries, cfg.drawerAnimation, { it.label }) { s -> set { it.copy(drawerAnimation = s) } }
         }
         SliderRow(Icons.Rounded.ViewColumn, "Kolumny", cfg.drawerColumns.toFloat(), 2f..12f, 9) { v -> set { it.copy(drawerColumns = v.toInt()) } }
-        SliderRow(Icons.Rounded.PhotoSizeSelectSmall, "Rozmiar ikon", cfg.iconScale, 0.6f..1.5f, 17, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(iconScale = v) } }
         SliderRow(
             Icons.Rounded.TableRows, "Wiersze na ekranie", cfg.drawerRows.toFloat(), 0f..20f, 19,
             { if (it.toInt() == 0) "Auto" else it.toInt().toString() },
         ) { v -> set { it.copy(drawerRows = v.toInt()) } }
+        SliderRow(Icons.Rounded.PhotoSizeSelectSmall, "Rozmiar ikon", cfg.iconScale, 0.6f..1.5f, 17, { "${(it * 100).toInt()}%" }) { v -> set { it.copy(iconScale = v) } }
     }
     Group("Tło") {
         SwitchRow(Icons.Rounded.Square, "Tło szuflady", null, cfg.drawerBackground) { v -> set { it.copy(drawerBackground = v) } }

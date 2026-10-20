@@ -11,6 +11,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.ViewColumn
@@ -166,13 +167,15 @@ fun FolderDialog(
             // Komórki i odstępy takie same jak siatka pulpitu
             val cell = cellH
             val footer = 34.dp
-            // Wiersz: tyle komórek, ile się zmieści, dalej przewijanie; siatka jak dotąd.
+            // Wiersz: okienko na całą szerokość ekranu z tymi samymi marginesami (6 dp) i komórkami
+            // co pulpit – ikony stoją dokładnie w kolumnach pulpitu; nadmiar się przewija, a pasek
+            // przewijania leży na samym dole, wtopiony w krawędź. Siatka jak dotąd.
             // Rozmiar okienka przechodzi płynnie między układami
-            val rowBar = if (cellW * list.size + 12.dp > maxWidth - 24.dp) 7.dp else 0.dp
-            val targetW = if (row) minOf(cellW * list.size.coerceAtLeast(1) + 12.dp, maxWidth - 24.dp)
-            else minOf(cellW * cols + 12.dp, maxWidth - 24.dp)
-            val targetH = if (row) cell + rowBar + footer + 6.dp
+            val rowBar = if (cellW * list.size > maxWidth - 12.dp) 3.dp else 0.dp
+            val targetW = if (row) maxWidth else minOf(cellW * cols + 12.dp, maxWidth - 24.dp)
+            val targetH = if (row) cell + footer + 6.dp + rowBar
             else minOf(cell * rows + 6.dp + footer, maxHeight * 0.7f)
+            val rowState = rememberLazyListState()
             val sizeSpec = spring<Dp>(dampingRatio = 0.82f, stiffness = 520f)
             val panelW by animateDpAsState(targetW, sizeSpec, label = "folderW")
             val panelH by animateDpAsState(targetH, sizeSpec, label = "folderH")
@@ -181,9 +184,10 @@ fun FolderDialog(
             val screenW = with(density) { maxWidth.toPx() }
             val screenH = with(density) { maxHeight.toPx() }
             val margin = with(density) { 12.dp.toPx() }
+            val side = if (row) 0f else margin
             val cx = if (anchor == Rect.Zero) screenW / 2 else anchor.center.x
             val cy = if (anchor == Rect.Zero) screenH / 2 else anchor.center.y
-            val x = (cx - wPx / 2).coerceIn(margin, (screenW - wPx - margin).coerceAtLeast(margin))
+            val x = (cx - wPx / 2).coerceIn(side, (screenW - wPx - side).coerceAtLeast(side))
             val y = (cy - hPx / 2).coerceIn(margin * 3, (screenH - hPx - margin * 3).coerceAtLeast(margin * 3))
             val shape = panel.shape
             Column(
@@ -201,7 +205,7 @@ fun FolderDialog(
                     .background(panel.background)
                     .border(1.dp, panel.border, shape)
                     .clickable(interactionSource = null, indication = null) {}
-                    .padding(start = 6.dp, end = 6.dp, top = 6.dp),
+                    .padding(top = 6.dp),
             ) {
                 // Pojedyncza komórka – wspólna dla siatki i wiersza
                 val appCell: @Composable (AppInfo, Modifier) -> Unit = { app, cellModifier ->
@@ -236,14 +240,14 @@ fun FolderDialog(
                         }
                     }
                 }
-                Crossfade(row, Modifier.weight(1f).fillMaxWidth(), animationSpec = tween(220), label = "folderLayout") { asRow ->
-                    if (asRow) FolderRow(list, cellW, rowBar, ink, appCell)
+                Crossfade(row, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 6.dp), animationSpec = tween(220), label = "folderLayout") { asRow ->
+                    if (asRow) FolderRow(list, cellW, rowState, appCell)
                     else LazyVerticalGrid(GridCells.Fixed(cols), modifier = Modifier.fillMaxSize()) {
                         items(list, key = { it.key }) { app -> appCell(app, Modifier) }
                     }
                 }
                 // Stopka: subtelna nazwa, przełącznik układu i mały plus
-                Row(Modifier.fillMaxWidth().height(footer), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().height(footer).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     BasicTextField(
                         value = name,
                         onValueChange = { name = it.take(30) },
@@ -290,6 +294,8 @@ fun FolderDialog(
                         modifier = Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onAddApps).padding(5.dp),
                     )
                 }
+                // Pasek przewijania wiersza: pod nazwą, na całą szerokość, wtopiony w dolną krawędź
+                if (row && rowBar > 0.dp) FolderScrollBar(rowState, list.size, cellW, ink, Modifier.fillMaxWidth().height(rowBar))
             }
         }
     }
@@ -297,73 +303,62 @@ fun FolderDialog(
 
 /**
  * Folder w jednym wierszu: komórki tej samej szerokości co na pulpicie, przewijanie w poziomie
- * z dociąganiem do pełnych ikon, krawędzie zanikają tam, gdzie jest jeszcze coś do przewinięcia,
- * a pod spodem cienki pasek pokazuje, którą część wiersza widać.
+ * z dociąganiem do pełnych ikon; krawędzie zanikają tam, gdzie jest jeszcze coś do przewinięcia.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FolderRow(
     list: List<AppInfo>,
     cellW: Dp,
-    barH: Dp,
-    ink: Color,
+    state: LazyListState,
     appCell: @Composable (AppInfo, Modifier) -> Unit,
 ) {
-    val state = rememberLazyListState()
     val fadeL by animateFloatAsState(if (state.canScrollBackward) 1f else 0f, label = "fadeL")
     val fadeR by animateFloatAsState(if (state.canScrollForward) 1f else 0f, label = "fadeR")
-    val scrollable = state.canScrollBackward || state.canScrollForward
-    val barAlpha by animateFloatAsState(if (scrollable) 1f else 0f, label = "rowBar")
-    Column(Modifier.fillMaxSize()) {
-        LazyRow(
-            state = state,
-            flingBehavior = rememberSnapFlingBehavior(state),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    // Maska krawędzi: przezroczystość tylko po stronie, w którą można przewinąć
-                    val f = (28.dp.toPx() / size.width).coerceAtMost(0.3f)
-                    drawRect(
-                        Brush.horizontalGradient(
-                            0f to Color.Black.copy(alpha = 1f - fadeL),
-                            f to Color.Black,
-                            1f - f to Color.Black,
-                            1f to Color.Black.copy(alpha = 1f - fadeR),
-                        ),
-                        blendMode = BlendMode.DstIn,
-                    )
-                },
-        ) {
-            items(list, key = { it.key }) { app -> appCell(app, Modifier.width(cellW)) }
-        }
-        // Pasek przewijania: tor i suwak proporcjonalny do widocznej części wiersza
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(barH)
-                .graphicsLayer { alpha = barAlpha }
-                .drawBehind {
-                    val info = state.layoutInfo
-                    val itemPx = cellW.toPx()
-                    val total = (itemPx * list.size).coerceAtLeast(1f)
-                    val view = info.viewportSize.width.toFloat().coerceAtLeast(1f)
-                    if (total <= view) return@drawBehind
-                    val trackW = size.width * 0.4f
-                    val trackX = (size.width - trackW) / 2
-                    val h = 3.dp.toPx()
-                    val y = (size.height - h) / 2
-                    val r = CornerRadius(h / 2)
-                    drawRoundRect(ink.copy(alpha = 0.15f), Offset(trackX, y), Size(trackW, h), r)
-                    val scrolled = state.firstVisibleItemIndex * itemPx + state.firstVisibleItemScrollOffset
-                    val thumbW = (trackW * view / total).coerceAtLeast(h * 3)
-                    val thumbX = trackX + (trackW - thumbW) * (scrolled / (total - view)).coerceIn(0f, 1f)
-                    drawRoundRect(ink.copy(alpha = 0.55f), Offset(thumbX, y), Size(thumbW, h), r)
-                },
-        )
+    LazyRow(
+        state = state,
+        flingBehavior = rememberSnapFlingBehavior(state),
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                // Maska krawędzi: przezroczystość tylko po stronie, w którą można przewinąć
+                val f = (28.dp.toPx() / size.width).coerceAtMost(0.3f)
+                drawRect(
+                    Brush.horizontalGradient(
+                        0f to Color.Black.copy(alpha = 1f - fadeL),
+                        f to Color.Black,
+                        1f - f to Color.Black,
+                        1f to Color.Black.copy(alpha = 1f - fadeR),
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    ) {
+        items(list, key = { it.key }) { app -> appCell(app, Modifier.width(cellW)) }
     }
+}
+
+/**
+ * Pasek przewijania wiersza folderu na samym dole okienka: delikatny tor na całą szerokość
+ * i suwak proporcjonalny do widocznej części, przycinany razem z rogami okienka.
+ */
+@Composable
+private fun FolderScrollBar(state: LazyListState, count: Int, cellW: Dp, ink: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier.drawBehind {
+            drawRect(ink.copy(alpha = 0.08f))
+            val itemPx = cellW.toPx()
+            val total = (itemPx * count).coerceAtLeast(1f)
+            val view = state.layoutInfo.viewportSize.width.toFloat().coerceAtLeast(1f)
+            if (total <= view) return@drawBehind
+            val scrolled = state.firstVisibleItemIndex * itemPx + state.firstVisibleItemScrollOffset
+            val thumbW = (size.width * view / total).coerceAtLeast(size.height * 8)
+            val thumbX = (size.width - thumbW) * (scrolled / (total - view)).coerceIn(0f, 1f)
+            drawRoundRect(ink.copy(alpha = 0.5f), Offset(thumbX, 0f), Size(thumbW, size.height), CornerRadius(size.height / 2))
+        },
+    )
 }
 
 private class WidgetEntry(

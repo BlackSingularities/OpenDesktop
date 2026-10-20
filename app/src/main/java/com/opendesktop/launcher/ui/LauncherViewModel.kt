@@ -411,6 +411,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         ws.updatePage(pageId) { p -> p.copy(items = p.items.map { if (it.id == itemId) it.copy(label = name.trim()) else it }) }
     }
 
+    fun setFolderRow(pageId: String, folderId: String, row: Boolean) = store.updateWorkspace { ws ->
+        ws.updatePage(pageId) { p -> p.copy(items = p.items.map { if (it.id == folderId) it.copy(folderRow = row) else it }) }
+    }
+
     fun addToFolder(pageId: String, folderId: String, keys: List<String>) = store.updateWorkspace { ws ->
         ws.updatePage(pageId) { p -> p.copy(items = p.items.map { if (it.id == folderId) it.copy(apps = (it.apps + keys).distinct()) else it }) }
     }

@@ -513,16 +513,16 @@ fun Dock(
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 2.dp)
+            .padding(start = 10.dp, end = 10.dp, bottom = 2.dp)
             .onGloballyPositioned { drag.dockBounds = it.boundsInRoot() }
             .then(
                 if (cfg.dockBackground) Modifier
                     .clip(RoundedCornerShape(30.dp))
                     .background(Color.White.copy(alpha = cfg.dockOpacity))
-                    .padding(horizontal = 10.dp)
-                else Modifier
-            )
-            .padding(vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                // Bez tła pulpit zaczyna się tuż nad ikonami doku
+                else Modifier.padding(top = 2.dp, bottom = 6.dp)
+            ),
     ) {
         // Ikona jak największa: ok. 80% miejsca na jedno pole
         val iconSize = (maxWidth / slots * 0.8f * cfg.dockIconScale).coerceIn(40.dp, 76.dp)

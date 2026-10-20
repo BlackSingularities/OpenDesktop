@@ -129,6 +129,8 @@ data class DesktopItem(
     val stretch: Boolean = false,
     /** Główna aplikacja folderu - uruchamia się po kliknięciu. */
     val primaryApp: String? = null,
+    /** Folder otwiera się jako jeden przewijany wiersz zamiast siatki. */
+    val folderRow: Boolean = false,
     /** Wygląd wbudowanej wyszukiwarki ([ItemType.Search]). */
     val searchStyle: SearchStyle = SearchStyle(),
     /** Rodzaj wbudowanego widżetu dla [ItemType.Gadget]. */

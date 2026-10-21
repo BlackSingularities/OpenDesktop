@@ -8,6 +8,10 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
+    <!-- Wyszukiwanie kontaktów w szufladzie (pytamy dopiero przy pierwszym użyciu) -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Odblokowanie ukrytych aplikacji -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Launcher musi widzieć wszystkie aplikacje i dostawców widżetów -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
@@ -49,6 +53,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Plakietki z liczbą powiadomień na ikonach -->
+        <service
+            android:name=".data.BadgeListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

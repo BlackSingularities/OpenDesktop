@@ -44,19 +44,13 @@ enum class DrawerSort(val label: String) {
     Category("Kategoria"),
     Usage("Najczęściej używane"),
     Installed("Ostatnio zainstalowane"),
-    Size("Rozmiar (największe)"),
-    UpdateDate("Ostatnio aktualizowane"),
 }
 
 @Serializable
-enum class AppFilter(val label: String) {
-    All("Wszystkie"),
-    LastWeek("Zainstalowane w tym tygodniu"),
-    LastMonth("Zainstalowane w tym miesiącu"),
-    Large("Duże aplikacje (>100MB)"),
-    Small("Małe aplikacje (<10MB)"),
-    System("Systemowe"),
-    UserInstalled("Zainstalowane przez użytkownika"),
+enum class PowerSaver(val label: String, val description: String) {
+    Off("Wyłączony", "Zawsze pełne efekty"),
+    Auto("Automatycznie", "Gdy działa systemowe oszczędzanie baterii albo telefon ma mało pamięci"),
+    On("Zawsze włączony", "Proste przejścia i szuflada, bez rozmycia i odbić"),
 }
 
 @Serializable
@@ -282,7 +276,8 @@ data class Config(
     val showLabels: Boolean = true,
     val labelSize: Float = 12f,
     val iconShape: IconShape = IconShape.Squircle,
-    val iconPadding: Float = 0.85f,
+    /** Plakietki z liczbą powiadomień na ikonach (wymaga dostępu do powiadomień). */
+    val notificationBadges: Boolean = true,
     // Dok
     val dockEnabled: Boolean = true,
     val dockCount: Int = 5,
@@ -326,13 +321,6 @@ data class Config(
     val autoTheme: Boolean = false,
     val darkModeStartHour: Int = 20,
     val darkModeEndHour: Int = 7,
-    // Efekty i animacje
-    val iconPressEffect: Boolean = true,
-    val iconWiggleOnLongPress: Boolean = true,
-    val parallaxEffect: Boolean = true,
-    val particleEffects: Boolean = false,
-    val iconBounceAnimation: Boolean = true,
-    val folderOpenAnimation: Boolean = true,
     /** Tło menu kontekstowych (ikony, widżety, szuflada): kolor RGB i krycie. */
     val menuColor: Long = 0xFFFFFFFF,
     val menuOpacity: Float = 0.74f,
@@ -342,7 +330,8 @@ data class Config(
     /** Zaokrąglenie rogów menu kontekstowych i okienek folderów (dp). */
     val menuRadius: Float = 6f,
     val folderRadius: Float = 6f,
-    val swipeTrails: Boolean = false,
+    /** Tryb oszczędny: proste przejścia i szuflada, bez rozmycia i odbić. */
+    val powerSaver: PowerSaver = PowerSaver.Auto,
     // AI – dostawca i osobne klucze/modele dla każdego z nich (klucz: AiProvider.name).
     // openRouterKey/aiModel/aiModelName to dawne pola OpenRoutera – czytane jako wartości zapasowe.
     val aiProvider: AiProvider = AiProvider.OpenRouter,
@@ -359,9 +348,6 @@ data class Config(
     val autoUpdate: Boolean = true,
     val skippedVersion: Int = 0,
     val onboardingDone: Boolean = false,
-    // Google Drive
-    val cloudAutoSync: Boolean = false,
-    val cloudSyncInterval: Int = 5, // minuty
 ) {
     companion object {
         const val DEFAULT_REPO = "BlackSingularities/OpenDesktop"
@@ -374,3 +360,13 @@ data class Backup(
     val config: Config,
     val workspace: Workspace,
 )
+
+/** Konfiguracja do rysowania w trybie oszczędnym: bez efektów 3D, rozmycia i odbić. */
+fun Config.lite(): Config = copy(
+    transition = if (transition == PageTransition.Slide || transition == PageTransition.Fade) transition else PageTransition.Slide,
+    drawerStyle = if (drawerStyle in LIGHT_DRAWERS) drawerStyle else DrawerStyle.Grid,
+    blurBehindDrawer = false,
+    dockReflection = false,
+)
+
+private val LIGHT_DRAWERS = setOf(DrawerStyle.Grid, DrawerStyle.Categories, DrawerStyle.List, DrawerStyle.Pages)

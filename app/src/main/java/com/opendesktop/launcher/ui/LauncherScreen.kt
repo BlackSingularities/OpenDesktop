@@ -465,13 +465,13 @@ fun LauncherScreen(
 
     // ------------------------------------------------------------------ menu kontekstowe
     @Composable
-    fun AppMenu(app: AppInfo, extra: List<MenuAction>) {
+    fun AppMenu(app: AppInfo, extra: List<MenuAction>, onDismiss: () -> Unit = { menu = null }) {
         val shortcuts by produceState(emptyList<ShortcutEntry>(), app.key) {
             value = withContext(Dispatchers.IO) { vm.shortcuts(app) }
         }
         ActionMenu(
             title = labelOf(app),
-            onDismiss = { menu = null },
+            onDismiss = onDismiss,
             shortcuts = shortcuts.map { s -> MenuShortcut(s.label, s.icon) { vm.startShortcut(s) } },
             // Zablokowany układ: tylko skróty, informacje i odinstalowanie – nic, co zmienia układ
             actions = (if (cfg.layoutLocked) emptyList() else extra) + listOfNotNull(
@@ -1111,7 +1111,8 @@ fun LauncherScreen(
                 onRename = { name -> if (name != folder.label) vm.renameItem(pageId, folderId, name) },
                 onRemoveApp = { key, toDesktop -> vm.removeFromFolder(pageId, folderId, key, toDesktop) },
                 onAddApps = { folderPicker = pageId to folderId },
-                onInfo = { vm.openDetails(it) },
+                onReorder = { keys -> vm.setFolderApps(pageId, folderId, keys) },
+                appMenu = { app, extra, dismiss -> AppMenu(app, extra, dismiss) },
                 onRowChange = { vm.setFolderRow(pageId, folderId, it) },
             )
         }

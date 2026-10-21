@@ -66,6 +66,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
@@ -137,7 +138,8 @@ fun FolderDialog(
     onRename: (String) -> Unit,
     onRemoveApp: (String, Boolean) -> Unit,
     onAddApps: () -> Unit,
-    onInfo: (AppInfo) -> Unit,
+    onReorder: (List<String>) -> Unit,
+    appMenu: @Composable (app: AppInfo, extra: List<MenuAction>, onDismiss: () -> Unit) -> Unit,
     onRowChange: (Boolean) -> Unit = {},
 ) {
     var name by remember(folder.id) { mutableStateOf(folder.label) }
@@ -157,6 +159,9 @@ fun FolderDialog(
     val panel = PanelStyle.of(cfg.folderColor, cfg.folderOpacity, cfg.folderRadius)
     val ink = panel.content
     fun close() { onRename(name); onDismiss() }
+    // Nowa kolejność kluczy po zamianie dwóch widocznych aplikacji
+    fun move(from: Int, to: Int): List<String> =
+        list.map { it.key }.toMutableList().apply { add(to, removeAt(from)) }
 
     Dialog(onDismissRequest = ::close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().clickable(interactionSource = null, indication = null) { close() }) {
@@ -222,17 +227,19 @@ fun FolderDialog(
                                     onLongPress = { menuKey = app.key },
                                 ),
                         )
+                        val idx = list.indexOf(app)
                         if (menuKey == app.key) {
                             Box(Modifier.align(Alignment.Center)) {
-                                ActionMenu(
-                                    title = labelOf(app),
-                                    onDismiss = { menuKey = null },
-                                    actions = listOf(
+                                // To samo menu co dla aplikacji na pulpicie, plus akcje folderu
+                                appMenu(
+                                    app,
+                                    listOfNotNull(
+                                        if (idx > 0) MenuAction("Przesuń wcześniej", Icons.AutoMirrored.Rounded.ArrowBack) { onReorder(move(idx, idx - 1)) } else null,
+                                        if (idx < list.lastIndex) MenuAction("Przesuń dalej", Icons.AutoMirrored.Rounded.ArrowForward) { onReorder(move(idx, idx + 1)) } else null,
                                         MenuAction("Wyjmij na pulpit", Icons.Rounded.Logout) { onRemoveApp(app.key, true) },
                                         MenuAction("Usuń z folderu", Icons.Rounded.Close) { onRemoveApp(app.key, false) },
-                                        MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { onInfo(app) },
                                     ),
-                                )
+                                ) { menuKey = null }
                             }
                         }
                     }

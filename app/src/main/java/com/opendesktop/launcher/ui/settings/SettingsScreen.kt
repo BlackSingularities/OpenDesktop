@@ -165,6 +165,10 @@ private fun SettingsHome(onClose: () -> Unit, onOpenCategories: () -> Unit, onOp
         Group("Usługi") {
             listOf(Section.Ai, Section.Updates, Section.Backup).forEach { s -> ActionRow(s.icon, s.title, s.summary, chevron = true) { onOpen(s) } }
         }
+        Group("O aplikacji") {
+            ActionRow(Icons.Rounded.Person, "Projekt i wykonanie", "redzikowski.com") { openUrl(ctx, "https://redzikowski.com") }
+            ActionRow(Icons.Rounded.LocalCafe, "Postaw kawę", "Wesprzyj rozwój na buycoffee.to") { openUrl(ctx, "https://buycoffee.to/adamredzikowski") }
+        }
         Text(
             "Otwarty launcher na Androida",
             color = Palette.TextFaint,
@@ -172,6 +176,12 @@ private fun SettingsHome(onClose: () -> Unit, onOpenCategories: () -> Unit, onOp
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
+    }
+}
+
+private fun openUrl(ctx: android.content.Context, url: String) {
+    runCatching {
+        ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
 

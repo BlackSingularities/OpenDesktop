@@ -16,6 +16,10 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -969,6 +973,8 @@ fun LauncherScreen(
                 ) {
                     EditToolbar(
                         bottomInset = navBottom,
+                        page = pagerState.currentPage,
+                        pageCount = ws.pages.size,
                         onWidgets = { widgetPicker = true },
                         onActions = { actionPicker = true },
                         onWallpaper = { SystemActions.openWallpaperPicker(ctx) },
@@ -1463,6 +1469,8 @@ private fun TopBarPill(icon: ImageVector, label: String, highlighted: Boolean, o
 @Composable
 private fun EditToolbar(
     bottomInset: Dp,
+    page: Int,
+    pageCount: Int,
     onWidgets: () -> Unit,
     onActions: () -> Unit,
     onWallpaper: () -> Unit,
@@ -1471,22 +1479,81 @@ private fun EditToolbar(
     onSettings: () -> Unit,
     onLock: () -> Unit,
 ) {
-    // Belka wtopiona w dół ekranu: na całą szerokość, bez odstępu, tło sięga pod pasek
-    // nawigacji; zaokrąglone tylko górne rogi. Przyciski dzielą szerokość po równo
-    Row(
+    // Arkusz wtopiony w dół ekranu: tło sięga pod pasek nawigacji, zaokrąglone górne rogi.
+    // Przyciski w trzech grupach: dodawanie, ekrany, układ
+    val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(Color.Black.copy(alpha = 0.6f))
-            .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 4.dp + bottomInset),
+            .clip(sheet)
+            .background(Brush.verticalGradient(listOf(Color(0xE61C1F26), Color(0xF20E1014))))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), sheet)
+            .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp + bottomInset),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets)
-        BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions)
-        BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper)
-        BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
-        BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage)
-        BigToolButton(Icons.Rounded.Lock, "Zablokuj", onLock)
-        BigToolButton(Icons.Rounded.Settings, "Ustawienia", onSettings)
+        Box(
+            Modifier
+                .size(width = 36.dp, height = 4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.25f))
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Edit, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Edycja pulpitu", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            PageDots(page, pageCount)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ToolGroup(3f) {
+                BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets, accent = Color(0xFF7FB2FF))
+                BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions, accent = Color(0xFFB79BFF))
+                BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper, accent = Color(0xFF6FD6A8))
+            }
+            ToolGroup(2f) {
+                BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
+                BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage, accent = Color(0xFFFF8A80))
+            }
+            ToolGroup(2f) {
+                BigToolButton(Icons.Rounded.Lock, "Zablokuj", onLock, accent = Color(0xFFFFCC80))
+                BigToolButton(Icons.Rounded.Settings, "Ustawienia", onSettings)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.ToolGroup(weight: Float, content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier
+            .weight(weight)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(horizontal = 2.dp, vertical = 4.dp),
+        content = content,
+    )
+}
+
+/** Wskaźnik bieżącego ekranu w nagłówku paska edycji. */
+@Composable
+private fun PageDots(page: Int, count: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (count in 2..8) repeat(count) { i ->
+            val w by animateDpAsState(if (i == page) 14.dp else 5.dp, label = "dot")
+            Box(
+                Modifier
+                    .size(width = w, height = 5.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = if (i == page) 0.9f else 0.3f))
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Text("${page + 1} / $count", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
     }
 }
 
@@ -1513,22 +1580,39 @@ private fun RowScope.BigToolButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    highlighted: Boolean = false,
+    accent: Color = Color.White,
 ) {
-    val fg = if (highlighted) Color.Black else Color.White
+    // Wciśnięcie lekko zmniejsza przycisk i rozjaśnia kółko ikony
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.88f else 1f, spring(dampingRatio = 0.5f, stiffness = 900f), label = "press")
     Column(
         Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (highlighted) Color.White else Color.Transparent)
-            .then(if (enabled) Modifier.pointerInput(onClick) { detectTapGestures { onClick() } } else Modifier)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.35f }
-            .padding(vertical = 8.dp),
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else 0.35f }
+            .clip(RoundedCornerShape(16.dp))
+            .then(if (enabled) Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick) else Modifier)
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, label, tint = fg, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(3.dp))
-        Text(label, color = fg, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = if (pressed) 0.32f else 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, label, tint = accent, modifier = Modifier.size(21.dp))
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            label,
+            color = Color.White.copy(alpha = 0.9f),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
     }
 }
 

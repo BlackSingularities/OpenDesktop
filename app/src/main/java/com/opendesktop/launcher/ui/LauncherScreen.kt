@@ -970,8 +970,6 @@ fun LauncherScreen(
                 ) {
                     EditToolbar(
                         bottomInset = navBottom,
-                        page = pagerState.currentPage,
-                        pageCount = ws.pages.size,
                         onWidgets = { widgetPicker = true },
                         onActions = { actionPicker = true },
                         onWallpaper = { SystemActions.openWallpaperPicker(ctx) },
@@ -1466,8 +1464,6 @@ private fun TopBarPill(icon: ImageVector, label: String, highlighted: Boolean, o
 @Composable
 private fun EditToolbar(
     bottomInset: Dp,
-    page: Int,
-    pageCount: Int,
     onWidgets: () -> Unit,
     onActions: () -> Unit,
     onWallpaper: () -> Unit,
@@ -1477,80 +1473,23 @@ private fun EditToolbar(
     onLock: () -> Unit,
 ) {
     // Arkusz wtopiony w dół ekranu: tło sięga pod pasek nawigacji, zaokrąglone górne rogi.
-    // Przyciski w trzech grupach: dodawanie, ekrany, układ
+    // Przyciski dzielą szerokość po równo
     val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    Column(
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(sheet)
             .background(Brush.verticalGradient(listOf(Color(0xE61C1F26), Color(0xF20E1014))))
             .border(1.dp, Color.White.copy(alpha = 0.08f), sheet)
-            .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp + bottomInset),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 8.dp + bottomInset),
     ) {
-        Box(
-            Modifier
-                .size(width = 36.dp, height = 4.dp)
-                .clip(RoundedCornerShape(50))
-                .background(Color.White.copy(alpha = 0.25f))
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Rounded.Edit, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Edycja pulpitu", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            PageDots(page, pageCount)
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ToolGroup(3f) {
-                BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets, accent = Color(0xFF7FB2FF))
-                BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions, accent = Color(0xFFB79BFF))
-                BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper, accent = Color(0xFF6FD6A8))
-            }
-            ToolGroup(2f) {
-                BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
-                BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage, accent = Color(0xFFFF8A80))
-            }
-            ToolGroup(2f) {
-                BigToolButton(Icons.Rounded.Lock, "Zablokuj", onLock, accent = Color(0xFFFFCC80))
-                BigToolButton(Icons.Rounded.Settings, "Ustawienia", onSettings)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RowScope.ToolGroup(weight: Float, content: @Composable RowScope.() -> Unit) {
-    Row(
-        Modifier
-            .weight(weight)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.06f))
-            .padding(horizontal = 2.dp, vertical = 4.dp),
-        content = content,
-    )
-}
-
-/** Wskaźnik bieżącego ekranu w nagłówku paska edycji. */
-@Composable
-private fun PageDots(page: Int, count: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (count in 2..8) repeat(count) { i ->
-            val w by animateDpAsState(if (i == page) 14.dp else 5.dp, label = "dot")
-            Box(
-                Modifier
-                    .size(width = w, height = 5.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.White.copy(alpha = if (i == page) 0.9f else 0.3f))
-            )
-        }
-        Spacer(Modifier.width(4.dp))
-        Text("${page + 1} / $count", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+        BigToolButton(Icons.Rounded.Widgets, "Widżety", onWidgets)
+        BigToolButton(Icons.Rounded.TouchApp, "Akcje", onActions)
+        BigToolButton(Icons.Rounded.Wallpaper, "Tapeta", onWallpaper)
+        BigToolButton(Icons.Rounded.Add, "Nowy ekran", onAddPage)
+        BigToolButton(Icons.Rounded.Delete, "Usuń ekran", onRemovePage)
+        BigToolButton(Icons.Rounded.Lock, "Zablokuj", onLock)
+        BigToolButton(Icons.Rounded.Settings, "Ustawienia", onSettings)
     }
 }
 
@@ -1577,7 +1516,6 @@ private fun RowScope.BigToolButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    accent: Color = Color.White,
 ) {
     // Wciśnięcie lekko zmniejsza przycisk i rozjaśnia kółko ikony
     val interaction = remember { MutableInteractionSource() }
@@ -1596,10 +1534,10 @@ private fun RowScope.BigToolButton(
             Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(accent.copy(alpha = if (pressed) 0.32f else 0.16f)),
+                .background(Color.White.copy(alpha = if (pressed) 0.24f else 0.1f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, label, tint = accent, modifier = Modifier.size(21.dp))
+            Icon(icon, label, tint = Color.White, modifier = Modifier.size(21.dp))
         }
         Spacer(Modifier.height(5.dp))
         Text(

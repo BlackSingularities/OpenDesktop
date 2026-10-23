@@ -478,7 +478,7 @@ fun LauncherScreen(
                 if (cfg.layoutLocked) null else MenuAction("Kategorie…", Icons.Rounded.Category) { assignFor = app },
                 if (cfg.layoutLocked) null else MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameApp = app },
                 MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { vm.openDetails(app) },
-                if (!app.isSystem) MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) } else null,
+                MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) },
             ),
         )
     }

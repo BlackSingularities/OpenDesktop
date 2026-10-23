@@ -115,7 +115,9 @@ class AppRepository(
             color = averageColor(bmp),
             systemCategory = a.applicationInfo.category,
             installTime = a.firstInstallTime,
-            isSystem = (a.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+            // Zaktualizowane aplikacje systemowe da się odinstalować (do wersji fabrycznej) zwykłym dialogiem
+            isSystem = (a.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
+                (a.applicationInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0,
             isWork = work,
         )
     }
@@ -162,6 +164,8 @@ class AppRepository(
     }
 
     fun uninstall(app: AppInfo) {
+        // Czystej aplikacji systemowej nie da się odinstalować – w informacjach o aplikacji można ją wyłączyć
+        if (app.isSystem) return openDetails(app)
         runCatching {
             context.startActivity(
                 Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.packageName}"))

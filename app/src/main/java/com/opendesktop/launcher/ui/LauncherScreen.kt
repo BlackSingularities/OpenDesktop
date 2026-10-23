@@ -473,12 +473,12 @@ fun LauncherScreen(
             title = labelOf(app),
             onDismiss = onDismiss,
             shortcuts = shortcuts.map { s -> MenuShortcut(s.label, s.icon) { vm.startShortcut(s) } },
-            // Zablokowany układ: tylko skróty, informacje i odinstalowanie – nic, co zmienia układ
+            // Zablokowany układ: tylko skróty i informacje – nic, co zmienia układ
             actions = (if (cfg.layoutLocked) emptyList() else extra) + listOfNotNull(
                 if (cfg.layoutLocked) null else MenuAction("Kategorie…", Icons.Rounded.Category) { assignFor = app },
                 if (cfg.layoutLocked) null else MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameApp = app },
                 MenuAction("Informacje o aplikacji", Icons.Rounded.Info) { vm.openDetails(app) },
-                MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) },
+                if (cfg.layoutLocked) null else MenuAction("Odinstaluj", Icons.Rounded.DeleteForever, danger = true) { vm.uninstall(app) },
             ),
         )
     }

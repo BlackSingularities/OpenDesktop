@@ -218,10 +218,7 @@ fun LauncherScreen(
 
     // Pokaż onboarding przy pierwszym uruchomieniu
     if (!cfg.onboardingDone) {
-        OnboardingScreen(
-            onComplete = { vm.completeOnboarding() },
-            onConnectDrive = { vm.connectGoogleDrive() },
-        )
+        OnboardingScreen(onComplete = { vm.completeOnboarding() })
         return
     }
 

@@ -332,6 +332,14 @@ data class Config(
     val folderRadius: Float = 6f,
     /** Tryb oszczędny: proste przejścia i szuflada, bez rozmycia i odbić. */
     val powerSaver: PowerSaver = PowerSaver.Auto,
+    // Efekty (ustawienia → Efekty)
+    val iconPressEffect: Boolean = true,
+    val iconWiggleOnLongPress: Boolean = true,
+    val particleEffects: Boolean = false,
+    val iconBounceAnimation: Boolean = true,
+    val folderOpenAnimation: Boolean = true,
+    val swipeTrails: Boolean = false,
+    val parallaxEffect: Boolean = false,
     // AI – dostawca i osobne klucze/modele dla każdego z nich (klucz: AiProvider.name).
     // openRouterKey/aiModel/aiModelName to dawne pola OpenRoutera – czytane jako wartości zapasowe.
     val aiProvider: AiProvider = AiProvider.OpenRouter,

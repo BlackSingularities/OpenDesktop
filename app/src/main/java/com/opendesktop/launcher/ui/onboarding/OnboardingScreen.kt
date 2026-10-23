@@ -40,16 +40,13 @@ data class OnboardingPage(
 )
 
 @Composable
-fun OnboardingScreen(
-    onComplete: () -> Unit,
-    onConnectDrive: () -> Unit,
-) {
+fun OnboardingScreen(onComplete: () -> Unit) {
     val pages = remember {
         listOf(
             OnboardingPage(
                 icon = Icons.Rounded.Home,
                 title = "Witaj w OpenDesktop",
-                description = "Otwarty launcher na Androida z pełną personalizacją, 20 stylami szuflady i integracją z Google Drive.",
+                description = "Otwarty launcher na Androida z pełną personalizacją i 20 stylami szuflady.",
                 color = Color(0xFF8AB4FF),
             ),
             OnboardingPage(
@@ -71,9 +68,9 @@ fun OnboardingScreen(
                 color = Color(0xFFFF6C9D),
             ),
             OnboardingPage(
-                icon = Icons.Rounded.Cloud,
-                title = "Google Drive Backup",
-                description = "Połącz konto Google i synchronizuj układ między urządzeniami. Auto-backup co 5 minut. Twoje dane, Twoja chmura.",
+                icon = Icons.Rounded.Backup,
+                title = "Kopia układu",
+                description = "Eksportuj ustawienia i układ pulpitu do pliku i przywróć je na innym urządzeniu. Znajdziesz to w ustawieniach.",
                 color = Color(0xFF6CCCFF),
             ),
         )
@@ -189,13 +186,8 @@ fun OnboardingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        // Przycisk główny - Połącz Drive lub Rozpocznij
                         Button(
-                            onClick = {
-                                if (pagerState.currentPage == pages.lastIndex) {
-                                    onConnectDrive()
-                                }
-                            },
+                            onClick = onComplete,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
@@ -204,23 +196,10 @@ fun OnboardingScreen(
                             ),
                             shape = RoundedCornerShape(16.dp),
                         ) {
-                            Icon(Icons.Rounded.Cloud, null)
-                            Spacer(Modifier.width(8.dp))
                             Text(
-                                "Połącz Google Drive",
+                                "Rozpocznij",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-
-                        // Przycisk pomijający
-                        TextButton(
-                            onClick = onComplete,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                "Pomiń, użyj lokalnie",
-                                color = Color.White.copy(alpha = 0.7f),
                             )
                         }
                     }

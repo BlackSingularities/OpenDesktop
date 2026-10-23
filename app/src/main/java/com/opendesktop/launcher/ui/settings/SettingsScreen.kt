@@ -595,28 +595,6 @@ private fun BackupSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
     var confirmReset by remember { mutableStateOf(false) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let(vm::exportTo) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importFrom) }
-    val connected = cfg.cloudAutoSync
-
-    Group("Google Drive") {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(if (connected) Color.White else Palette.TextFaint))
-            Text(
-                if (connected) "Połączono z Google Drive" else "Nie połączono",
-                color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(start = 12.dp),
-            )
-        }
-        if (!connected) {
-            ActionRow(Icons.Rounded.CloudUpload, "Połącz z Google Drive", "Dane będą automatycznie synchronizowane z Twoim kontem") { vm.connectGoogleDrive() }
-        } else {
-            SwitchRow(Icons.Rounded.Sync, "Auto-synchronizacja", "Co ${cfg.cloudSyncInterval} min", cfg.cloudAutoSync) { v -> set { it.copy(cloudAutoSync = v) } }
-            SliderRow(Icons.Rounded.Timer, "Interwał synchronizacji", cfg.cloudSyncInterval.toFloat(), 1f..30f, 28, { "${it.toInt()} min" }) { v ->
-                set { it.copy(cloudSyncInterval = v.toInt()) }
-            }
-            ActionRow(Icons.Rounded.Sync, "Synchronizuj teraz") { vm.syncNow() }
-            ActionRow(Icons.Rounded.Backup, "Utwórz kopię w chmurze") { vm.createBackup() }
-            ActionRow(Icons.Rounded.CloudOff, "Odłącz Google Drive", danger = true) { vm.disconnectDrive() }
-        }
-    }
     Group("Lokalnie") {
         ActionRow(Icons.Rounded.FileUpload, "Eksportuj ustawienia i układ", "Plik JSON") { exportLauncher.launch("opendesktop-${LocalDate.now()}.json") }
         ActionRow(Icons.Rounded.FileDownload, "Importuj z pliku") { importLauncher.launch(arrayOf("application/json", "*/*")) }

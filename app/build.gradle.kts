@@ -8,8 +8,8 @@ plugins {
 // Numer wersji z CI (GITHUB_RUN_NUMBER), lokalnie 1
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 val keystorePath: String? = System.getenv("SIGNING_KEYSTORE_PATH")
-val appVersion = providers.gradleProperty("appVersion").get()
-val appVersionStart = providers.gradleProperty("appVersionStart").get().toInt()
+// Nazwa wersji z tagu vX.Y.Z (CI przekazuje -PappVersionName), lokalnie wersja deweloperska
+val appVersionName = providers.gradleProperty("appVersionName").getOrElse("0.0.0-dev")
 
 android {
     namespace = "com.opendesktop.launcher"
@@ -20,7 +20,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
-        versionName = "$appVersion.${(buildNumber - appVersionStart).coerceAtLeast(0)}"
+        versionName = appVersionName
     }
 
     signingConfigs {

@@ -1,10 +1,10 @@
 name: Build & Release
 
-# Każdy commit na main = nowy release z podpisanym APK (aktualizator w aplikacji go znajdzie)
+# Wypchnięcie tagu vX.Y.Z = nowy release z podpisanym APK (aktualizator w aplikacji go znajdzie)
+# Wydanie: git tag v2.0.0 && git push origin v2.0.0
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags: ["v*.*.*"]
 
 permissions:
   contents: write
@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Wersja z tagu
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -49,16 +52,10 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: gradle :app:testReleaseUnitTest :app:assembleRelease --no-daemon --stacktrace
+        run: gradle :app:testReleaseUnitTest :app:assembleRelease -PappVersionName="$VERSION" --no-daemon --stacktrace
 
       - name: Nazwij APK
         run: |
-          BASE=$(grep '^appVersion=' gradle.properties | cut -d= -f2)
-          START=$(grep '^appVersionStart=' gradle.properties | cut -d= -f2)
-          PATCH=$(( GITHUB_RUN_NUMBER - START ))
-          [ "$PATCH" -lt 0 ] && PATCH=0
-          VERSION="$BASE.$PATCH"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           cp app/build/outputs/apk/release/app-release.apk "OpenDesktop-$VERSION.apk"
 
       - name: Publikuj release
@@ -66,7 +63,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           NOTES=$(git log -1 --pretty=format:'%s%n%n%b')
-          gh release create "v$VERSION" "OpenDesktop-$VERSION.apk" \
+          gh release create "$GITHUB_REF_NAME" "OpenDesktop-$VERSION.apk" \
             --title "OpenDesktop $VERSION" \
             --notes "$NOTES" \
             --target "$GITHUB_SHA"

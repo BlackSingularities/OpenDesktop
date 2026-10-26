@@ -162,6 +162,7 @@ import com.opendesktop.launcher.ui.components.AppPickerDialog
 import com.opendesktop.launcher.ui.components.MenuAction
 import com.opendesktop.launcher.ui.components.MenuShortcut
 import com.opendesktop.launcher.ui.components.TextInputDialog
+import com.opendesktop.launcher.ui.components.UndoBar
 import com.opendesktop.launcher.ui.desktop.DesktopCallbacks
 import com.opendesktop.launcher.ui.desktop.DesktopGrid
 import com.opendesktop.launcher.ui.desktop.Dock
@@ -215,6 +216,7 @@ fun LauncherScreen(
     val apps by vm.apps.collectAsStateWithLifecycle()
     val loaded by vm.appsLoaded.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
+    val undoOffer by vm.undo.collectAsStateWithLifecycle()
 
     // Pokaż onboarding przy pierwszym uruchomieniu
     if (!cfg.onboardingDone) {
@@ -920,8 +922,16 @@ fun LauncherScreen(
                     )
                 }
                 EditHint(
-                    visible = editMode && !drag.active,
+                    // Pigułka cofania zajmuje to samo miejsce nad dokiem i jest ważniejsza niż podpowiedź
+                    visible = editMode && !drag.active && undoOffer == null,
                     hasSelection = selected != null,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
+                )
+                // Cofnięcie ostatniego usunięcia – także widżetu, który wraca z tym samym identyfikatorem.
+                // W szufladzie, nakładkach i w trakcie przeciągania nie ma w co kliknąć, więc pigułka znika
+                UndoBar(
+                    offer = undoOffer.takeIf { !drag.active && overlay == Overlay.None && openFolder == null },
+                    onUndo = { vibrate(); vm.undoLast() },
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp),
                 )
                 }

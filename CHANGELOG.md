@@ -5,6 +5,12 @@
 - O `READ_CONTACTS` pytamy dopiero przy pierwszym wyszukiwaniu; bez zgody sekcja kontaktów jest pomijana, a wyszukiwanie aplikacji działa dalej.
 - Nowe przełączniki w Ustawieniach → Szuflada aplikacji: „Kontakty w wynikach” i „Szybkie odpowiedzi” (domyślnie włączone).
 
+## next CI release — Cofanie usunięcia
+
+- Pigułka „Usunięto… · Cofnij” nad dokiem przez 5 sekund po usunięciu ikony, folderu, widżetu albo całego ekranu.
+- Widżet systemowy znika z hosta dopiero po upływie tego czasu, więc cofnięcie przywraca go działającego, z tym samym identyfikatorem.
+- Cofnięcie usunięcia ekranu przywraca też numer ekranu głównego.
+
 ## next CI release — Plakietki powiadomień
 
 - Liczba oczekujących powiadomień w rogu ikony: pulpit, dok, foldery i wszystkie układy szuflady.

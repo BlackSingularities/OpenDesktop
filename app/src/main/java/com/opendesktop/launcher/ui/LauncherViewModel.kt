@@ -115,6 +115,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private var undoSnapshot: Workspace? = null
     /** Widżety systemowe usuwamy z hosta dopiero, gdy minie czas na cofnięcie. */
     private var pendingWidgetDeletes: List<Int> = emptyList()
+    /** Ekran domowy sprzed usunięcia strony – cofnięcie przywraca też jego numer. */
+    private var undoDefaultPage: Int? = null
     private var undoJob: Job? = null
 
     private var shortcutCache: List<android.content.pm.ShortcutInfo> = emptyList()
@@ -151,10 +153,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     // ---------------------------------------------------------------- cofanie
 
-    private fun offerUndo(message: String, before: Workspace, widgets: List<Int> = emptyList()) {
+    private fun offerUndo(message: String, before: Workspace, widgets: List<Int> = emptyList(), defaultPage: Int? = null) {
         commitPendingWidgets()
         undoSnapshot = before
         pendingWidgetDeletes = widgets
+        undoDefaultPage = defaultPage
         undo.value = UndoOffer(message)
         undoJob?.cancel()
         undoJob = viewModelScope.launch {
@@ -167,7 +170,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val snapshot = undoSnapshot ?: return
         undoJob?.cancel()
         store.updateWorkspace { snapshot }
+        // Widżety wróciły na pulpit razem ze snapshotem, więc ich identyfikatory zostają w hoście
         pendingWidgetDeletes = emptyList()
+        undoDefaultPage?.let { page -> store.updateConfig { it.copy(defaultPage = page) } }
+        undoDefaultPage = null
         undoSnapshot = null
         undo.value = null
     }
@@ -175,6 +181,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun dismissUndo() {
         undoJob?.cancel()
         commitPendingWidgets()
+        undoDefaultPage = null
         undoSnapshot = null
         undo.value = null
     }
@@ -621,22 +628,32 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         return page.id
     }
 
-    fun removePage(index: Int) {
+    fun removePage(index: Int, undoable: Boolean = true) {
         val ws = workspace.value
         val page = ws.pages.getOrNull(index) ?: return
-        page.items.filter { it.type == ItemType.Widget }.forEach { runCatching { widgetHost.deleteAppWidgetId(it.widgetId) } }
+        val widgets = page.items.filter { it.type == ItemType.Widget && it.widgetId >= 0 }.map { it.widgetId }
         store.updateWorkspace { w ->
             val rest = w.pages.filterNot { it.id == page.id }
             w.copy(pages = rest.ifEmpty { listOf(Page()) })
         }
         val def = config.value.defaultPage
         if (def >= index && def > 0) store.updateConfig { it.copy(defaultPage = def - 1) }
+        if (undoable) {
+            offerUndo(
+                if (widgets.isEmpty()) "Usunięto ekran" else "Usunięto ekran z widżetami",
+                ws,
+                widgets,
+                defaultPage = def,
+            )
+        } else {
+            widgets.forEach { runCatching { widgetHost.deleteAppWidgetId(it) } }
+        }
     }
 
     fun removePageIfEmpty(pageId: String) {
         val ws = workspace.value
         val page = ws.pages.firstOrNull { it.id == pageId } ?: return
-        if (page.items.isEmpty() && ws.pages.size > 1) removePage(ws.pages.indexOf(page))
+        if (page.items.isEmpty() && ws.pages.size > 1) removePage(ws.pages.indexOf(page), undoable = false)
     }
 
     fun movePage(index: Int, dir: Int): Int {
@@ -889,11 +906,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
                 } ?: error("Nie można odczytać pliku")
                 store.importBackup(text)
+                dismissUndo()
             }.onSuccess { toast("Przywrócono układ") }.onFailure { toast("Błąd importu: ${it.message}") }
         }
     }
 
     fun resetLayout() {
+        dismissUndo()
         workspace.value.pages.flatMap { it.items }.filter { it.type == ItemType.Widget }
             .forEach { runCatching { widgetHost.deleteAppWidgetId(it.widgetId) } }
         store.updateWorkspace { it.copy(initialized = false) }

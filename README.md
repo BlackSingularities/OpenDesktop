@@ -15,6 +15,7 @@ Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie 
 - **Dok** — od 3 do 7 miejsc; przeciąganie między dokiem a pulpitem.
 - **Gesty** — przesunięcie w górę, w dół i podwójne dotknięcie z akcjami do wyboru.
 - **Strefy upuszczania** — usuń, informacje, odinstaluj.
+- **Cofanie** — po usunięciu ikony, folderu, widżetu albo ekranu przez pięć sekund widać nad dokiem „Cofnij”; widżet wraca działający, bo z hosta znika dopiero po tym czasie.
 
 ## Szuflada aplikacji
 

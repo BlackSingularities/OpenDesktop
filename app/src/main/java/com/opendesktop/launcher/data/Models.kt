@@ -304,6 +304,10 @@ data class Config(
     val searchAutoFocus: Boolean = false,
     val drawerBackground: Boolean = true,
     val drawerHeaderBackground: Boolean = true,
+    /** Kontakty i ekrany ustawień w wynikach wyszukiwania w szufladzie. */
+    val drawerContacts: Boolean = true,
+    /** Kalkulator i przeliczanie jednostek nad wynikami wyszukiwania. */
+    val drawerQuickAnswers: Boolean = true,
     // Gesty
     val swipeUp: GestureAction = GestureAction.Drawer,
     val swipeDown: GestureAction = GestureAction.Notifications,

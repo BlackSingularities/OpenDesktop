@@ -21,6 +21,9 @@ Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie 
 
 - Sortowanie po nazwie, kategorii, częstości użycia lub dacie instalacji.
 - Wyszukiwanie po nazwie, pakiecie i kategorii; Enter uruchamia pierwszy wynik; szukanie w sieci.
+- Szybkie odpowiedzi nad wynikami: kalkulator („12*7+3”) i przeliczanie jednostek („10 km na mi”, „72 f to c”), kliknięcie kopiuje wynik do schowka.
+- Kontakty z książki adresowej i ekrany ustawień systemowych pod wynikami aplikacji; kontakt otwiera wizytówkę, ustawienie – odpowiedni ekran Androida. O dostęp do kontaktów pytamy przy pierwszym wyszukiwaniu, a bez zgody sekcja jest po prostu pomijana.
+- Oba źródła wyników można wyłączyć w Ustawieniach → Szuflada aplikacji („Szybkie odpowiedzi”, „Kontakty w wynikach”).
 - Filtr kategorii, ukrywanie aplikacji, zmiana nazw, skróty aplikacji (gdy OpenDesktop jest domyślny).
 - Kategorie: aplikacja może należeć do jednej albo wielu; tworzenie ręczne, automatyczne (bez AI) lub przez AI.
 

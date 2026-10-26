@@ -80,6 +80,7 @@ import com.opendesktop.launcher.data.Config
 import com.opendesktop.launcher.data.DrawerSort
 import com.opendesktop.launcher.data.DrawerStyle
 import com.opendesktop.launcher.data.SystemActions
+import com.opendesktop.launcher.data.UniversalSearch
 import com.opendesktop.launcher.data.Workspace
 import com.opendesktop.launcher.ui.LauncherViewModel
 import com.opendesktop.launcher.ui.components.PanelMenu
@@ -119,6 +120,12 @@ fun AppDrawer(
     val keyboard = LocalSoftwareKeyboardController.current
     val aiResults by vm.aiSearch.collectAsStateWithLifecycle()
     val aiBusy by vm.aiSearchBusy.collectAsStateWithLifecycle()
+    // Wyniki poza aplikacjami: kontakty (za zgodą) i ekrany ustawień systemowych
+    val contactsOn = rememberContactsAccess(query, cfg.drawerContacts)
+    val contactHits = rememberContactHits(query, contactsOn)
+    val settingHits = remember(query, cfg.drawerContacts) {
+        if (cfg.drawerContacts) UniversalSearch.settings(query) else emptyList()
+    }
 
     LaunchedEffect(focusRequest) {
         if (focusRequest > 0) runCatching { focus.requestFocus(); keyboard?.show() }
@@ -292,6 +299,9 @@ fun AppDrawer(
             // Wyszukiwanie z AI i w sieci
             AnimatedVisibility(query.isNotBlank()) {
                 Column(Modifier.padding(horizontal = 12.dp)) {
+                    if (cfg.drawerQuickAnswers) {
+                        QuickAnswerCard(query, Modifier.padding(bottom = 8.dp))
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (vm.aiReady) {
                             ActionChip(if (aiBusy) "AI szuka…" else "Zapytaj AI", Icons.Rounded.AutoAwesome) { vm.aiFindApp(query) }
@@ -348,6 +358,13 @@ fun AppDrawer(
                         styleView(list, if (list === visible) sections else listOf(DrawerSection("tab", null, list)))
                     }
                 } else styleView(visible, sections)
+            }
+        }
+
+        // Kontakty i ustawienia pod wynikami aplikacji
+        if (query.isNotBlank() && (contactHits.isNotEmpty() || settingHits.isNotEmpty())) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp).navigationBarsPadding()) {
+                ExtraResults(query, contactHits, settingHits)
             }
         }
     }

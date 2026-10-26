@@ -19,6 +19,17 @@ object NotificationBadges {
     fun hasAccess(ctx: Context): Boolean =
         ctx.packageName in NotificationManagerCompat.getEnabledListenerPackages(ctx)
 
+    /**
+     * Po starcie procesu system nie zawsze od razu podłącza nasłuch – prośba o ponowne
+     * podłączenie sprawia, że plakietki pojawiają się bez czekania na kolejne powiadomienie.
+     */
+    fun ensureConnected(ctx: Context) {
+        if (!hasAccess(ctx)) return
+        runCatching {
+            NotificationListenerService.requestRebind(ComponentName(ctx, BadgeListenerService::class.java))
+        }
+    }
+
     fun openAccessSettings(ctx: Context) {
         val component = ComponentName(ctx, BadgeListenerService::class.java).flattenToString()
         val direct = Intent("android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS")

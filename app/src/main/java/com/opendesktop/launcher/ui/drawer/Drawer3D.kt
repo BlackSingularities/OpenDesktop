@@ -70,7 +70,10 @@ import com.opendesktop.launcher.data.AppInfo
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.LabelShadow
 import com.opendesktop.launcher.ui.components.canvasGestures
+import com.opendesktop.launcher.ui.components.LocalBadgeCounts
+import com.opendesktop.launcher.ui.components.badgeCount
 import com.opendesktop.launcher.ui.components.drawAppIcon
+import com.opendesktop.launcher.ui.components.drawBadge
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
@@ -172,6 +175,7 @@ fun DrawerHelix(apps: List<AppInfo>, cb: DrawerCallbacks) {
         val radius = wPx * 0.32f
         val iconPx = with(density) { 58.dp.toPx() } * cb.iconScale
         val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
+        val badges = LocalBadgeCounts.current
         Canvas(Modifier.fillMaxSize()) {
             val s = scroll.value
             val perTurn = 7f
@@ -196,6 +200,7 @@ fun DrawerHelix(apps: List<AppInfo>, cb: DrawerCallbacks) {
             holder.items = list.filter { it.depth > -0.2f }
             for (p in list) {
                 drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                drawBadge(badges[p.app.packageName] ?: 0, Offset(p.x, p.y), p.size, p.alpha)
                 if (p.depth > 0.75f && cb.showLabels) {
                     labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (iconPx * 2.2f).toInt())) }, p, cb.label(p.app), p.alpha)
                 }
@@ -272,6 +277,7 @@ fun DrawerSphere(apps: List<AppInfo>, cb: DrawerCallbacks) {
             with(density) { 28.dp.toPx() }, with(density) { 70.dp.toPx() },
         ) * cb.iconScale
         val style = TextStyle(color = Color.White, fontSize = 12.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
+        val badges = LocalBadgeCounts.current
         Canvas(Modifier.fillMaxSize()) {
             val cx = size.width / 2
             val cy = size.height / 2
@@ -293,6 +299,7 @@ fun DrawerSphere(apps: List<AppInfo>, cb: DrawerCallbacks) {
             holder.items = list.filter { it.depth > 0f }
             for (p in list) {
                 drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                drawBadge(badges[p.app.packageName] ?: 0, Offset(p.x, p.y), p.size, p.alpha)
                 if (p.depth > 0.88f && cb.showLabels) {
                     labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (baseIcon * 2.4f).toInt())) }, p, cb.label(p.app), p.alpha)
                 }
@@ -340,6 +347,7 @@ fun DrawerWheel(apps: List<AppInfo>, cb: DrawerCallbacks) {
                     },
                 ),
         ) {
+            val badges = LocalBadgeCounts.current
             Canvas(Modifier.fillMaxSize()) {
                 val ccx = wPx + radius * 0.42f
                 val ccy = size.height / 2
@@ -361,7 +369,10 @@ fun DrawerWheel(apps: List<AppInfo>, cb: DrawerCallbacks) {
                     list += Projected(apps[i], x, y, iconPx * k, -dist, (1f - dist * 0.1f).coerceIn(0.2f, 1f))
                 }
                 holder.items = list
-                for (p in list.sortedBy { it.depth }) drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                for (p in list.sortedBy { it.depth }) {
+                    drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                    drawBadge(badges[p.app.packageName] ?: 0, Offset(p.x, p.y), p.size, p.alpha)
+                }
             }
             if (focused != null && cb.showLabels) {
                 val style = TextStyle(color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, shadow = LabelShadow)
@@ -423,6 +434,7 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
         val style = TextStyle(color = Color.White, fontSize = 11.sp, textAlign = TextAlign.Center, shadow = LabelShadow)
         val step = (2 * PI / perRing).toFloat()
 
+        val badges = LocalBadgeCounts.current
         Canvas(Modifier.fillMaxSize()) {
             val s = scroll.value
             val cx = size.width / 2
@@ -452,6 +464,7 @@ fun DrawerCylinder(apps: List<AppInfo>, cb: DrawerCallbacks) {
             holder.items = list.filter { it.depth > 0f }
             for (p in list) {
                 drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                drawBadge(badges[p.app.packageName] ?: 0, Offset(p.x, p.y), p.size, p.alpha)
                 if (p.depth > 0.55f && cb.showLabels) {
                     labelUnder(layouts, { t -> measurer.measure(t, style, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = (iconPx * 1.7f).toInt())) }, p, cb.label(p.app), p.alpha)
                 }
@@ -503,7 +516,7 @@ fun DrawerWave(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues)
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppIcon(app.icon, "", 48.dp * cb.iconScale, cb.shape, false, pressed = pressed)
+                    AppIcon(app.icon, "", 48.dp * cb.iconScale, cb.shape, false, pressed = pressed, badgeCount = badgeCount(app))
                     Spacer(Modifier.width(14.dp))
                     if (cb.showLabels) {
                         Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -558,7 +571,7 @@ fun DrawerStack(apps: List<AppInfo>, cb: DrawerCallbacks, padding: PaddingValues
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppIcon(app.icon, "", 52.dp * cb.iconScale, cb.shape, false, pressed = pressed)
+                    AppIcon(app.icon, "", 52.dp * cb.iconScale, cb.shape, false, pressed = pressed, badgeCount = badgeCount(app))
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
                         if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -604,6 +617,7 @@ fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {
             ),
     ) {
         val style = TextStyle(color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, shadow = LabelShadow)
+        val badges = LocalBadgeCounts.current
         Canvas(Modifier.fillMaxSize()) {
             val cx = size.width / 2
             val cy = size.height / 2
@@ -624,7 +638,10 @@ fun DrawerBubbles(apps: List<AppInfo>, cb: DrawerCallbacks) {
                 list += Projected(apps[i], x, y, cell * 0.9f * k, k, (0.35f + 0.65f * k).coerceIn(0f, 1f))
             }
             holder.items = list
-            for (p in list) drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+            for (p in list) {
+                drawAppIcon(p.app.icon, Offset(p.x, p.y), p.size, p.alpha, cb.shape)
+                drawBadge(badges[p.app.packageName] ?: 0, Offset(p.x, p.y), p.size, p.alpha)
+            }
             // Podpis tylko aplikacji najbliżej środka
             if (cb.showLabels) {
                 list.minByOrNull { (it.x - cx) * (it.x - cx) + (it.y - cy) * (it.y - cy) }?.let { c ->

@@ -73,6 +73,7 @@ import com.opendesktop.launcher.ui.components.ActionIcon
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.FolderIcon
 import com.opendesktop.launcher.ui.components.iconSizeFor
+import com.opendesktop.launcher.ui.components.badgeCount
 import com.opendesktop.launcher.ui.components.itemGestures
 import com.opendesktop.launcher.widget.LauncherWidgetHost
 import kotlin.math.roundToInt
@@ -305,6 +306,7 @@ private fun DesktopItemSlot(
                     showLabel = cfg.showLabels,
                     labelSize = cfg.labelSize,
                     pressed = pressed || mergeTarget,
+                    badgeCount = badgeCount(app),
                     modifier = Modifier.fillMaxSize().then(gestures),
                 )
             }
@@ -321,6 +323,7 @@ private fun DesktopItemSlot(
                         showLabel = cfg.showLabels,
                         labelSize = cfg.labelSize,
                         pressed = pressed || mergeTarget,
+                        badgeCount = badgeCount(item.apps.map { apps[it] }),
                         modifier = Modifier.fillMaxSize().then(gestures),
                         badge = {
                             // Znaczek folderu: cztery małe kwadraty 2×2, bez obramowania
@@ -351,6 +354,7 @@ private fun DesktopItemSlot(
                     labelSize = cfg.labelSize,
                     pressed = pressed,
                     highlight = mergeTarget,
+                    badgeCount = badgeCount(item.apps.map { apps[it] }),
                     modifier = Modifier.fillMaxSize().then(gestures),
                 )
             }
@@ -576,6 +580,7 @@ fun Dock(
                             showLabel = cfg.dockLabels,
                             labelSize = cfg.labelSize,
                             pressed = pressed,
+                            badgeCount = badgeCount(app),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(areaH)

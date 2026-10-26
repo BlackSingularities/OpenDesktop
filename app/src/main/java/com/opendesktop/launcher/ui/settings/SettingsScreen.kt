@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.opendesktop.launcher.BuildConfig
 import com.opendesktop.launcher.R
@@ -428,6 +429,29 @@ private fun LookSection(cfg: Config, set: Setter, pick: Picker) {
     Group("Ikony") {
         ActionRow(Icons.Rounded.Crop, "Kształt ikon", cfg.iconShape.label, chevron = true) {
             pick.choose("Kształt ikon", IconShape.entries, cfg.iconShape, { it.label }) { s -> set { it.copy(iconShape = s) } }
+        }
+        // Liczenie powiadomień wymaga osobnej zgody systemowej – sprawdzamy ją po każdym powrocie
+        var badgeAccess by remember { mutableStateOf(NotificationBadges.hasAccess(ctx)) }
+        LifecycleResumeEffect(Unit) {
+            badgeAccess = NotificationBadges.hasAccess(ctx)
+            onPauseOrDispose {}
+        }
+        SwitchRow(
+            Icons.Rounded.Notifications,
+            "Plakietki powiadomień",
+            "Liczba powiadomień w rogu ikony – na pulpicie, w doku i w szufladzie",
+            cfg.notificationBadges,
+        ) { v ->
+            set { it.copy(notificationBadges = v) }
+            if (v && !badgeAccess) NotificationBadges.openAccessSettings(ctx)
+        }
+        if (cfg.notificationBadges && !badgeAccess) {
+            ActionRow(
+                Icons.Rounded.NotificationsActive,
+                "Dostęp do powiadomień",
+                "Bez zgody plakietki się nie pokażą",
+                chevron = true,
+            ) { NotificationBadges.openAccessSettings(ctx) }
         }
     }
     Group("Menu i foldery") {

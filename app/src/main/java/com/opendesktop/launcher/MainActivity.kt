@@ -12,12 +12,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.opendesktop.launcher.data.NotificationBadges
 import com.opendesktop.launcher.data.SystemActions
 import com.opendesktop.launcher.ui.LauncherScreen
 import com.opendesktop.launcher.ui.LauncherViewModel
+import com.opendesktop.launcher.ui.components.LocalBadgeCounts
 import com.opendesktop.launcher.ui.theme.OpenDesktopTheme
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -57,8 +60,12 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val cfg by vm.config.collectAsStateWithLifecycle()
+            val badges by NotificationBadges.counts.collectAsStateWithLifecycle()
             OpenDesktopTheme(cfg) {
-                LauncherScreen(vm = vm, homePressed = homePressed, onAddWidget = ::startAddWidget)
+                // Plakietki na ikonach – puste, gdy wyłączone w ustawieniach albo bez dostępu
+                CompositionLocalProvider(LocalBadgeCounts provides if (cfg.notificationBadges) badges else emptyMap()) {
+                    LauncherScreen(vm = vm, homePressed = homePressed, onAddWidget = ::startAddWidget)
+                }
             }
         }
     }

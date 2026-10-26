@@ -78,6 +78,7 @@ import com.opendesktop.launcher.data.Category
 import com.opendesktop.launcher.data.IconShape
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.LabelShadow
+import com.opendesktop.launcher.ui.components.badgeCount
 import com.opendesktop.launcher.ui.components.itemGestures
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -132,7 +133,7 @@ fun DrawerTouchable(
 @Composable
 fun DrawerCell(app: AppInfo, cb: DrawerCallbacks, iconSize: Dp, modifier: Modifier = Modifier) {
     DrawerTouchable(app, cb, modifier) { pressed ->
-        AppIcon(app.icon, cb.label(app), iconSize, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize, maxLines = 1)
+        AppIcon(app.icon, cb.label(app), iconSize, cb.shape, cb.showLabels, pressed = pressed, labelSize = cb.labelSize, maxLines = 1, badgeCount = badgeCount(app))
     }
 }
 
@@ -274,7 +275,7 @@ private fun ListRow(app: AppInfo, cb: DrawerCallbacks) {
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(app.icon, "", 44.dp * cb.iconScale, cb.shape, false, pressed = pressed)
+            AppIcon(app.icon, "", 44.dp * cb.iconScale, cb.shape, false, pressed = pressed, badgeCount = badgeCount(app))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 if (cb.showLabels) Text(cb.label(app), color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

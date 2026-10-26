@@ -96,6 +96,8 @@ fun AppIcon(
     shadow: Boolean = true,
     /** Plakietka rysowana na ikonie (np. znaczek folderu w rogu). */
     badge: (@Composable BoxScope.() -> Unit)? = null,
+    /** Liczba oczekujących powiadomień – plakietka w prawym górnym rogu. */
+    badgeCount: Int = 0,
 ) {
     val scale by animateFloatAsState(if (pressed) 0.86f else 1f, spring(dampingRatio = 0.45f, stiffness = 700f), label = "press")
     Column(
@@ -121,6 +123,7 @@ fun AppIcon(
                 Box(Modifier.fillMaxSize().clip(CircleShape).background(Color.White.copy(alpha = 0.15f)))
             }
             badge?.invoke(this)
+            NotificationBadge(badgeCount, iconSize, Modifier.align(Alignment.TopEnd))
         }
         if (showLabel) {
             Text(
@@ -152,6 +155,8 @@ fun FolderIcon(
     pressed: Boolean = false,
     highlight: Boolean = false,
     labelSize: Float = 12f,
+    /** Suma powiadomień aplikacji w folderze. */
+    badgeCount: Int = 0,
 ) {
     val scale by animateFloatAsState(
         if (pressed) 0.88f else if (highlight) 1.12f else 1f,
@@ -161,33 +166,39 @@ fun FolderIcon(
         Box(
             Modifier
                 .size(iconSize)
-                .graphicsLayer { scaleX = scale; scaleY = scale }
-                .clip(RoundedCornerShape(30))
-                // Subtelne tło bez obramowania – widać głównie cztery miniatury 2×2
-                .background(Color.White.copy(alpha = if (highlight) 0.3f else 0.12f))
-                .padding(iconSize * 0.1f),
+                .graphicsLayer { scaleX = scale; scaleY = scale },
         ) {
-            val mini = (iconSize * 0.8f - 4.dp) / 2
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
-                for (r in 0 until 2) {
-                    Row(Modifier, horizontalArrangement = Arrangement.SpaceEvenly) {
-                        for (c in 0 until 2) {
-                            val ic = icons.getOrNull(r * 2 + c)
-                            Box(Modifier.size(mini).padding(1.dp)) {
-                                if (ic != null) {
-                                    val s = iconShapeOf(shape)
-                                    Image(
-                                        ic, null,
-                                        Modifier.fillMaxSize().then(if (s != null) Modifier.clip(s) else Modifier),
-                                        filterQuality = FilterQuality.Medium,
-                                    )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(30))
+                    // Subtelne tło bez obramowania – widać głównie cztery miniatury 2×2
+                    .background(Color.White.copy(alpha = if (highlight) 0.3f else 0.12f))
+                    .padding(iconSize * 0.1f),
+            ) {
+                val mini = (iconSize * 0.8f - 4.dp) / 2
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+                    for (r in 0 until 2) {
+                        Row(Modifier, horizontalArrangement = Arrangement.SpaceEvenly) {
+                            for (c in 0 until 2) {
+                                val ic = icons.getOrNull(r * 2 + c)
+                                Box(Modifier.size(mini).padding(1.dp)) {
+                                    if (ic != null) {
+                                        val s = iconShapeOf(shape)
+                                        Image(
+                                            ic, null,
+                                            Modifier.fillMaxSize().then(if (s != null) Modifier.clip(s) else Modifier),
+                                            filterQuality = FilterQuality.Medium,
+                                        )
+                                    }
                                 }
+                                if (c == 0) Spacer(Modifier.size(2.dp))
                             }
-                            if (c == 0) Spacer(Modifier.size(2.dp))
                         }
                     }
                 }
             }
+            NotificationBadge(badgeCount, iconSize, Modifier.align(Alignment.TopEnd))
         }
         if (showLabel) {
             Text(

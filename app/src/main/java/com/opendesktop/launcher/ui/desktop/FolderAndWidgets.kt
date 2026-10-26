@@ -115,6 +115,7 @@ import com.opendesktop.launcher.ui.components.ActionMenu
 import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.MenuAction
 import com.opendesktop.launcher.ui.components.PanelStyle
+import com.opendesktop.launcher.ui.components.badgeCount
 import com.opendesktop.launcher.ui.components.itemGestures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -217,6 +218,7 @@ fun FolderDialog(
                         AppIcon(
                             app.icon, labelOf(app), iconSize, cfg.iconShape, cfg.showLabels,
                             pressed = pressed, labelSize = cfg.labelSize, labelColor = ink, shadow = !panel.light,
+                            badgeCount = badgeCount(app),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .onGloballyPositioned { bounds = it.boundsInRoot() }

@@ -3,6 +3,7 @@ package com.opendesktop.launcher
 import android.app.Application
 import com.opendesktop.launcher.data.AppRepository
 import com.opendesktop.launcher.data.LauncherStore
+import com.opendesktop.launcher.data.NotificationBadges
 import com.opendesktop.launcher.widget.LauncherWidgetHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,5 +23,6 @@ class LauncherApplication : Application() {
         store = LauncherStore(this, appScope)
         apps = AppRepository(this, appScope, store.config.value.iconShape)
         widgetHost = LauncherWidgetHost(this)
+        NotificationBadges.ensureConnected(this)
     }
 }

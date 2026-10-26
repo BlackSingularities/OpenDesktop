@@ -6,6 +6,7 @@ Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie 
 
 - **Siatka do ustawienia** — od 3 do 10 kolumn i od 3 do 12 wierszy; zmiana układu przenosi elementy, które się nie mieszczą, na kolejne ekrany.
 - **Ikony, foldery i widżety** — przytrzymaj i przeciągnij; upuść aplikację na aplikację, a powstanie folder.
+- **Plakietki powiadomień** — liczba oczekujących powiadomień w rogu ikony na pulpicie, w doku, w folderach i w szufladzie (wymaga dostępu do powiadomień; przełącznik w Ustawieniach → Wygląd → Ikony).
 - **Nakładanie się** — elementy mogą na siebie zachodzić albo trzymać się wolnych komórek (przełącznik w ustawieniach).
 - **Zmiana rozmiaru** — uchwyt w rogu zaznaczonego elementu w trybie edycji (dotyczy widżetów, folderów i ikon).
 - **Wiele ekranów** — dodawanie, usuwanie, zmiana kolejności i wybór ekranu głównego. Przytrzymanie elementu przy krawędzi przenosi go na sąsiedni ekran albo tworzy nowy.

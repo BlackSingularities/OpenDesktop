@@ -5,6 +5,11 @@
 - O `READ_CONTACTS` pytamy dopiero przy pierwszym wyszukiwaniu; bez zgody sekcja kontaktów jest pomijana, a wyszukiwanie aplikacji działa dalej.
 - Nowe przełączniki w Ustawieniach → Szuflada aplikacji: „Kontakty w wynikach” i „Szybkie odpowiedzi” (domyślnie włączone).
 
+## next CI release — Plakietki powiadomień
+
+- Liczba oczekujących powiadomień w rogu ikony: pulpit, dok, foldery i wszystkie układy szuflady.
+- Przełącznik „Plakietki powiadomień” w Ustawieniach → Wygląd → Ikony, z prośbą o systemowy dostęp do powiadomień.
+
 ## next CI release — Transparent application icon
 
 - Use the transparent application mark in launcher, splash and existing branding surfaces.

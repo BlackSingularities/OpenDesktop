@@ -167,7 +167,7 @@ private fun SettingsHome(onClose: () -> Unit, onOpenCategories: () -> Unit, onOp
             listOf(Section.Ai, Section.Updates, Section.Backup).forEach { s -> ActionRow(s.icon, s.title, s.summary, chevron = true) { onOpen(s) } }
         }
         Group("O aplikacji") {
-            ActionRow(Icons.Rounded.Person, "Projekt i wykonanie", "redzikowski.com") { openUrl(ctx, "https://redzikowski.com") }
+            ActionRow(Icons.Rounded.Person, "Pomysł i wykonanie", "Adam Rędzikowski · redzikowski.com") { openUrl(ctx, "https://redzikowski.com") }
             ActionRow(Icons.Rounded.LocalCafe, "Postaw kawę", "Wesprzyj rozwój na buycoffee.to") { openUrl(ctx, "https://buycoffee.to/adamredzikowski") }
         }
         Text(

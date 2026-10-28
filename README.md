@@ -41,7 +41,7 @@ Klucz zostaje na urządzeniu i nie trafia do kopii zapasowej.
 
 ## Aktualizacje
 
-Każdy commit na `main` buduje podpisane APK i publikuje wydanie w GitHub Releases. Aplikacja sama sprawdza najnowsze wydanie wskazanego repozytorium (domyślnie `BlackSingularities/OpenDesktop`; w ustawieniach można je wyszukać na GitHubie), pobiera APK i przekazuje je do instalatora systemowego.
+Każdy wypchnięty tag `vX.Y.Z` buduje podpisane APK i publikuje wydanie w GitHub Releases. Aplikacja sama sprawdza najnowsze wydanie wskazanego repozytorium (domyślnie `BlackSingularities/OpenDesktop`; w ustawieniach można je wyszukać na GitHubie), pobiera APK i przekazuje je do instalatora systemowego.
 
 ## Budowanie
 

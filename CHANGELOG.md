@@ -1,3 +1,9 @@
+## 2.1.1
+
+- Nowa strona aplikacji z opisem funkcji.
+- Jednolita informacja o autorze (Adam Rędzikowski · redzikowski.com) i przycisk „Postaw kawę”.
+- Usunięte odnośniki do repozytorium z interfejsu.
+
 ## next CI release — Wyszukiwarka szuflady: kontakty, ustawienia i szybkie odpowiedzi
 
 - Nad wynikami aplikacji kalkulator i przeliczanie jednostek (`QuickAnswers`); kliknięcie kopiuje wynik do schowka.

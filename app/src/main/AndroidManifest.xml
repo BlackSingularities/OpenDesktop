@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
     <!-- Wyszukiwanie kontaktów w szufladzie (pytamy dopiero przy pierwszym użyciu) -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Pogoda dla bieżącego miejsca (zgrubna lokalizacja; pytamy przy wyborze w widżecie) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Odblokowanie ukrytych aplikacji -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Launcher musi widzieć wszystkie aplikacje i dostawców widżetów -->

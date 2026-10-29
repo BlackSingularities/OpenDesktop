@@ -1,14 +1,21 @@
 package com.opendesktop.launcher.ui.desktop
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,32 +31,33 @@ import androidx.compose.material.icons.rounded.Air
 import androidx.compose.material.icons.rounded.Battery5Bar
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.BorderStyle
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.HorizontalRule
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.LineWeight
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Numbers
 import androidx.compose.material.icons.rounded.Opacity
-import androidx.compose.material.icons.rounded.Padding
 import androidx.compose.material.icons.rounded.ColorLens
-import androidx.compose.material.icons.rounded.Colorize
-import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.RoundedCorner
-import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Subject
 import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.Thermostat
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Title
 import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Umbrella
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.ViewWeek
@@ -57,10 +65,10 @@ import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.WbTwilight
-import androidx.compose.material.icons.rounded.ZoomIn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,19 +83,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.opendesktop.launcher.data.DeviceLocation
 import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.data.GadgetStyle
 import com.opendesktop.launcher.data.WeatherMetric
-import com.opendesktop.launcher.ui.settings.DarkDialog
-import com.opendesktop.launcher.ui.settings.PillButton
-import com.opendesktop.launcher.ui.settings.SliderRow
+import com.opendesktop.launcher.data.WeatherPlace
+import com.opendesktop.launcher.data.WeatherRepo
+import com.opendesktop.launcher.ui.settings.DialogTextField
 import com.opendesktop.launcher.ui.settings.Tile
-import com.opendesktop.launcher.ui.settings.TileGrid
 import com.opendesktop.launcher.ui.theme.Palette
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 
 /** Gotowe zestawy wyglądu – zmieniają tylko kolory, tło, rogi, obrys i cienie, nie ustawienia treści. */
@@ -133,149 +148,400 @@ private val weights = listOf("Cienka" to 200, "Lekka" to 300, "Zwykła" to 400, 
 private val aligns = listOf("Do lewej" to 0, "Środek" to 1, "Do prawej" to 2)
 private val fonts = listOf("Systemowa", "Szeryfowa", "Maszynowa", "Odręczna", "Wąska")
 private val gradients = listOf("Jednolite", "Pionowy", "Poziomy", "Ukośny", "Promienisty")
-private val iconStyles = listOf("Akcent", "Kolorowe", "Kolor tekstu", "Emoji")
+private val iconStyles = listOf("Akcent", "Kolorowe", "Tekst", "Emoji")
 private val quickCities = listOf("Warszawa", "Kraków", "Gdańsk", "Wrocław", "Poznań", "Łódź", "Szczecin", "Lublin", "Zakopane")
 
-/** Proporcje podglądu w oknie (szerokość / wysokość kafelka). */
+/** Tła pod podglądem: sprawdzenie czytelności na jasnej, mieszanej i ciemnej tapecie. */
+private val backdrops = listOf(
+    "Jasne" to Brush.linearGradient(listOf(Color(0xFFF6F2EA), Color(0xFFD9DEE6))),
+    "Mieszane" to Brush.linearGradient(listOf(Color(0xFFF3EFE6), Color(0xFF7A8FA6), Color(0xFF0E1420))),
+    "Ciemne" to Brush.linearGradient(listOf(Color(0xFF1B2433), Color(0xFF05070B))),
+)
+
+/** Wysokość podglądu zależna od proporcji kafelka. */
 private fun previewHeight(kind: GadgetKind) = when {
-    kind.h >= 4 -> 250.dp
-    kind.h >= 3 -> 210.dp
-    kind.h == 1 -> 76.dp
+    kind.h >= 4 -> 260.dp
+    kind.h >= 3 -> 220.dp
+    kind.h == 1 -> 84.dp
     kind.w <= 2 -> 170.dp
-    else -> 140.dp
+    else -> 150.dp
+}
+
+private enum class DialogPage(val label: String, val icon: ImageVector) {
+    Place("Miejsce", Icons.Rounded.Place),
+    Content("Treść", Icons.Rounded.Tune),
+    Style("Styl", Icons.Rounded.Wallpaper),
+    Colors("Kolory", Icons.Rounded.ColorLens),
+    Text("Tekst", Icons.Rounded.TextFields),
 }
 
 /**
- * Dostosowanie wbudowanego widżetu: stały podgląd na żywo i cztery karty – treść (ustawienia
- * właściwe dla rodzaju), wygląd karty, kolory (z własnym kolorem HSV/hex) i tekst.
+ * Dostosowanie wbudowanego widżetu na pełnym ekranie: pasek z zapisem, duży podgląd na wybranym
+ * tle i karty – miejsce (pogoda), treść, styl karty, kolory i tekst. Każda zmiana od razu
+ * widać w podglądzie; zapis dopiero przyciskiem.
  */
 @Composable
 fun GadgetStyleDialog(kind: GadgetKind, initial: GadgetStyle, onDismiss: () -> Unit, onSave: (GadgetStyle) -> Unit) {
     var st by remember { mutableStateOf(initial) }
-    var tab by remember { mutableIntStateOf(0) }
-    DarkDialog(
-        title = kind.label,
-        subtitle = kind.description,
-        onDismiss = onDismiss,
-        scrollable = false,
-        buttons = {
-            PillButton("Domyślne", primary = false) { st = kind.defaultStyle() }
-            PillButton("Anuluj", primary = false, onClick = onDismiss)
-            PillButton("Zapisz", onClick = { onSave(st) })
-        },
-    ) {
-        // Podgląd na przejściu od jasnej do ciemnej tapety – zostaje na górze przy przewijaniu
+    val pages = remember(kind) { DialogPage.entries.filter { it != DialogPage.Place || kind.isWeather } }
+    var page by remember { mutableStateOf(pages.first()) }
+    var backdrop by remember { mutableIntStateOf(1) }
+    val set: (GadgetStyle) -> Unit = { st = it }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(Modifier.fillMaxSize().background(Palette.Panel)) {
+            // Pasek: zamknij, nazwa, przywróć, zapisz
+            Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 12.dp, top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                RoundIcon(Icons.Rounded.Close, "Zamknij", onClick = onDismiss)
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                    Text(kind.label, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (st != initial) "Niezapisane zmiany" else kind.description, color = if (st != initial) Palette.Accent else Palette.TextDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                RoundIcon(Icons.Rounded.RestartAlt, "Przywróć domyślne") { st = kind.defaultStyle() }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Zapisz",
+                    color = Palette.Ink,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Palette.Accent).clickable { onSave(st) }.padding(horizontal = 18.dp, vertical = 10.dp),
+                )
+            }
+            PreviewStage(kind, st, backdrop) { backdrop = it }
+            TabBar(pages, page) { page = it }
+            Column(
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (page) {
+                    DialogPage.Place -> PlaceOptions(st, set)
+                    DialogPage.Content -> {
+                        KindOptions(kind, st, set)
+                        if (kind.isWeather) WeatherLookOptions(kind, st, set)
+                    }
+                    DialogPage.Style -> CardOptions(st, set)
+                    DialogPage.Colors -> ColorOptions(st, set)
+                    DialogPage.Text -> TextOptions(kind, st, set)
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewStage(kind: GadgetKind, st: GadgetStyle, backdrop: Int, onBackdrop: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFFF3EFE6), Color(0xFF7A8FA6), Color(0xFF0E1420))))
-                .padding(8.dp),
+                .clip(RoundedCornerShape(24.dp))
+                .background(backdrops[backdrop].second)
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            GadgetWidget(kind, st, Modifier.fillMaxWidth().height(previewHeight(kind)))
+            // Szerokość jak na pulpicie: wąskie widżety nie rozciągają się na cały ekran
+            val frac = (kind.w / 4f).coerceIn(0.5f, 1f)
+            GadgetWidget(kind, st, Modifier.fillMaxWidth(frac).height(previewHeight(kind)))
         }
-        Chips(listOf("Treść", "Wygląd", "Kolory", "Tekst"), tab) { tab = it }
-        Column(
-            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            when (tab) {
-                0 -> {
-                    KindOptions(kind, st) { st = it }
-                    if (kind.isWeather) WeatherLookOptions(kind, st) { st = it }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Tło podglądu", color = Palette.TextFaint, fontSize = 11.sp, modifier = Modifier.weight(1f).padding(start = 4.dp))
+            backdrops.forEachIndexed { i, (name, brush) ->
+                Row(
+                    Modifier
+                        .padding(start = 6.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (i == backdrop) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+                        .clickable { onBackdrop(i) }
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(12.dp).clip(CircleShape).background(brush).border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape))
+                    Spacer(Modifier.width(5.dp))
+                    Text(name, color = if (i == backdrop) Color.White else Palette.TextDim, fontSize = 11.sp)
                 }
-                1 -> CardOptions(st) { st = it }
-                2 -> ColorOptions(st) { st = it }
-                else -> TextOptions(kind, st) { st = it }
             }
         }
     }
 }
+
+@Composable
+private fun TabBar(pages: List<DialogPage>, selected: DialogPage, onPick: (DialogPage) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(top = 10.dp)
+            .clip(RoundedCornerShape(18.dp)).background(Color.White.copy(alpha = 0.06f)).padding(4.dp),
+    ) {
+        pages.forEach { pg ->
+            val on = pg == selected
+            val bg by animateColorAsState(if (on) Palette.Accent else Color.Transparent, label = "tab")
+            Column(
+                Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(bg).clickable { onPick(pg) }.padding(vertical = 7.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(pg.icon, null, tint = if (on) Palette.Ink else Palette.TextDim, modifier = Modifier.size(18.dp))
+                Text(pg.label, color = if (on) Palette.Ink else Palette.TextDim, fontSize = 11.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+            }
+        }
+    }
+}
+
+// ---------- Miejsce (pogoda) ----------
+
+@Composable
+private fun PlaceOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
+    val ctx = LocalContext.current
+    var granted by remember { mutableStateOf(DeviceLocation.granted(ctx)) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+        if (ok) {
+            DeviceLocation.clear()
+            set(st.copy(useDeviceLocation = true))
+        }
+    }
+    Section("Lokalizacja", Icons.Rounded.Place) {
+        Segmented(listOf("Moja lokalizacja", "Wybrane miejsce"), if (st.useDeviceLocation) 0 else 1) { i ->
+            if (i == 1) set(st.copy(useDeviceLocation = false))
+            else if (granted) set(st.copy(useDeviceLocation = true))
+            else runCatching { ask.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }
+        }
+        if (st.useDeviceLocation) DevicePlace(granted) { runCatching { ask.launch(Manifest.permission.ACCESS_COARSE_LOCATION) } }
+        else CityPicker(st, set)
+    }
+    Section("Odświeżanie", Icons.Rounded.Refresh, hint = "Pogoda odświeża się sama co 20 minut. Przycisk w rogu widżetu pobiera ją od razu.") {
+        Toggles(listOf(Tile(Icons.Rounded.Refresh, "Przycisk odświeżania", st.showRefresh) { set(st.copy(showRefresh = it)) }))
+        ActionChip(Icons.Rounded.Refresh, "Odśwież teraz") { WeatherRefresh.request() }
+    }
+    UnitOptions(st, set)
+}
+
+/** Stan „Moja lokalizacja”: wykryte miejsce albo prośba o zgodę. */
+@Composable
+private fun DevicePlace(granted: Boolean, onAsk: () -> Unit) {
+    val ctx = LocalContext.current
+    var place by remember { mutableStateOf<Result<WeatherPlace>?>(null) }
+    LaunchedEffect(granted, WeatherRefresh.tick) {
+        place = null
+        if (granted) place = runCatching { DeviceLocation.current(ctx.applicationContext) }
+    }
+    when {
+        !granted -> {
+            Hint("Launcher potrzebuje przybliżonej lokalizacji, żeby pokazać pogodę tam, gdzie jesteś.")
+            ActionChip(Icons.Rounded.MyLocation, "Zezwól na lokalizację", primary = true, onClick = onAsk)
+        }
+        place == null -> Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+            Spacer(Modifier.width(10.dp))
+            Text("Ustalanie położenia…", color = Palette.TextDim, fontSize = 13.sp)
+        }
+        else -> place?.getOrNull()?.let { PlaceCard(Icons.Rounded.MyLocation, it.name, it.region.ifBlank { it.coords }) }
+            ?: Hint(place?.exceptionOrNull()?.message ?: "Nie udało się ustalić położenia")
+    }
+}
+
+@Composable
+private fun CityPicker(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
+    PlaceCard(Icons.Rounded.Place, st.city.ifBlank { "Warszawa" }, if (st.coords.isNotBlank()) st.coords else "wyszukiwane po nazwie")
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<WeatherPlace>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(query) {
+        if (query.trim().length < 2) {
+            results = emptyList()
+            failed = false
+            return@LaunchedEffect
+        }
+        delay(350)
+        searching = true
+        val r = runCatching { WeatherRepo.search(query) }
+        results = r.getOrDefault(emptyList())
+        failed = r.isFailure
+        searching = false
+    }
+    DialogTextField(
+        value = query,
+        onValueChange = { query = it.take(60) },
+        placeholder = "Szukaj miejscowości albo wpisz 52.23, 21.01",
+        leadingIcon = Icons.Rounded.Search,
+        trailing = if (searching) ({ CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp) }) else null,
+    )
+    if (results.isNotEmpty()) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.05f))) {
+            results.forEach { pl ->
+                Row(
+                    Modifier.fillMaxWidth().clickable {
+                        set(st.copy(city = pl.name, coords = pl.coords))
+                        query = ""
+                    }.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Place, null, tint = Palette.TextDim, modifier = Modifier.size(18.dp))
+                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text(pl.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        if (pl.region.isNotBlank()) Text(pl.region, color = Palette.TextDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    } else if (failed) Hint("Brak połączenia – nie można wyszukać.")
+    else if (query.trim().length >= 2 && !searching) Hint("Nic nie znaleziono.")
+    SubLabel("Szybki wybór")
+    FlowChips(quickCities, quickCities.indexOfFirst { it.equals(st.city.trim(), ignoreCase = true) && st.coords.isBlank() }) {
+        set(st.copy(city = quickCities[it], coords = ""))
+    }
+}
+
+@Composable
+private fun PlaceCard(icon: ImageVector, name: String, detail: String) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.08f)).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(36.dp).clip(CircleShape).background(Palette.Accent), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = Palette.Ink, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(detail, color = Palette.TextDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun UnitOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
+    Section("Jednostki", Icons.Rounded.Speed) {
+        SubLabel("Temperatura")
+        Segmented(listOf("°C", "°F"), if (st.fahrenheit) 1 else 0) { set(st.copy(fahrenheit = it == 1)) }
+        SubLabel("Wiatr")
+        Segmented(listOf("km/h", "m/s", "mph", "węzły"), st.windUnit.coerceIn(0, 3)) { set(st.copy(windUnit = it)) }
+        SubLabel("Ciśnienie")
+        Segmented(listOf("hPa", "mmHg", "inHg"), st.pressureUnit.coerceIn(0, 2)) { set(st.copy(pressureUnit = it)) }
+    }
+}
+
+// ---------- Styl karty ----------
 
 @Composable
 private fun CardOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    Label("Gotowe style")
-    Chips(looks.map { it.first }, looks.indexOfFirst { st.withLook(it.second) == st }) { set(st.withLook(looks[it].second)) }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconChip(Icons.Rounded.ContentCopy, "Kopiuj wygląd") { copiedLook = st }
-        copiedLook?.let { c -> IconChip(Icons.Rounded.ContentPaste, "Wklej wygląd") { set(st.withAppearance(c)) } }
+    Section("Gotowe style", Icons.Rounded.Wallpaper) {
+        LookGrid(st, set)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ActionChip(Icons.Rounded.ContentCopy, "Kopiuj wygląd") { copiedLook = st }
+            copiedLook?.let { c -> ActionChip(Icons.Rounded.ContentPaste, "Wklej wygląd") { set(st.withAppearance(c)) } }
+        }
     }
-
-    Label("Tło")
-    Chips(gradients, st.gradient.coerceIn(0, 4)) { set(st.copy(gradient = it)) }
-    SliderRow(Icons.Rounded.Opacity, "Krycie tła", ((st.background ushr 24) and 0xFF) / 255f * 100f, 0f..100f, 19, { "${it.toInt()}%" }) { a ->
-        val alpha = (a / 100f * 255f).toLong().coerceIn(0, 255)
-        // Ta sama przezroczystość dla obu kolorów gradientu
-        set(st.copy(background = (alpha shl 24) or (st.background and 0xFFFFFF), background2 = (alpha shl 24) or (st.background2 and 0xFFFFFF)))
+    Section("Tło", Icons.Rounded.Opacity) {
+        FlowChips(gradients, st.gradient.coerceIn(0, 4)) { set(st.copy(gradient = it)) }
+        ValueSlider("Krycie", ((st.background ushr 24) and 0xFF) / 255f * 100f, 0f..100f, { "${it.toInt()}%" }) { a ->
+            val alpha = (a / 100f * 255f).toLong().coerceIn(0, 255)
+            // Ta sama przezroczystość dla obu kolorów gradientu
+            set(st.copy(background = (alpha shl 24) or (st.background and 0xFFFFFF), background2 = (alpha shl 24) or (st.background2 and 0xFFFFFF)))
+        }
+        if (st.weatherBackground) Hint("Tło zależy od pogody – wyłącz „Tło wg pogody” w Treści, żeby użyć własnego.")
     }
-    SliderRow(Icons.Rounded.RoundedCorner, "Zaokrąglenie rogów", st.radius.toFloat(), 0f..48f, 11, { "${it.toInt()} dp" }) {
-        set(st.copy(radius = it.toInt()))
-    }
-    SliderRow(Icons.Rounded.BlurOn, "Cień pod kartą", st.shadow * 100f, 0f..100f, 9, { "${it.toInt()}%" }) {
-        set(st.copy(shadow = it / 100f))
-    }
-    SliderRow(Icons.Rounded.Padding, "Margines wewnętrzny", st.padding.toFloat(), 0f..32f, 7, { "${it.toInt()} dp" }) {
-        set(st.copy(padding = it.toInt()))
-    }
-
-    Label("Obrys i cienie")
-    TileGrid(
-        listOf(
-            Tile(Icons.Rounded.BorderStyle, "Obrys", st.border) { v -> set(st.copy(border = v)) },
-            Tile(Icons.Rounded.BlurOn, "Cień tekstu", st.textShadow) { v -> set(st.copy(textShadow = v)) },
+    Section("Kształt", Icons.Rounded.BorderStyle) {
+        ValueSlider("Zaokrąglenie rogów", st.radius.toFloat(), 0f..48f, { "${it.toInt()} dp" }) { set(st.copy(radius = it.toInt())) }
+        ValueSlider("Margines wewnętrzny", st.padding.toFloat(), 0f..32f, { "${it.toInt()} dp" }) { set(st.copy(padding = it.toInt())) }
+        ValueSlider("Cień pod kartą", st.shadow * 100f, 0f..100f, { "${it.toInt()}%" }) { set(st.copy(shadow = it / 100f)) }
+        Toggles(
+            listOf(
+                Tile(Icons.Rounded.BorderStyle, "Obrys", st.border) { set(st.copy(border = it)) },
+                Tile(Icons.Rounded.BlurOn, "Cień tekstu", st.textShadow) { set(st.copy(textShadow = it)) },
+            )
         )
-    )
-    if (st.border) {
-        SliderRow(Icons.Rounded.LineWeight, "Grubość obrysu", st.borderWidth, 0.5f..4f, 6, { "%.1f dp".format(it) }) {
-            set(st.copy(borderWidth = it))
+        if (st.border) ValueSlider("Grubość obrysu", st.borderWidth, 0.5f..4f, { "%.1f dp".format(it) }) { set(st.copy(borderWidth = it)) }
+    }
+}
+
+/** Gotowe style jako miniatury karty: tło, kolor tekstu i akcentu. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LookGrid(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        looks.forEach { (name, look) ->
+            val on = st.withLook(look) == st
+            Column(Modifier.width(68.dp).clickable { set(st.withLook(look)) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                val shape = RoundedCornerShape((look.radius * 0.5f).coerceIn(4f, 16f).dp)
+                Box(
+                    Modifier
+                        .size(68.dp, 50.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFFDCE3EC), Color(0xFF3A4A5E))))
+                        .border(if (on) 2.dp else 0.dp, if (on) Palette.Accent else Color.Transparent, RoundedCornerShape(14.dp))
+                        .padding(6.dp),
+                ) {
+                    Box(
+                        Modifier.fillMaxSize().clip(shape).background(backgroundBrush(look))
+                            .then(if (look.border) Modifier.border(1.dp, if (look.borderColor != 0L) Color(look.borderColor) else Color(look.textColor).copy(alpha = 0.3f), shape) else Modifier),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Aa", color = Color(look.textColor), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.width(4.dp))
+                            Box(Modifier.size(7.dp).clip(CircleShape).background(Color(look.accent)))
+                        }
+                    }
+                }
+                Text(name, color = if (on) Color.White else Palette.TextDim, fontSize = 11.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+            }
         }
     }
 }
+
+// ---------- Kolory ----------
 
 @Composable
 private fun ColorOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    ColorPicker("Kolor tekstu", st.textColor, textColors) { set(st.copy(textColor = it)) }
-    ColorPicker("Kolor akcentu", st.accent, accentColors) { set(st.copy(accent = it)) }
-    val alpha = ((st.background ushr 24) and 0xFF).let { if (it == 0L) 0x66L else it }
-    ColorPicker(if (st.gradient > 0) "Tło – pierwszy kolor" else "Kolor tła", st.background or 0xFF000000, backgroundColors) { c ->
-        set(st.copy(background = (alpha shl 24) or (c and 0xFFFFFF)))
+    Section("Tekst i akcent", Icons.Rounded.ColorLens) {
+        ColorPicker("Kolor tekstu", st.textColor, textColors) { set(st.copy(textColor = it)) }
+        ColorPicker("Kolor akcentu", st.accent, accentColors) { set(st.copy(accent = it)) }
     }
-    if (st.gradient > 0) {
-        ColorPicker("Tło – drugi kolor", st.background2 or 0xFF000000, backgroundColors) { c ->
-            set(st.copy(background2 = (alpha shl 24) or (c and 0xFFFFFF)))
+    val alpha = ((st.background ushr 24) and 0xFF).let { if (it == 0L) 0x66L else it }
+    Section("Tło", Icons.Rounded.Opacity, hint = if (st.weatherBackground) "Teraz tło zależy od pogody – te kolory działają po wyłączeniu „Tło wg pogody”." else null) {
+        ColorPicker(if (st.gradient > 0) "Pierwszy kolor" else "Kolor tła", st.background or 0xFF000000, backgroundColors) { c ->
+            set(st.copy(background = (alpha shl 24) or (c and 0xFFFFFF)))
+        }
+        if (st.gradient > 0) {
+            ColorPicker("Drugi kolor", st.background2 or 0xFF000000, backgroundColors) { c ->
+                set(st.copy(background2 = (alpha shl 24) or (c and 0xFFFFFF)))
+            }
         }
     }
     if (st.border) {
-        ColorPicker("Kolor obrysu", if (st.borderColor == 0L) st.textColor else st.borderColor, accentColors, auto = st.borderColor == 0L, onAuto = { set(st.copy(borderColor = 0)) }) {
-            set(st.copy(borderColor = (0xCCL shl 24) or (it and 0xFFFFFF)))
+        Section("Obrys", Icons.Rounded.BorderStyle) {
+            ColorPicker("Kolor obrysu", if (st.borderColor == 0L) st.textColor else st.borderColor, accentColors, auto = st.borderColor == 0L, onAuto = { set(st.copy(borderColor = 0)) }) {
+                set(st.copy(borderColor = (0xCCL shl 24) or (it and 0xFFFFFF)))
+            }
         }
     }
-    if (st.weatherBackground) DialogHint("Tło zależy teraz od pogody – kolory tła są używane, gdy wyłączysz „Tło wg pogody”.")
 }
 
+// ---------- Tekst ----------
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TextOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    Label("Wielkość")
-    SliderRow(Icons.Rounded.TextFields, "Wielkość tekstu", st.textScale * 100f, 60f..160f, 9, { "${it.toInt()}%" }) {
-        set(st.copy(textScale = it / 100f))
+    Section("Wielkość i grubość", Icons.Rounded.TextFields) {
+        ValueSlider("Wielkość tekstu", st.textScale * 100f, 60f..160f, { "${it.toInt()}%" }) { set(st.copy(textScale = it / 100f)) }
+        FlowChips(weights.map { it.first }, weights.indexOfFirst { it.second == st.weight }) { set(st.copy(weight = weights[it].second)) }
     }
-    Label("Grubość")
-    Chips(weights.map { it.first }, weights.indexOfFirst { it.second == st.weight }) { set(st.copy(weight = weights[it].second)) }
-    Label("Krój pisma")
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        fonts.forEachIndexed { i, name ->
-            val family = when (i) {
-                1 -> FontFamily.Serif
-                2 -> FontFamily.Monospace
-                3 -> FontFamily.Cursive
-                else -> FontFamily.SansSerif
+    Section("Krój pisma", Icons.Rounded.Title) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            fonts.forEachIndexed { i, name ->
+                val family = when (i) {
+                    1 -> FontFamily.Serif
+                    2 -> FontFamily.Monospace
+                    3 -> FontFamily.Cursive
+                    4 -> FontFamily(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.NORMAL))
+                    else -> FontFamily.SansSerif
+                }
+                Chip(name, st.fontFamily == i, family) { set(st.copy(fontFamily = i)) }
             }
-            Chip(name, st.fontFamily == i, family) { set(st.copy(fontFamily = i)) }
         }
     }
     if (kind.usesAlign()) {
-        Label("Wyrównanie")
-        Chips(aligns.map { it.first }, aligns.indexOfFirst { it.second == st.align }) { set(st.copy(align = aligns[it].second)) }
+        Section("Wyrównanie", Icons.Rounded.Subject) {
+            Segmented(aligns.map { it.first }, aligns.indexOfFirst { it.second == st.align }) { set(st.copy(align = aligns[it].second)) }
+        }
     }
 }
 
@@ -284,6 +550,8 @@ private fun GadgetKind.usesAlign() = this !in setOf(
     GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails, GadgetKind.SunArc, GadgetKind.YearDots,
 )
 
+// ---------- Treść ----------
+
 /** Ustawienia treści właściwe dla rodzaju widżetu. */
 @Composable
 private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) -> Unit) {
@@ -291,167 +559,147 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
     val seconds = Tile(Icons.Rounded.Timer, "Sekundy", st.showSeconds) { set(st.copy(showSeconds = it)) }
     val date = Tile(Icons.Rounded.DateRange, "Data", st.showDate) { set(st.copy(showDate = it)) }
     fun details(label: String) = Tile(Icons.Rounded.Info, label, st.showDetails) { set(st.copy(showDetails = it)) }
-    val monday = Tile(Icons.Rounded.ViewWeek, "Od pon.", st.mondayFirst) { set(st.copy(mondayFirst = it)) }
+    val monday = Tile(Icons.Rounded.ViewWeek, "Tydzień od poniedziałku", st.mondayFirst) { set(st.copy(mondayFirst = it)) }
     val today = Tile(Icons.Rounded.Today, "Wyróżnij teraz", st.highlightToday) { set(st.copy(highlightToday = it)) }
     val condition = Tile(Icons.Rounded.Title, "Opis warunków", st.showCondition) { set(st.copy(showCondition = it)) }
     val tomorrow = Tile(Icons.Rounded.SkipNext, "Od jutra", st.startTomorrow) { set(st.copy(startTomorrow = it)) }
-    val fill = Tile(Icons.Rounded.ShowChart, "Wypełnienie", st.chartFill) { set(st.copy(chartFill = it)) }
+    val fill = Tile(Icons.Rounded.ShowChart, "Wypełnienie wykresu", st.chartFill) { set(st.copy(chartFill = it)) }
+    val summary = Tile(Icons.Rounded.Subject, "Podsumowanie", st.showSummary) { set(st.copy(showSummary = it)) }
     val daysSlider: @Composable () -> Unit = {
-        SliderRow(Icons.Rounded.CalendarMonth, "Liczba dni", st.days.toFloat().coerceIn(1f, 16f), 1f..16f, 14, { "${it.toInt()}" }) { set(st.copy(days = it.toInt())) }
+        ValueSlider("Liczba dni", st.days.toFloat().coerceIn(1f, 16f), 1f..16f, { "${it.toInt()}" }, steps = 14) { set(st.copy(days = it.toInt())) }
     }
     val hoursSlider: @Composable () -> Unit = {
-        SliderRow(Icons.Rounded.Schedule, "Liczba godzin", st.hours.toFloat().coerceIn(3f, 48f), 3f..48f, 44, { "${it.toInt()} h" }) { set(st.copy(hours = it.toInt())) }
-        Chips(listOf("Co godzinę", "Co 2 h", "Co 3 h", "Co 6 h"), listOf(1, 2, 3, 6).indexOf(st.hourStep)) { set(st.copy(hourStep = listOf(1, 2, 3, 6)[it])) }
+        ValueSlider("Liczba godzin", st.hours.toFloat().coerceIn(3f, 48f), 3f..48f, { "${it.toInt()} h" }, steps = 44) { set(st.copy(hours = it.toInt())) }
+        SubLabel("Odstęp")
+        Segmented(listOf("1 h", "2 h", "3 h", "6 h"), listOf(1, 2, 3, 6).indexOf(st.hourStep)) { set(st.copy(hourStep = listOf(1, 2, 3, 6)[it])) }
     }
     val dayNames: @Composable () -> Unit = {
-        Label("Nazwy dni")
-        Chips(listOf("pon.", "poniedziałek", "29.10", "pon. 29"), st.dayNames.coerceIn(0, 3)) { set(st.copy(dayNames = it)) }
+        SubLabel("Nazwy dni")
+        Segmented(listOf("pon.", "poniedziałek", "29.10", "pon. 29"), st.dayNames.coerceIn(0, 3)) { set(st.copy(dayNames = it)) }
+    }
+    val layout: @Composable (List<String>, Int) -> Unit = { options, max ->
+        Section("Układ", Icons.Rounded.Wallpaper) { Segmented(options, st.mode.coerceIn(0, max)) { set(st.copy(mode = it)) } }
     }
 
     when (kind) {
-        GadgetKind.DigitalClock -> {
-            Label("Zegar")
-            TileGrid(listOf(clock, seconds, date, Tile(Icons.Rounded.Battery5Bar, "Bateria", st.showBattery) { set(st.copy(showBattery = it)) }))
+        GadgetKind.DigitalClock -> Section("Zegar", Icons.Rounded.AccessTime) {
+            Toggles(listOf(clock, seconds, date, Tile(Icons.Rounded.Battery5Bar, "Bateria", st.showBattery) { set(st.copy(showBattery = it)) }))
         }
         GadgetKind.AnalogClock -> {
-            Label("Tarcza")
-            Chips(listOf("Kreski", "Kropki", "Obwódka"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(seconds, details("Cyfry")))
+            layout(listOf("Kreski", "Kropki", "Obwódka"), 2)
+            Section("Tarcza", Icons.Rounded.AccessTime) { Toggles(listOf(seconds, details("Cyfry"))) }
         }
-        GadgetKind.ClockWeather -> {
-            Label("Zegar i pogoda")
-            CityField(st, set)
-            TileGrid(listOf(clock, seconds, date, details("Miasto")))
-            UnitOptions(st, set)
+        GadgetKind.ClockWeather -> Section("Zegar i pogoda", Icons.Rounded.AccessTime) {
+            Toggles(listOf(clock, seconds, date, details("Nazwa miejsca")))
         }
         GadgetKind.Weather -> {
-            Label("Pogoda teraz")
-            CityField(st, set)
-            Chips(listOf("Klasyczny", "Duża temperatura", "Jedna linia"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(details("Szczegóły")))
+            layout(listOf("Klasyczny", "Duża temp.", "Jedna linia"), 2)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Szczegóły"))) }
             MetricOptions(st, WeatherMetric.all, set)
-            UnitOptions(st, set)
         }
         GadgetKind.Forecast -> {
-            Label("Prognoza na dni")
-            CityField(st, set)
-            Chips(listOf("Kolumny", "Lista z paskami", "Wykres", "Kompaktowy"), st.mode.coerceIn(0, 3)) { set(st.copy(mode = it)) }
-            daysSlider()
-            dayNames()
-            TileGrid(listOf(details("Nagłówek"), tomorrow, today, condition) + if (st.mode == 2) listOf(fill) else emptyList())
+            layout(listOf("Kolumny", "Lista", "Wykres", "Kompakt"), 3)
+            Section("Zakres", Icons.Rounded.DateRange) {
+                daysSlider()
+                dayNames()
+            }
+            Section("Pokazuj", Icons.Rounded.Info) {
+                Toggles(listOf(details("Nagłówek"), tomorrow, today, condition) + if (st.mode == 2) listOf(fill) else emptyList())
+            }
             MetricOptions(st, listOf(WeatherMetric.Precip, WeatherMetric.Rain, WeatherMetric.Wind, WeatherMetric.Uv), set)
-            UnitOptions(st, set)
         }
         GadgetKind.HourlyForecast -> {
-            Label("Prognoza godzinowa")
-            CityField(st, set)
-            Chips(listOf("Wykres", "Kolumny", "Lista"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) }
-            hoursSlider()
-            TileGrid(listOf(details("Nagłówek"), clock, today, fill))
-            MetricOptions(st, listOf(WeatherMetric.Precip, WeatherMetric.Wind), set)
-            UnitOptions(st, set)
-        }
-        GadgetKind.WeatherFull -> {
-            Label("Pełny panel")
-            CityField(st, set)
-            DialogHint("Panel sam chowa sekcje, które się nie mieszczą – powiększ widżet, żeby zobaczyć godziny i dni.")
-            hoursSlider()
-            daysSlider()
-            dayNames()
-            TileGrid(listOf(details("Odczuwalna"), clock, today, tomorrow, condition, fill))
-            MetricOptions(st, WeatherMetric.all.filter { it != WeatherMetric.Feels }, set)
-            UnitOptions(st, set)
-        }
-        GadgetKind.WeatherDetails -> {
-            Label("Szczegóły pogody")
-            CityField(st, set)
-            Chips(listOf("Kafelki", "Lista"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(details("Nagłówek"), clock))
-            MetricOptions(st, WeatherMetric.all, set)
-            UnitOptions(st, set)
-        }
-        GadgetKind.SunArc -> {
-            Label("Słońce")
-            CityField(st, set)
-            Chips(listOf("Łuk", "Sam tekst"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(clock, details("Szczegóły")))
-        }
-        GadgetKind.Calendar -> {
-            Label("Kalendarz")
-            TileGrid(listOf(monday))
-        }
-        GadgetKind.DateCard -> {
-            Label("Kartka")
-            TileGrid(listOf(details("Rok")))
-        }
-        GadgetKind.Battery -> {
-            Label("Bateria")
-            Chips(listOf("Pierścień", "Pasek"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(details("Opis")))
-        }
-        GadgetKind.WorldClock -> {
-            Label("Miasta (do 6)")
-            ZonePicker(st, set)
-            Chips(listOf("Obok siebie", "Lista"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(clock, seconds, details("Różnica")))
-        }
-        GadgetKind.Countdown -> {
-            Label("Odliczanie")
-            DarkField(st.label, "Nazwa (np. Urlop)") { set(st.copy(label = it.take(40))) }
-            DarkField(st.target, "Data RRRR-MM-DD") { set(st.copy(target = it.take(10))) }
-            val now = LocalDate.now()
-            Chips(listOf("Za tydzień", "Za miesiąc", "Nowy Rok", "Wigilia"), -1) { i ->
-                val d = when (i) {
-                    0 -> now.plusWeeks(1)
-                    1 -> now.plusMonths(1)
-                    2 -> LocalDate.of(now.year + 1, 1, 1)
-                    else -> LocalDate.of(now.year, 12, 24).let { if (it.isBefore(now)) it.plusYears(1) else it }
-                }
-                set(st.copy(target = d.toString(), label = st.label.ifBlank { listOf("", "", "Nowy Rok", "Wigilia")[i] }))
+            layout(listOf("Wykres", "Kolumny", "Lista"), 2)
+            Section("Zakres", Icons.Rounded.AccessTime) { hoursSlider() }
+            Section("Pokazuj", Icons.Rounded.Info) {
+                Toggles(listOf(details("Nagłówek"), summary, clock, today) + if (st.mode == 0) listOf(fill) else emptyList())
             }
-            Chips(listOf("Same dni", "Dni, godziny, minuty"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(seconds, details("Data")))
-        }
-        GadgetKind.Note -> {
-            Label("Notatka")
-            DarkField(st.label, "Tytuł (opcjonalnie)") { set(st.copy(label = it.take(40))) }
-            DarkField(st.text, "Treść", singleLine = false) { set(st.copy(text = it.take(500))) }
-            Chips(listOf("Od góry", "Wyśrodkowana"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-        }
-        GadgetKind.Greeting -> {
-            Label("Powitanie")
-            DarkField(st.label, "Twoje imię") { set(st.copy(label = it.take(30))) }
-            TileGrid(listOf(date))
-        }
-        GadgetKind.Progress -> {
-            Label("Okres")
-            Chips(listOf("Dzień", "Tydzień", "Miesiąc", "Rok"), st.mode.coerceIn(0, 3)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(details("Dokładnie"), monday))
-        }
-        GadgetKind.Proverb -> {
-            Label("Przysłowie")
-            Chips(listOf("Kursywa", "Prosto"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            TileGrid(listOf(details("Źródło")))
-        }
-        GadgetKind.Storage -> {
-            Label("Pamięć")
-            TileGrid(listOf(details("Ilość GB")))
-        }
-        GadgetKind.MoonPhase -> {
-            Label("Księżyc")
-            Chips(listOf("Naturalny", "W kolorze akcentu", "W kolorze tekstu"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) }
-            TileGrid(
-                listOf(
-                    details("Pełnia i nów"),
-                    Tile(Icons.Rounded.Public, "Półkula płd.", st.southern) { set(st.copy(southern = it)) },
-                )
+            MetricOptions(
+                st,
+                listOf(WeatherMetric.Feels, WeatherMetric.Precip, WeatherMetric.Rain, WeatherMetric.Wind, WeatherMetric.Humidity, WeatherMetric.Uv, WeatherMetric.Cloud, WeatherMetric.Pressure),
+                set,
+                hint = "Wartości, które się nie zmieszczą, chowają się – powiększ widżet, żeby zobaczyć więcej.",
             )
         }
+        GadgetKind.WeatherFull -> {
+            Section("Zakres", Icons.Rounded.DateRange, hint = "Panel sam chowa sekcje, które się nie mieszczą – powiększ widżet, żeby zobaczyć godziny i dni.") {
+                hoursSlider()
+                daysSlider()
+                dayNames()
+            }
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Odczuwalna"), clock, today, tomorrow, condition, fill)) }
+            MetricOptions(st, WeatherMetric.all.filter { it != WeatherMetric.Feels }, set)
+        }
+        GadgetKind.WeatherDetails -> {
+            layout(listOf("Kafelki", "Lista"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Nagłówek"), clock)) }
+            MetricOptions(st, WeatherMetric.all, set)
+        }
+        GadgetKind.SunArc -> {
+            layout(listOf("Łuk", "Sam tekst"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(clock, details("Szczegóły"))) }
+        }
+        GadgetKind.Calendar -> Section("Kalendarz", Icons.Rounded.DateRange) { Toggles(listOf(monday)) }
+        GadgetKind.DateCard -> Section("Kartka", Icons.Rounded.DateRange) { Toggles(listOf(details("Rok"))) }
+        GadgetKind.Battery -> {
+            layout(listOf("Pierścień", "Pasek"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Opis"))) }
+        }
+        GadgetKind.WorldClock -> {
+            Section("Miasta (do 6)", Icons.Rounded.Public) { ZonePicker(st, set) }
+            layout(listOf("Obok siebie", "Lista"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(clock, seconds, details("Różnica czasu"))) }
+        }
+        GadgetKind.Countdown -> {
+            Section("Odliczanie", Icons.Rounded.Timer) {
+                DialogTextField(st.label, { set(st.copy(label = it.take(40))) }, label = "Nazwa (np. Urlop)")
+                DialogTextField(st.target, { set(st.copy(target = it.take(10))) }, label = "Data RRRR-MM-DD")
+                val now = LocalDate.now()
+                FlowChips(listOf("Za tydzień", "Za miesiąc", "Nowy Rok", "Wigilia"), -1) { i ->
+                    val d = when (i) {
+                        0 -> now.plusWeeks(1)
+                        1 -> now.plusMonths(1)
+                        2 -> LocalDate.of(now.year + 1, 1, 1)
+                        else -> LocalDate.of(now.year, 12, 24).let { if (it.isBefore(now)) it.plusYears(1) else it }
+                    }
+                    set(st.copy(target = d.toString(), label = st.label.ifBlank { listOf("", "", "Nowy Rok", "Wigilia")[i] }))
+                }
+            }
+            layout(listOf("Same dni", "Dni, godziny, minuty"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(seconds, details("Data"))) }
+        }
+        GadgetKind.Note -> {
+            Section("Notatka", Icons.Rounded.Subject) {
+                DialogTextField(st.label, { set(st.copy(label = it.take(40))) }, label = "Tytuł (opcjonalnie)")
+                DialogTextField(st.text, { set(st.copy(text = it.take(500))) }, label = "Treść", singleLine = false, minLines = 3)
+            }
+            layout(listOf("Od góry", "Wyśrodkowana"), 1)
+        }
+        GadgetKind.Greeting -> Section("Powitanie", Icons.Rounded.WbSunny) {
+            DialogTextField(st.label, { set(st.copy(label = it.take(30))) }, label = "Twoje imię")
+            Toggles(listOf(date))
+        }
+        GadgetKind.Progress -> {
+            layout(listOf("Dzień", "Tydzień", "Miesiąc", "Rok"), 3)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Dokładnie"), monday)) }
+        }
+        GadgetKind.Proverb -> {
+            layout(listOf("Kursywa", "Prosto"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Źródło"))) }
+        }
+        GadgetKind.Storage -> Section("Pamięć", Icons.Rounded.Info) { Toggles(listOf(details("Ilość GB"))) }
+        GadgetKind.MoonPhase -> {
+            layout(listOf("Naturalny", "Akcent", "Kolor tekstu"), 2)
+            Section("Pokazuj", Icons.Rounded.Info) {
+                Toggles(listOf(details("Pełnia i nów"), Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
+            }
+        }
         GadgetKind.YearDots -> {
-            Label("Kropki")
-            Chips(listOf("Rok", "Miesiąc"), st.mode.coerceIn(0, 1)) { set(st.copy(mode = it)) }
-            DarkField(st.label, "Tytuł (opcjonalnie)") { set(st.copy(label = it.take(30))) }
-            TileGrid(listOf(details("Licznik dni")))
+            layout(listOf("Rok", "Miesiąc"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) {
+                DialogTextField(st.label, { set(st.copy(label = it.take(30))) }, label = "Tytuł (opcjonalnie)")
+                Toggles(listOf(details("Licznik dni")))
+            }
         }
     }
 }
@@ -459,36 +707,25 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
 /** Wygląd wspólny dla widżetów pogody: tło wg pogody, ikony, kolory temperatur. */
 @Composable
 private fun WeatherLookOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    Label("Wygląd pogody")
-    TileGrid(
-        listOf(
-            Tile(Icons.Rounded.Wallpaper, "Tło wg pogody", st.weatherBackground) { on ->
-                // Włączenie na prawie przezroczystym tle nic by nie zmieniło – podnosimy krycie
-                val alpha = (st.background ushr 24) and 0xFF
-                val bg = if (on && alpha < 0x99) (0xD9L shl 24) or (st.background and 0xFFFFFF) else st.background
-                set(st.copy(weatherBackground = on, background = bg))
-            },
-            Tile(Icons.Rounded.Thermostat, "Kolorowe temp.", st.tempColors) { set(st.copy(tempColors = it)) },
-            Tile(Icons.Rounded.Numbers, "Dziesiąte części", st.decimals) { set(st.copy(decimals = it)) },
-            Tile(Icons.Rounded.Update, "Godzina aktual.", st.showUpdated) { set(st.copy(showUpdated = it)) },
-        ) + if (kind in setOf(GadgetKind.Forecast, GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails)) {
-            listOf(Tile(Icons.Rounded.HorizontalRule, "Linie podziału", st.separators) { set(st.copy(separators = it)) })
-        } else emptyList()
-    )
-    Label("Ikony")
-    Chips(iconStyles, st.iconStyle.coerceIn(0, 3)) { set(st.copy(iconStyle = it)) }
-    SliderRow(Icons.Rounded.ZoomIn, "Wielkość ikon", st.iconScale * 100f, 50f..200f, 14, { "${it.toInt()}%" }) {
-        set(st.copy(iconScale = it / 100f))
-    }
-}
-
-@Composable
-private fun UnitOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    Label("Jednostki")
-    Chips(listOf("°C", "°F"), if (st.fahrenheit) 1 else 0) { set(st.copy(fahrenheit = it == 1)) }
-    Chips(listOf("km/h", "m/s", "mph", "węzły"), st.windUnit.coerceIn(0, 3)) { set(st.copy(windUnit = it)) }
-    if (WeatherMetric.Pressure in st.metrics) {
-        Chips(listOf("hPa", "mmHg", "inHg"), st.pressureUnit.coerceIn(0, 2)) { set(st.copy(pressureUnit = it)) }
+    Section("Wygląd pogody", Icons.Rounded.WbSunny) {
+        Toggles(
+            listOf(
+                Tile(Icons.Rounded.Wallpaper, "Tło wg pogody", st.weatherBackground) { on ->
+                    // Włączenie na prawie przezroczystym tle nic by nie zmieniło – podnosimy krycie
+                    val alpha = (st.background ushr 24) and 0xFF
+                    val bg = if (on && alpha < 0x99) (0xD9L shl 24) or (st.background and 0xFFFFFF) else st.background
+                    set(st.copy(weatherBackground = on, background = bg))
+                },
+                Tile(Icons.Rounded.Thermostat, "Kolorowe temperatury", st.tempColors) { set(st.copy(tempColors = it)) },
+                Tile(Icons.Rounded.Numbers, "Dziesiąte części", st.decimals) { set(st.copy(decimals = it)) },
+                Tile(Icons.Rounded.Update, "Godzina aktualizacji", st.showUpdated) { set(st.copy(showUpdated = it)) },
+            ) + if (kind in setOf(GadgetKind.Forecast, GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails)) {
+                listOf(Tile(Icons.Rounded.HorizontalRule, "Linie podziału", st.separators) { set(st.copy(separators = it)) })
+            } else emptyList()
+        )
+        SubLabel("Ikony")
+        Segmented(iconStyles, st.iconStyle.coerceIn(0, 3)) { set(st.copy(iconStyle = it)) }
+        ValueSlider("Wielkość ikon", st.iconScale * 100f, 50f..200f, { "${it.toInt()}%" }) { set(st.copy(iconScale = it / 100f)) }
     }
 }
 
@@ -505,36 +742,28 @@ private val metricTiles = mapOf(
 )
 
 @Composable
-private fun MetricOptions(st: GadgetStyle, available: List<String>, set: (GadgetStyle) -> Unit) {
-    Label("Pokazywane wartości")
-    TileGrid(
-        available.mapNotNull { m ->
-            val (icon, label) = metricTiles[m] ?: return@mapNotNull null
-            Tile(icon, label, m in st.metrics) { on -> set(st.copy(metrics = if (on) st.metrics + m else st.metrics - m)) }
-        }
-    )
-}
-
-@Composable
-private fun CityField(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    DarkField(st.city, "Miasto albo współrzędne (52.23, 21.01)") { set(st.copy(city = it.take(60))) }
-    Chips(quickCities, quickCities.indexOfFirst { it.equals(st.city.trim(), ignoreCase = true) }) { set(st.copy(city = quickCities[it])) }
+private fun MetricOptions(st: GadgetStyle, available: List<String>, set: (GadgetStyle) -> Unit, hint: String? = null) {
+    Section("Wartości", Icons.Rounded.Thermostat, hint = hint) {
+        Toggles(
+            available.mapNotNull { m ->
+                val (icon, label) = metricTiles[m] ?: return@mapNotNull null
+                Tile(icon, label, m in st.metrics) { on -> set(st.copy(metrics = if (on) st.metrics + m else st.metrics - m)) }
+            }
+        )
+    }
 }
 
 @Composable
 private fun ZonePicker(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        WorldZones.forEach { (id, name) ->
-            val on = id in st.zones
-            Chip(name, on) {
-                val next = if (on) st.zones - id else (st.zones + id).takeLast(6)
-                set(st.copy(zones = next))
-            }
-        }
-    }
+    Toggles(
+        WorldZones.map { (id, name) ->
+            Tile(Icons.Rounded.Public, name, id in st.zones) { on -> set(st.copy(zones = if (on) (st.zones + id).takeLast(6) else st.zones - id)) }
+        },
+        showIcons = false,
+    )
 }
 
-// ---------- Kolory ----------
+// ---------- Wybór koloru ----------
 
 private fun hsv(c: Long): FloatArray = FloatArray(3).also { android.graphics.Color.colorToHSV(c.toInt(), it) }
 
@@ -543,9 +772,10 @@ private fun fromHsv(h: Float, s: Float, v: Float): Long = android.graphics.Color
 private fun hex(c: Long) = "#%06X".format(c and 0xFFFFFF)
 
 /**
- * Wybór koloru: gotowe próbki i „własny” – suwaki odcienia, nasycenia i jasności oraz pole hex.
+ * Wybór koloru: próbki i „własny” – suwaki odcienia, nasycenia i jasności oraz pole hex.
  * Zwraca kolor nieprzezroczysty; przezroczystość ustawia wywołujący.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorPicker(
     title: String,
@@ -557,16 +787,11 @@ private fun ColorPicker(
 ) {
     var open by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f)) { Label(title) }
-        Text(
-            if (auto) "auto" else hex(value),
-            color = Palette.TextDim,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(top = 6.dp, end = 4.dp),
-        )
+        Box(Modifier.size(22.dp).clip(CircleShape).background(Color(value or 0xFF000000)).border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape))
+        Text(title, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f).padding(start = 10.dp))
+        Text(if (auto) "auto" else hex(value), color = Palette.TextDim, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
     }
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (onAuto != null) Chip("Auto", auto, onClick = onAuto)
         presets.forEach { c ->
             val sel = !auto && (value and 0xFFFFFF) == (c and 0xFFFFFF)
@@ -575,7 +800,7 @@ private fun ColorPicker(
         // Tęczowa próbka otwiera własny kolor
         Box(
             Modifier
-                .size(36.dp)
+                .size(34.dp)
                 .clip(CircleShape)
                 .background(Brush.sweepGradient(listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)))
                 .border(if (open) 3.dp else 1.dp, if (open) Palette.Accent else Color.White.copy(alpha = 0.25f), CircleShape)
@@ -594,21 +819,20 @@ private fun ColorPicker(
     }
     if (open) {
         val hsv = hsvState.value
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
-            Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(Color(value or 0xFF000000)).border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp)))
-            Spacer(Modifier.width(10.dp))
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.05f)).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             var text by remember(value) { mutableStateOf(hex(value)) }
-            Box(Modifier.weight(1f)) {
-                DarkField(text, "Hex (#RRGGBB)") { t ->
-                    text = t.take(7)
-                    val clean = t.trim().removePrefix("#")
-                    if (clean.length == 6) clean.toLongOrNull(16)?.let { onPick(0xFF000000 or it) }
-                }
-            }
+            DialogTextField(text, { t ->
+                text = t.take(7)
+                val clean = t.trim().removePrefix("#")
+                if (clean.length == 6) clean.toLongOrNull(16)?.let { onPick(0xFF000000 or it) }
+            }, label = "Hex (#RRGGBB)")
+            ValueSlider("Odcień", hsv[0], 0f..360f, { "${it.toInt()}°" }) { emit(it, hsv[1], hsv[2]) }
+            ValueSlider("Nasycenie", hsv[1] * 100f, 0f..100f, { "${it.toInt()}%" }) { emit(hsv[0], it / 100f, hsv[2]) }
+            ValueSlider("Jasność", hsv[2] * 100f, 0f..100f, { "${it.toInt()}%" }) { emit(hsv[0], hsv[1], it / 100f) }
         }
-        SliderRow(Icons.Rounded.ColorLens, "Odcień", hsv[0], 0f..360f, 0, { "${it.toInt()}°" }) { emit(it, hsv[1], hsv[2]) }
-        SliderRow(Icons.Rounded.Colorize, "Nasycenie", hsv[1] * 100f, 0f..100f, 0, { "${it.toInt()}%" }) { emit(hsv[0], it / 100f, hsv[2]) }
-        SliderRow(Icons.Rounded.LightMode, "Jasność", hsv[2] * 100f, 0f..100f, 0, { "${it.toInt()}%" }) { emit(hsv[0], hsv[1], it / 100f) }
     }
 }
 
@@ -616,7 +840,7 @@ private fun ColorPicker(
 private fun Swatch(color: Color, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(36.dp)
+            .size(34.dp)
             .clip(CircleShape)
             .background(color)
             .border(if (selected) 3.dp else 1.dp, if (selected) Palette.Accent else Color.White.copy(alpha = 0.25f), CircleShape)
@@ -627,32 +851,65 @@ private fun Swatch(color: Color, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-// ---------- Drobne kontrolki ----------
+// ---------- Kontrolki okna ----------
 
+/** Sekcja ustawień: karta z ikoną i nazwą, opcjonalna podpowiedź pod spodem. */
 @Composable
-private fun DialogHint(text: String) {
-    Text(text, color = Palette.TextFaint, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(horizontal = 4.dp))
-}
-
-@Composable
-private fun IconChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(alpha = 0.1f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun Section(title: String, icon: ImageVector, hint: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Palette.PanelHigh).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Palette.TextDim, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(title.uppercase(), color = Palette.TextDim, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        }
+        content()
+        if (hint != null) Hint(hint)
     }
 }
 
 @Composable
-private fun Chips(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun SubLabel(text: String) {
+    Text(text, color = Palette.TextDim, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+}
+
+@Composable
+private fun Hint(text: String) {
+    Text(text, color = Palette.TextFaint, fontSize = 12.sp, lineHeight = 16.sp)
+}
+
+/** Przełącznik segmentowy – wszystkie opcje widać naraz, bez przewijania w bok. */
+@Composable
+private fun Segmented(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.06f)).padding(3.dp)) {
+        options.forEachIndexed { i, name ->
+            val on = i == selected
+            val bg by animateColorAsState(if (on) Palette.Accent else Color.Transparent, label = "seg")
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(11.dp)).background(bg).clickable { onPick(i) }.padding(horizontal = 4.dp, vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    name,
+                    color = if (on) Palette.Ink else Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+/** Wybór jednej z wielu opcji – chipy zawijane do kolejnych wierszy. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlowChips(options: List<String>, selected: Int, onPick: (Int) -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         options.forEachIndexed { i, name -> Chip(name, i == selected) { onPick(i) } }
     }
 }
@@ -667,29 +924,85 @@ private fun Chip(name: String, selected: Boolean, family: FontFamily? = null, on
         fontFamily = family,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (selected) Palette.Accent else Color.White.copy(alpha = 0.1f))
+            .background(if (selected) Palette.Accent else Color.White.copy(alpha = 0.08f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     )
 }
 
+/** Przełączniki jako chipy z ikoną i ptaszkiem – zawijane, z pełnymi nazwami. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DarkField(value: String, label: String, singleLine: Boolean = true, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        singleLine = singleLine,
-        minLines = if (singleLine) 1 else 3,
-        modifier = Modifier.fillMaxWidth(),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            focusedBorderColor = Color.White,
-            unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-            focusedLabelColor = Color.White,
-            unfocusedLabelColor = Palette.TextDim,
-            cursorColor = Color.White,
-        ),
-    )
+private fun Toggles(tiles: List<Tile>, showIcons: Boolean = true) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        tiles.forEach { t ->
+            val bg by animateColorAsState(if (t.value) Palette.Accent else Color.White.copy(alpha = 0.08f), label = "toggle")
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(bg).clickable { t.onChange(!t.value) }.padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (t.value || showIcons) {
+                    Icon(if (t.value) Icons.Rounded.Check else t.icon, null, tint = if (t.value) Palette.Ink else Palette.TextDim, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(t.label, color = if (t.value) Palette.Ink else Color.White, fontSize = 13.sp, fontWeight = if (t.value) FontWeight.SemiBold else FontWeight.Normal)
+            }
+        }
+    }
+}
+
+/** Suwak z nazwą i wartością; podgląd zmienia się już w trakcie przesuwania. */
+@Composable
+private fun ValueSlider(
+    title: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    format: (Float) -> String,
+    steps: Int = 0,
+    onChange: (Float) -> Unit,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text(format(value), color = Palette.TextDim, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Slider(
+            value = value.coerceIn(range.start, range.endInclusive),
+            onValueChange = onChange,
+            valueRange = range,
+            steps = steps,
+            modifier = Modifier.height(32.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = Palette.Accent,
+                activeTrackColor = Palette.Accent,
+                inactiveTrackColor = Color.White.copy(alpha = 0.15f),
+                activeTickColor = Color.Transparent,
+                inactiveTickColor = Color.Transparent,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun ActionChip(icon: ImageVector, text: String, primary: Boolean = false, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (primary) Palette.Accent else Color.White.copy(alpha = 0.1f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = if (primary) Palette.Ink else Color.White, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, color = if (primary) Palette.Ink else Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun RoundIcon(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, description, tint = Color.White, modifier = Modifier.size(20.dp)) }
 }

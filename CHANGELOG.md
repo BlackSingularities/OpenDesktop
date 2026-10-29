@@ -1,3 +1,10 @@
+## 2.3.0 — Nowe okno „Dostosuj”, własna lokalizacja i bogatsza prognoza godzinowa
+
+- Okno „Dostosuj” od nowa, na pełnym ekranie: pasek z zapisem i przywracaniem domyślnych, duży podgląd na jasnym, mieszanym lub ciemnym tle, karty z ikonami (Miejsce, Treść, Styl, Kolory, Tekst), ustawienia w sekcjach, przełączniki segmentowe zamiast przewijanych chipów, gotowe style jako miniatury, suwaki zmieniające podgląd na żywo.
+- Pogoda dla bieżącego położenia telefonu („Moja lokalizacja”, zgrubna lokalizacja) albo wybranego miejsca z wyszukiwarki z podpowiedziami (zapisuje współrzędne).
+- Mały przycisk odświeżania w rogu widżetów pogody (można ukryć) i „Odśwież teraz” w oknie.
+- Prognoza godzinowa: odczuwalna, opady w mm, wiatr z kierunkiem i porywami, wilgotność, UV, zachmurzenie, ciśnienie; podsumowanie (kiedy zacznie/przestanie padać, najcieplej i najzimniej); nazwa dnia o północy.
+
 ## 2.2.0 — Rozbudowane widżety i pogoda wielodniowa
 
 - Nowe widżety: prognoza godzinowa (wykres, kolumny, lista), pogoda – pełny panel, szczegóły pogody, słońce (łuk, wschód/zachód, długość dnia), faza Księżyca, rok w kropkach.

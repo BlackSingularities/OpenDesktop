@@ -1,7 +1,24 @@
 package com.opendesktop.launcher.ui.desktop
 
+import android.content.Context
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.opendesktop.launcher.data.DeviceLocation
+import com.opendesktop.launcher.data.WeatherProblem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -86,17 +103,64 @@ import java.time.format.TextStyle as JTextStyle
 
 // ---------- Dane i pomocnicze ----------
 
-/** Stan pogody: null = ładowanie, failure = błąd sieci lub nieznane miasto. Odświeżane co 20 minut. */
+/** Ręczne odświeżanie: zmiana [tick] wymusza nowe zapytanie we wszystkich widżetach pogody. */
+internal object WeatherRefresh {
+    var tick by mutableIntStateOf(0)
+        private set
+    /** Liczba trwających zapytań – kręci ikoną odświeżania. */
+    var busy by mutableIntStateOf(0)
+
+    fun request() {
+        WeatherRepo.clear()
+        DeviceLocation.clear()
+        tick++
+    }
+}
+
+private suspend fun loadWeather(ctx: Context, st: GadgetStyle): WeatherNow =
+    if (st.useDeviceLocation) DeviceLocation.current(ctx).let { WeatherRepo.get(it.name, it.coords) } else WeatherRepo.get(st.city, st.coords)
+
+/**
+ * Stan pogody: null = ładowanie, failure = błąd sieci, nieznane miasto albo brak lokalizacji.
+ * Odświeżane co 20 minut i po stuknięciu przycisku; nieudane odświeżenie nie zasłania starych danych.
+ */
 @Composable
-internal fun rememberWeather(city: String): Result<WeatherNow>? {
-    val state by produceState<Result<WeatherNow>?>(null, city) {
+internal fun rememberWeather(st: GadgetStyle): Result<WeatherNow>? {
+    val ctx = LocalContext.current.applicationContext
+    val tick = WeatherRefresh.tick
+    var state by remember(st.city, st.coords, st.useDeviceLocation) { mutableStateOf<Result<WeatherNow>?>(null) }
+    LaunchedEffect(st.city, st.coords, st.useDeviceLocation, tick) {
         while (true) {
-            val r = runCatching { WeatherRepo.get(city) }
-            value = r
+            WeatherRefresh.busy++
+            val r = try {
+                runCatching { loadWeather(ctx, st) }
+            } finally {
+                WeatherRefresh.busy--
+            }
+            if (r.isSuccess || state?.isSuccess != true) state = r
             delay(if (r.isSuccess) 20 * 60_000L else 2 * 60_000L)
         }
     }
     return state
+}
+
+/** Mały okrągły przycisk odświeżania w rogu widżetu; kręci się, gdy trwa pobieranie. */
+@Composable
+internal fun RefreshButton(p: GadgetPaint, modifier: Modifier = Modifier) {
+    val spinning = WeatherRefresh.busy > 0
+    val angle = if (spinning) {
+        rememberInfiniteTransition(label = "refresh").animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "angle").value
+    } else 0f
+    Box(
+        modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(p.fg.copy(alpha = 0.12f))
+            .clickable { WeatherRefresh.request() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.Refresh, "Odśwież pogodę", tint = p.fg.copy(alpha = 0.85f), modifier = Modifier.size(15.dp).rotate(angle))
+    }
 }
 
 /** Bieżący czas w miejscu prognozy (strefa miasta, nie telefonu). */
@@ -155,7 +219,8 @@ private fun WeatherPlaceholder(p: GadgetPaint, state: Result<WeatherNow>?, size:
         if (state == null) T("Pobieranie pogody…", p.text(size, FontWeight.Normal, 0.8f))
         else {
             ShadowedGlyph(Icons.Rounded.CloudOff, p.fg.copy(alpha = 0.7f), (size * 1.8f).dp, p.st.textShadow)
-            T(if (state.exceptionOrNull()?.message?.startsWith("Nie znaleziono") == true) "Nie znam: ${p.st.city}" else "Brak połączenia", p.text(size, FontWeight.Normal, 0.8f))
+            val e = state.exceptionOrNull()
+            T(if (e is WeatherProblem) e.message.orEmpty() else "Brak połączenia", p.text(size, FontWeight.Normal, 0.8f), maxLines = 2)
         }
     }
 }
@@ -163,7 +228,7 @@ private fun WeatherPlaceholder(p: GadgetPaint, state: Result<WeatherNow>?, size:
 /** Pogoda albo zastępczy napis; [content] dostaje gotowe dane. */
 @Composable
 private fun WithWeather(p: GadgetPaint, content: @Composable (WeatherNow, LocalDateTime) -> Unit) {
-    val state = rememberWeather(p.st.city)
+    val state = rememberWeather(p.st)
     // Zmieniający się co minutę argument wymusza przeliczenie „teraz” (godziny, łuk słońca, zmiana dnia)
     val tick = rememberNow(false)
     val w = state?.getOrNull()
@@ -281,7 +346,77 @@ private fun HeaderLine(p: GadgetPaint, w: WeatherNow, fs: Float) {
             Modifier.weight(1f),
         )
         UpdatedLabel(p, w, fs * 0.8f)
+        if (p.st.showRefresh) Spacer(Modifier.width(26.dp))
     }
+}
+
+/** Wartość dodatkowa dla jednej godziny: tekst, kolor i opcjonalny obrót strzałki wiatru. */
+private class HourValue(val text: String, val color: Color, val arrow: Float? = null)
+
+/** Wartości godzinowe w stałej kolejności – tylko wybrane przez użytkownika. */
+private val hourMetrics = listOf(
+    WeatherMetric.Feels, WeatherMetric.Precip, WeatherMetric.Rain, WeatherMetric.Wind,
+    WeatherMetric.Humidity, WeatherMetric.Uv, WeatherMetric.Cloud, WeatherMetric.Pressure,
+)
+
+private fun hourIcon(m: String): ImageVector = when (m) {
+    WeatherMetric.Feels -> Icons.Rounded.Thermostat
+    WeatherMetric.Precip -> Icons.Rounded.Umbrella
+    WeatherMetric.Rain -> Icons.Rounded.WaterDrop
+    WeatherMetric.Wind -> Icons.Rounded.Air
+    WeatherMetric.Humidity -> Icons.Rounded.Opacity
+    WeatherMetric.Uv -> Icons.Rounded.WbSunny
+    WeatherMetric.Cloud -> Icons.Rounded.Cloud
+    else -> Icons.Rounded.Speed
+}
+
+private fun hourValue(p: GadgetPaint, h: WeatherHour, m: String): HourValue {
+    val dim = p.fg.copy(alpha = 0.72f)
+    return when (m) {
+        WeatherMetric.Feels -> HourValue(p.deg(h.feels), if (p.st.tempColors) temperatureColor(h.feels) else dim)
+        WeatherMetric.Precip -> HourValue(if (h.precipProb > 0) "${h.precipProb}%" else "–", precipColor(p))
+        WeatherMetric.Rain -> HourValue(if (h.precip >= 0.05) "%.1f".format(if (p.st.fahrenheit) h.precip / 25.4 else h.precip) else "–", precipColor(p))
+        WeatherMetric.Wind -> HourValue(
+            "${WeatherUnits.wind(h.wind, p.st.windUnit).roundToInt()}" + if (h.gusts > h.wind + 15) "↑${WeatherUnits.wind(h.gusts, p.st.windUnit).roundToInt()}" else "",
+            dim, h.windDir + 180f,
+        )
+        WeatherMetric.Humidity -> HourValue("${h.humidity}%", dim)
+        WeatherMetric.Uv -> HourValue(if (h.isDay) "${h.uv.roundToInt()}" else "–", if (h.uv >= 6) Color(0xFFFFB347) else dim)
+        WeatherMetric.Cloud -> HourValue("${h.cloud}%", dim)
+        else -> HourValue(WeatherUnits.pressure(h.pressure, p.st.pressureUnit).let { if (p.st.pressureUnit == 2) "%.2f".format(it) else "${it.roundToInt()}" }, dim)
+    }
+}
+
+/** Jedna wartość godzinowa: opcjonalna strzałka wiatru i tekst. */
+@Composable
+private fun HourCell(p: GadgetPaint, v: HourValue, fs: Float, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        if (v.arrow != null) {
+            Icon(Icons.Rounded.Navigation, null, tint = v.color, modifier = Modifier.size((fs * 0.95f * p.st.textScale).dp).rotate(v.arrow))
+            Spacer(Modifier.width(1.dp))
+        }
+        T(v.text, p.text(fs, FontWeight.Normal, color = v.color).copy(textAlign = TextAlign.Center))
+    }
+}
+
+/** Nazwa dnia nad pierwszą godziną nowej doby (na wykresie zamiast „00”). */
+private fun isMidnight(h: WeatherHour, i: Int) = i > 0 && h.time.hour == 0
+
+/**
+ * Krótkie podsumowanie najbliższych godzin: kiedy zacznie (albo przestanie) padać oraz
+ * najcieplejsza i najzimniejsza godzina.
+ */
+private fun hourlySummary(p: GadgetPaint, hours: List<WeatherHour>): String {
+    if (hours.isEmpty()) return ""
+    fun wet(h: WeatherHour) = h.precipProb >= 50 || h.precip >= 0.2
+    fun at(h: WeatherHour) = clock(h.time, p.st)
+    val rain = when {
+        wet(hours[0]) -> hours.indexOfFirst { !wet(it) }.let { if (it < 0) "Opady przez najbliższe ${hours.size} h" else "Opady do ok. ${at(hours[it])}" }
+        else -> hours.firstOrNull(::wet)?.let { "Opady od ok. ${at(it)} (${it.precipProb}%)" } ?: "Bez opadów przez ${hours.size} h"
+    }
+    val hot = hours.maxBy { it.temp }
+    val cold = hours.minBy { it.temp }
+    return "$rain · max ${p.deg(hot.temp)} o ${at(hot)} · min ${p.deg(cold.temp)} o ${at(cold)}"
 }
 
 // ---------- Wykresy ----------
@@ -511,11 +646,24 @@ private fun HourChart(p: GadgetPaint, hours: List<WeatherHour>, modifier: Modifi
         val colW = maxWidth.value / hours.size
         val every = ceil(30f * st.textScale / colW).toInt().coerceAtLeast(1)
         val small = minOf(maxHeight.value * 0.085f, colW * every * 0.3f).coerceIn(7f, 15f)
+        // Dodatkowe wiersze pod wykresem – tyle, ile się zmieści nad minimalną wysokością krzywej
+        val rowH = small * 1.35f * st.textScale
+        val fixed = small * (4.2f + if (p.has(WeatherMetric.Precip)) 2f else 0f) * st.textScale
+        val extra = hourMetrics.filter { p.has(it) && it != WeatherMetric.Precip }
+            .take(((maxHeight.value - fixed - small * 4.5f - rowH) / rowH).toInt().coerceAtLeast(0))
+        val locale = Locale.getDefault()
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth()) {
                 hours.forEachIndexed { i, h ->
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        if (i % every == 0) T(hourLabel(h, i == 0, st), p.text(small * 0.9f, if (i == 0) FontWeight.Bold else FontWeight.Medium, 0.85f).copy(textAlign = TextAlign.Center), Modifier.requiredWidth((colW * every).dp))
+                        if (i % every == 0) {
+                            val midnight = isMidnight(h, i)
+                            T(
+                                if (midnight) cap(h.time.dayOfWeek.getDisplayName(JTextStyle.SHORT, locale), locale) else hourLabel(h, i == 0, st),
+                                p.text(small * 0.9f, if (i == 0 || midnight) FontWeight.Bold else FontWeight.Medium, 0.85f, color = if (midnight) p.accent else p.fg).copy(textAlign = TextAlign.Center),
+                                Modifier.requiredWidth((colW * every).dp),
+                            )
+                        }
                     }
                 }
             }
@@ -548,31 +696,69 @@ private fun HourChart(p: GadgetPaint, hours: List<WeatherHour>, modifier: Modifi
                     }
                 }
             }
+            extra.forEach { m ->
+                Row(Modifier.fillMaxWidth().height(rowH.dp), verticalAlignment = Alignment.CenterVertically) {
+                    hours.forEachIndexed { i, h ->
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            if (i % every == 0) HourCell(p, hourValue(p, h, m), small * 0.78f, Modifier.requiredWidth((colW * every).dp))
+                        }
+                    }
+                }
+            }
+            if (extra.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().padding(top = 1.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                    extra.forEach { m ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(hourIcon(m), null, tint = p.accent.copy(alpha = 0.8f), modifier = Modifier.size((small * 0.75f * st.textScale).dp))
+                            Spacer(Modifier.width(2.dp))
+                            T(metricName(m), p.text(small * 0.62f, FontWeight.Normal, 0.55f))
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+private fun metricName(m: String) = when (m) {
+    WeatherMetric.Feels -> "odczuwalna"
+    WeatherMetric.Precip -> "szansa opadów"
+    WeatherMetric.Rain -> "opady"
+    WeatherMetric.Wind -> "wiatr"
+    WeatherMetric.Humidity -> "wilgotność"
+    WeatherMetric.Uv -> "UV"
+    WeatherMetric.Cloud -> "chmury"
+    else -> "ciśnienie"
 }
 
 @Composable
 private fun HourColumns(p: GadgetPaint, hours: List<WeatherHour>, modifier: Modifier) {
     val st = p.st
     BoxWithConstraints(modifier) {
-        val shown = hours.take((maxWidth.value / 34f).toInt().coerceAtLeast(2))
+        val shown = hours.take((maxWidth.value / 38f).toInt().coerceAtLeast(2))
         val colW = maxWidth.value / shown.size
-        val lines = 3 + (if (p.has(WeatherMetric.Precip)) 1 else 0) + (if (p.has(WeatherMetric.Wind)) 1 else 0)
+        val locale = Locale.getDefault()
+        // Wartości, które się nie zmieszczą w wysokości, odpadają od końca listy
+        val metrics = hourMetrics.filter { p.has(it) }.take(((maxHeight.value / 13f) - 4.5f).toInt().coerceAtLeast(0))
+        val lines = 3 + metrics.size
         val small = minOf(maxHeight.value / (lines * 1.45f + 2.2f), colW * 0.26f).coerceIn(7f, 16f)
         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             shown.forEachIndexed { i, h ->
+                if (isMidnight(h, i) && st.separators) Box(Modifier.width(1.dp).fillMaxHeight(0.8f).background(p.faint))
                 Column(
                     Modifier.weight(1f).fillMaxHeight()
                         .then(if (i == 0 && st.highlightToday) Modifier.clip(RoundedCornerShape(12.dp)).background(p.fg.copy(alpha = 0.08f)) else Modifier),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    T(hourLabel(h, i == 0, st), p.text(small * 0.9f, if (i == 0) FontWeight.Bold else FontWeight.Medium, 0.85f).copy(textAlign = TextAlign.Center))
+                    val midnight = isMidnight(h, i)
+                    T(
+                        if (midnight) cap(h.time.dayOfWeek.getDisplayName(JTextStyle.SHORT, locale), locale) else hourLabel(h, i == 0, st),
+                        p.text(small * 0.9f, if (i == 0 || midnight) FontWeight.Bold else FontWeight.Medium, 0.85f, color = if (midnight) p.accent else p.fg).copy(textAlign = TextAlign.Center),
+                    )
                     WxIcon(p, h.code, h.isDay, minOf(small * 2f * st.textScale, colW * 0.62f).dp)
                     T(p.deg(h.temp), p.text(small * 1.05f, FontWeight.SemiBold, color = p.tempColor(h.temp)).copy(textAlign = TextAlign.Center))
-                    if (p.has(WeatherMetric.Precip)) T("${h.precipProb}%", p.text(small * 0.78f, FontWeight.Normal, color = precipColor(p)).copy(textAlign = TextAlign.Center))
-                    if (p.has(WeatherMetric.Wind)) T("${WeatherUnits.wind(h.wind, st.windUnit).roundToInt()}", p.text(small * 0.78f, FontWeight.Normal, 0.65f).copy(textAlign = TextAlign.Center))
+                    metrics.forEach { m -> HourCell(p, hourValue(p, h, m), small * 0.78f) }
                 }
             }
         }
@@ -586,13 +772,17 @@ private fun HourList(p: GadgetPaint, hours: List<WeatherHour>, modifier: Modifie
         val shown = hours.take((maxHeight.value / (20f * st.textScale)).toInt().coerceAtLeast(1))
         val rowH = maxHeight.value / shown.size
         val fs = minOf(rowH * 0.45f, 16f).coerceAtLeast(7f)
+        val cellW = fs * 3.3f * st.textScale
+        // Kolumny wartości od lewej, dopóki zostaje miejsce na godzinę, ikonę, opis i temperaturę
+        val metrics = hourMetrics.filter { p.has(it) }.take(((maxWidth.value - fs * 14f * st.textScale) / cellW).toInt().coerceAtLeast(0))
+        val describe = maxWidth.value - metrics.size * cellW > fs * 17f * st.textScale
         Column(Modifier.fillMaxSize()) {
             shown.forEachIndexed { i, h ->
                 Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     T(hourLabel(h, i == 0, st), p.text(fs, if (i == 0) FontWeight.Bold else FontWeight.Medium).copy(textAlign = TextAlign.Start), Modifier.width((fs * 3.6f * st.textScale).dp))
                     WxIcon(p, h.code, h.isDay, minOf(rowH * 0.75f, fs * 1.7f * st.textScale).dp)
-                    T(WeatherRepo.describeShort(h.code), p.text(fs * 0.85f, FontWeight.Normal, 0.7f).copy(textAlign = TextAlign.Start), Modifier.weight(1f).padding(start = 8.dp))
-                    if (p.has(WeatherMetric.Precip)) T(if (h.precipProb >= 10) "${h.precipProb}%" else "", p.text(fs * 0.8f, FontWeight.SemiBold, color = precipColor(p)).copy(textAlign = TextAlign.End), Modifier.width((fs * 3f * st.textScale).dp))
+                    T(if (describe) WeatherRepo.describeShort(h.code) else "", p.text(fs * 0.85f, FontWeight.Normal, 0.7f).copy(textAlign = TextAlign.Start), Modifier.weight(1f).padding(start = 8.dp))
+                    metrics.forEach { m -> HourCell(p, hourValue(p, h, m), fs * 0.8f, Modifier.width(cellW.dp)) }
                     T(p.deg(h.temp), p.text(fs, FontWeight.SemiBold, color = p.tempColor(h.temp)).copy(textAlign = TextAlign.End), Modifier.width((fs * 3.2f * st.textScale).dp))
                 }
                 if (i < shown.lastIndex) Separator(p)
@@ -607,7 +797,7 @@ private fun HourList(p: GadgetPaint, hours: List<WeatherHour>, modifier: Modifie
 internal fun ClockWeather(p: GadgetPaint) {
     val st = p.st
     val now = rememberNow(st.showSeconds)
-    val weather = rememberWeather(st.city)
+    val weather = rememberWeather(st)
     val locale = Locale.getDefault()
     val (time, ampm) = timeText(now, st, locale)
     val date = cap(now.format(DateTimeFormatter.ofPattern("EEE, d MMM", locale)), locale)
@@ -731,8 +921,16 @@ internal fun HourlyForecast(p: GadgetPaint) = WithWeather(p) { w, _ ->
     if (hours.isEmpty()) return@WithWeather
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val small = (maxHeight.value * 0.1f).coerceIn(9f, 16f)
+        val tall = maxHeight.value > 120f
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (st.showDetails) HeaderLine(p, w, small)
+            if (st.showSummary && tall) {
+                T(
+                    hourlySummary(p, shownHours(w, st.copy(hourStep = 1))),
+                    p.text(small * 0.85f, FontWeight.Normal, 0.75f).copy(textAlign = TextAlign.Start),
+                    Modifier.fillMaxWidth().then(if (!st.showDetails && st.showRefresh) Modifier.padding(end = 26.dp) else Modifier),
+                )
+            }
             val m = Modifier.fillMaxWidth().weight(1f)
             when (st.mode) {
                 1 -> HourColumns(p, hours, m)
@@ -761,7 +959,7 @@ internal fun WeatherFull(p: GadgetPaint) = WithWeather(p) { w, _ ->
         val showDays = h > 250 && days.isNotEmpty()
         val metrics = currentMetrics(p, w, skip = setOf(WeatherMetric.Feels))
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(end = if (st.showRefresh) 22.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         T(w.place, p.text(small * 1.15f, FontWeight.SemiBold).copy(textAlign = TextAlign.Start), Modifier.weight(1f, fill = false))

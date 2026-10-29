@@ -165,7 +165,7 @@ enum class GadgetKind(val label: String, val description: String, val w: Int, va
     fun defaultStyle(): GadgetStyle = when (this) {
         DigitalClock, AnalogClock, ClockWeather, Greeting -> GadgetStyle(background = 0x00000000, border = false, textShadow = true)
         Forecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip))
-        HourlyForecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip), hours = 12)
+        HourlyForecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip, WeatherMetric.Wind, WeatherMetric.Feels), hours = 12)
         WeatherFull -> GadgetStyle(
             background = 0xD9000000, weatherBackground = true, border = false, shadow = 0.3f, textShadow = true, iconStyle = 1, tempColors = true,
             metrics = listOf(WeatherMetric.Precip, WeatherMetric.Wind, WeatherMetric.Humidity), hours = 12, days = 7,
@@ -283,6 +283,14 @@ data class GadgetStyle(
     val showCondition: Boolean = false,
     /** Półkula południowa (lustrzane odbicie Księżyca). */
     val southern: Boolean = false,
+    /** Współrzędne wybranego miejsca („lat, lon”); puste = szukanie po nazwie z [city]. */
+    val coords: String = "",
+    /** Pogoda dla bieżącego położenia telefonu zamiast [city]. */
+    val useDeviceLocation: Boolean = false,
+    /** Mały przycisk odświeżania w rogu widżetu pogody. */
+    val showRefresh: Boolean = true,
+    /** Podsumowanie prognozy godzinowej: najbliższe opady, najcieplej i najzimniej. */
+    val showSummary: Boolean = true,
 )
 
 /**

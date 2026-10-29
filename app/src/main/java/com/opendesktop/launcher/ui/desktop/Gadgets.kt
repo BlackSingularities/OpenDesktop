@@ -218,7 +218,7 @@ fun weatherBrush(code: Int, isDay: Boolean, alpha: Float): Brush {
     return Brush.verticalGradient(listOf(Color(top).copy(alpha = alpha), Color(bottom).copy(alpha = alpha)))
 }
 
-private fun backgroundBrush(st: GadgetStyle): Brush {
+internal fun backgroundBrush(st: GadgetStyle): Brush {
     val a = Color(st.background)
     val b = Color(st.background2)
     return when (st.gradient) {
@@ -295,7 +295,7 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
     val shape = RoundedCornerShape(style.radius.coerceIn(0, 60).dp)
     val p = remember(style) { GadgetPaint(style) }
     // Tło pogodowe potrzebuje danych – to samo zapytanie co treść widżetu (wspólna pamięć podręczna)
-    val weather = if (kind?.isWeather == true && style.weatherBackground) rememberWeather(style.city)?.getOrNull() else null
+    val weather = if (kind?.isWeather == true && style.weatherBackground) rememberWeather(style)?.getOrNull() else null
     val brush = if (weather != null) {
         weatherBrush(weather.code, weather.isDay, ((style.background ushr 24) and 0xFF) / 255f)
     } else backgroundBrush(style)
@@ -338,6 +338,9 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                 GadgetKind.YearDots -> YearDots(p)
                 null -> Unit
             }
+        }
+        if (kind?.isWeather == true && style.showRefresh) {
+            RefreshButton(p, Modifier.align(Alignment.TopEnd).padding((style.radius.coerceIn(0, 60) * 0.18f + 5f).dp))
         }
     }
 }

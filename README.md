@@ -11,7 +11,9 @@ Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie 
 - **Zmiana rozmiaru** — uchwyt w rogu zaznaczonego elementu w trybie edycji (dotyczy widżetów, folderów i ikon).
 - **Wiele ekranów** — dodawanie, usuwanie, zmiana kolejności i wybór ekranu głównego. Przytrzymanie elementu przy krawędzi przenosi go na sąsiedni ekran albo tworzy nowy.
 - **12 przejść między ekranami** — przesunięcie, sześcian, sześcian od środka, głębia, oddalenie, przenikanie, wachlarz, odwracana karta, stos kart, karuzela 3D, akordeon, fala.
-- **Widżety systemowe i wbudowane** — zegar z datą i baterią oraz pasek wyszukiwania.
+- **Widżety systemowe i wbudowane** — zegar z datą i baterią, pasek wyszukiwania oraz ponad 20 własnych widżetów (zegary, kalendarz, bateria, odliczanie, notatka, faza Księżyca, rok w kropkach…).
+- **Pogoda** (Open-Meteo, bez klucza) — bieżąca, prognoza do 16 dni (kolumny, lista z paskami zakresu, wykres, kompakt), prognoza godzinowa do 48 h (wykres z opadami, kolumny, lista), pełny panel, kafelki szczegółów (wiatr z kierunkiem, wilgotność, ciśnienie, UV, opady, zachmurzenie, słońce) i łuk drogi słońca. Miasto albo współrzędne, jednostki °C/°F, km/h, m/s, mph, węzły, hPa/mmHg/inHg.
+- **Dostosowanie widżetów** — stały podgląd i cztery karty: treść, wygląd (16 gotowych stylów, gradienty, obrys, cienie, kopiowanie wyglądu między widżetami), kolory (własny kolor HSV lub hex) i tekst (5 krojów, 6 grubości). Dla pogody: tło zależne od warunków, kolorowe temperatury, ikony akcent/kolorowe/emoji, wielkość ikon.
 - **Dok** — od 3 do 7 miejsc; przeciąganie między dokiem a pulpitem.
 - **Gesty** — przesunięcie w górę, w dół i podwójne dotknięcie z akcjami do wyboru.
 - **Strefy upuszczania** — usuń, informacje, odinstaluj.

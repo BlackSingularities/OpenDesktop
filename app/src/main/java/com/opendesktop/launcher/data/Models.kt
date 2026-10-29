@@ -151,12 +151,43 @@ enum class GadgetKind(val label: String, val description: String, val w: Int, va
     Progress("Postęp czasu", "Ile minęło z dnia, miesiąca, roku", 4, 1),
     Proverb("Przysłowie dnia", "Codziennie inne", 4, 2),
     Storage("Pamięć", "Miejsce na dane i RAM", 3, 2),
+    HourlyForecast("Prognoza godzinowa", "Wykres temperatury i opadów na kolejne godziny", 4, 2),
+    WeatherFull("Pogoda – pełny panel", "Teraz, najbliższe godziny i kolejne dni", 4, 4),
+    WeatherDetails("Szczegóły pogody", "Wiatr, wilgotność, ciśnienie, UV, opady", 4, 2),
+    SunArc("Słońce", "Wschód, zachód i długość dnia", 4, 2),
+    MoonPhase("Faza Księżyca", "Dzisiejsza faza i najbliższa pełnia", 2, 2),
+    YearDots("Rok w kropkach", "Każdy dzień roku albo miesiąca jako kropka", 4, 2),
     ;
+
+    /** Widżet korzystający z danych pogodowych (miasto, jednostki, tło zależne od pogody). */
+    val isWeather: Boolean get() = this in setOf(ClockWeather, Weather, Forecast, HourlyForecast, WeatherFull, WeatherDetails, SunArc)
 
     fun defaultStyle(): GadgetStyle = when (this) {
         DigitalClock, AnalogClock, ClockWeather, Greeting -> GadgetStyle(background = 0x00000000, border = false, textShadow = true)
+        Forecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip))
+        HourlyForecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip), hours = 12)
+        WeatherFull -> GadgetStyle(
+            background = 0xD9000000, weatherBackground = true, border = false, shadow = 0.3f, textShadow = true, iconStyle = 1, tempColors = true,
+            metrics = listOf(WeatherMetric.Precip, WeatherMetric.Wind, WeatherMetric.Humidity), hours = 12, days = 7,
+        )
+        WeatherDetails -> GadgetStyle(metrics = WeatherMetric.all)
         else -> GadgetStyle()
     }
+}
+
+/** Dodatkowe wartości pogodowe do pokazania w widżetach (lista w [GadgetStyle.metrics]). */
+object WeatherMetric {
+    const val Precip = "precip"
+    const val Rain = "rain"
+    const val Wind = "wind"
+    const val Humidity = "humidity"
+    const val Feels = "feels"
+    const val Pressure = "pressure"
+    const val Uv = "uv"
+    const val Sun = "sun"
+    const val Cloud = "cloud"
+
+    val all = listOf(Feels, Wind, Humidity, Pressure, Uv, Precip, Rain, Cloud, Sun)
 }
 
 /**
@@ -200,8 +231,58 @@ data class GadgetStyle(
     /** Treść notatki. */
     val text: String = "",
     val mondayFirst: Boolean = true,
-    /** Liczba dni prognozy. */
+    /** Liczba dni prognozy (1–16). */
     val days: Int = 5,
+
+    // ----- Rozszerzone ustawienia wyglądu (wszystkie rodzaje) -----
+    /** Krój: 0 = systemowy, 1 = szeryfowy, 2 = o stałej szerokości, 3 = odręczny, 4 = wąski. */
+    val fontFamily: Int = 0,
+    /** Drugi kolor tła do gradientu (ARGB); używany, gdy [gradient] > 0. */
+    val background2: Long = 0x40000000,
+    /** Gradient tła: 0 = brak, 1 = pionowy, 2 = poziomy, 3 = ukośny, 4 = promienisty. */
+    val gradient: Int = 0,
+    /** Grubość obrysu w dp. */
+    val borderWidth: Float = 1f,
+    /** Kolor obrysu; 0 = automatyczny (przygaszony kolor tekstu). */
+    val borderColor: Long = 0,
+    /** Ikony pogody: 0 = kolor akcentu, 1 = kolorowe wg warunków, 2 = kolor tekstu, 3 = emoji. */
+    val iconStyle: Int = 0,
+    /** Mnożnik wielkości ikon. */
+    val iconScale: Float = 1f,
+
+    // ----- Pogoda -----
+    /** Tło karty zależne od pogody i pory dnia (zastępuje kolor tła). */
+    val weatherBackground: Boolean = false,
+    /** Kolorowanie temperatur od fioletu (mróz) do czerwieni (upał). */
+    val tempColors: Boolean = false,
+    /** Wiatr: 0 = km/h, 1 = m/s, 2 = mph, 3 = węzły. */
+    val windUnit: Int = 0,
+    /** Ciśnienie: 0 = hPa, 1 = mmHg, 2 = inHg. */
+    val pressureUnit: Int = 0,
+    /** Dodatkowe wartości ([WeatherMetric]). */
+    val metrics: List<String> = emptyList(),
+    /** Prognoza od jutra zamiast od dziś. */
+    val startTomorrow: Boolean = false,
+    /** Nazwy dni: 0 = skrót, 1 = pełna nazwa, 2 = data, 3 = skrót i data. */
+    val dayNames: Int = 0,
+    /** Liczba godzin prognozy godzinowej (3–48). */
+    val hours: Int = 12,
+    /** Co ile godzin pokazywać punkt prognozy godzinowej. */
+    val hourStep: Int = 1,
+    /** Temperatury z jedną cyfrą po przecinku. */
+    val decimals: Boolean = false,
+    /** Wyróżnienie dzisiejszego dnia / bieżącej godziny. */
+    val highlightToday: Boolean = true,
+    /** Linie oddzielające dni i sekcje. */
+    val separators: Boolean = true,
+    /** Wypełnienie pod krzywą wykresu. */
+    val chartFill: Boolean = true,
+    /** Godzina ostatniej aktualizacji w rogu. */
+    val showUpdated: Boolean = false,
+    /** Opis warunków słowami pod ikoną. */
+    val showCondition: Boolean = false,
+    /** Półkula południowa (lustrzane odbicie Księżyca). */
+    val southern: Boolean = false,
 )
 
 /**

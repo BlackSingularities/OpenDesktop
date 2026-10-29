@@ -1,3 +1,13 @@
+## next CI release — Rozbudowane widżety i pogoda wielodniowa
+
+- Nowe widżety: prognoza godzinowa (wykres, kolumny, lista), pogoda – pełny panel, szczegóły pogody, słońce (łuk, wschód/zachód, długość dnia), faza Księżyca, rok w kropkach.
+- Prognoza dzienna do 16 dni w czterech układach: kolumny, lista z paskami zakresu temperatur, wykres max/min, kompaktowy; nazwy dni, start od jutra, wyróżnienie dziś, opis warunków, opady, suma opadów, wiatr, UV.
+- Pogoda teraz w trzech układach i z wybieranymi wartościami (odczuwalna, wiatr z kierunkiem, wilgotność, ciśnienie, UV, opady, zachmurzenie, słońce).
+- Jednostki: °C/°F, km/h, m/s, mph, węzły, hPa/mmHg/inHg; miasto albo współrzędne, szybki wybór miast.
+- Okno „Dostosuj” z kartami Treść / Wygląd / Kolory / Tekst i stałym podglądem: gradienty tła, grubość i kolor obrysu, 7 nowych gotowych stylów, kopiuj/wklej wygląd, własny kolor (HSV, hex), kroje pisma.
+- Wygląd pogody: tło zależne od warunków i pory dnia, kolorowe temperatury, ikony kolorowe lub emoji, wielkość ikon, dziesiąte części stopnia, godzina aktualizacji, linie podziału.
+- Jedno zapytanie do Open-Meteo na miasto (16 dni + 48 h), rozbiór poza wątkiem głównym; testy parsera, jednostek i fazy Księżyca.
+
 ## 2.1.1
 
 - Nowa strona aplikacji z opisem funkcji.

@@ -28,17 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.Cloud
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.Dehaze
-import androidx.compose.material.icons.rounded.Grain
-import androidx.compose.material.icons.rounded.NightsStay
-import androidx.compose.material.icons.rounded.Thunderstorm
-import androidx.compose.material.icons.rounded.Umbrella
-import androidx.compose.material.icons.rounded.WbCloudy
-import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,28 +43,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.data.GadgetStyle
-import com.opendesktop.launcher.data.WeatherNow
-import com.opendesktop.launcher.data.WeatherRepo
+import com.opendesktop.launcher.data.WeatherUnits
+import com.opendesktop.launcher.domain.Moon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -88,19 +84,30 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 import java.time.format.TextStyle as JTextStyle
 
-/** Kolory, cień i czcionka wyliczone raz ze stylu widżetu. */
-private class GadgetPaint(val st: GadgetStyle) {
+/** Kolory, cień, czcionka i jednostki wyliczone raz ze stylu widżetu. */
+internal class GadgetPaint(val st: GadgetStyle) {
     val fg = Color(st.textColor)
     val accent = Color(st.accent)
     val shadow: Shadow? = if (st.textShadow) {
         Shadow(if (fg.luminance() > 0.5f) Color.Black.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.6f), Offset(0f, 1.5f), 6f)
     } else null
     val weight = FontWeight(st.weight.coerceIn(100, 900))
+    val family: FontFamily? = when (st.fontFamily) {
+        1 -> FontFamily.Serif
+        2 -> FontFamily.Monospace
+        3 -> FontFamily.Cursive
+        4 -> FontFamily(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.NORMAL))
+        else -> null
+    }
     val hAlign: Alignment.Horizontal = when (st.align) {
         0 -> Alignment.Start
         2 -> Alignment.End
@@ -116,6 +123,8 @@ private class GadgetPaint(val st: GadgetStyle) {
         2 -> TextAlign.End
         else -> TextAlign.Center
     }
+    /** Kolor linii podziału i nieaktywnych torów. */
+    val faint = fg.copy(alpha = 0.18f)
 
     /** [size] w sp przed przemnożeniem przez skalę tekstu użytkownika. */
     fun text(size: Float, w: FontWeight = weight, alpha: Float = 1f, color: Color = fg, italic: Boolean = false) = TextStyle(
@@ -123,19 +132,112 @@ private class GadgetPaint(val st: GadgetStyle) {
         fontSize = (size * st.textScale).coerceAtLeast(6f).sp,
         fontWeight = w,
         fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
+        fontFamily = family,
         shadow = shadow,
         textAlign = textAlign,
     )
+
+    // ----- Jednostki pogody (dane zawsze metryczne) -----
+
+    fun deg(c: Double): String {
+        val v = WeatherUnits.temp(c, st.fahrenheit)
+        return if (st.decimals) "%.1f°".format(v) else "${v.roundToInt()}°"
+    }
+
+    /** Kolor temperatury (wejście w °C); bez kolorowania – kolor tekstu. */
+    fun tempColor(c: Double): Color = if (st.tempColors) temperatureColor(c) else fg
+
+    fun wind(kmh: Double): String {
+        val u = st.windUnit.coerceIn(0, 3)
+        return "${WeatherUnits.wind(kmh, u).roundToInt()} ${WeatherUnits.windNames[u]}"
+    }
+
+    fun pressure(hpa: Double): String {
+        val u = st.pressureUnit.coerceIn(0, 2)
+        val v = WeatherUnits.pressure(hpa, u)
+        return (if (u == 2) "%.2f".format(v) else "${v.roundToInt()}") + " " + WeatherUnits.pressureNames[u]
+    }
+
+    fun rain(mm: Double): String = if (st.fahrenheit) "%.2f in".format(mm / 25.4) else "%.1f mm".format(mm)
+
+    fun iconTint(code: Int, isDay: Boolean): Color = when (st.iconStyle) {
+        1 -> conditionColor(code, isDay)
+        2 -> fg
+        else -> accent
+    }
+
+    fun has(metric: String) = metric in st.metrics
+}
+
+/** Skala barw temperatury: fiolet przy mrozie, przez błękit, zieleń i żółć, do czerwieni w upale. */
+private val tempStops = listOf(
+    -20.0 to Color(0xFFB388FF),
+    -8.0 to Color(0xFF7C9CFF),
+    0.0 to Color(0xFF64C8FF),
+    8.0 to Color(0xFF4DD0E1),
+    14.0 to Color(0xFF8BE08F),
+    20.0 to Color(0xFFFFE066),
+    26.0 to Color(0xFFFFB347),
+    33.0 to Color(0xFFFF6B5A),
+    40.0 to Color(0xFFE53970),
+)
+
+fun temperatureColor(c: Double): Color {
+    if (c <= tempStops.first().first) return tempStops.first().second
+    if (c >= tempStops.last().first) return tempStops.last().second
+    val i = tempStops.indexOfLast { it.first <= c }
+    val (t0, c0) = tempStops[i]
+    val (t1, c1) = tempStops[i + 1]
+    return lerp(c0, c1, ((c - t0) / (t1 - t0)).toFloat())
+}
+
+/** Kolor ikony pogody dla trybu „kolorowe”. */
+fun conditionColor(code: Int, isDay: Boolean): Color = when (code) {
+    0, 1 -> if (isDay) Color(0xFFFFC94D) else Color(0xFFFFE9A8)
+    2 -> if (isDay) Color(0xFFFFD97A) else Color(0xFFCFD8E3)
+    3 -> Color(0xFFCFD8E3)
+    45, 48 -> Color(0xFFB0BEC5)
+    in 51..57 -> Color(0xFF8FD3FF)
+    in 61..67, in 80..82 -> Color(0xFF4FB3FF)
+    in 71..77, 85, 86 -> Color(0xFFE3F4FF)
+    in 95..99 -> Color(0xFFFFB13D)
+    else -> Color(0xFFCFD8E3)
+}
+
+/** Tło karty zależne od warunków i pory dnia. */
+fun weatherBrush(code: Int, isDay: Boolean, alpha: Float): Brush {
+    val (top, bottom) = when (code) {
+        0, 1 -> if (isDay) 0xFF2F7FD8 to 0xFF7EC3F2 else 0xFF0A1633 to 0xFF253D72
+        2 -> if (isDay) 0xFF4A7FB8 to 0xFF9BB9D6 else 0xFF121C33 to 0xFF34445E
+        3, 45, 48 -> if (isDay) 0xFF5F7387 to 0xFF9AA8B6 else 0xFF1B232D to 0xFF3A4552
+        in 51..67, in 80..82 -> if (isDay) 0xFF34495E to 0xFF5D7A93 else 0xFF101A26 to 0xFF2A3A4C
+        in 71..77, 85, 86 -> if (isDay) 0xFF6F8FB0 to 0xFFB6CADD else 0xFF1E2B3D to 0xFF4A5D75
+        in 95..99 -> if (isDay) 0xFF2B2845 to 0xFF5A4E73 else 0xFF141225 to 0xFF35304D
+        else -> 0xFF34495E to 0xFF5D7A93
+    }
+    return Brush.verticalGradient(listOf(Color(top).copy(alpha = alpha), Color(bottom).copy(alpha = alpha)))
+}
+
+private fun backgroundBrush(st: GadgetStyle): Brush {
+    val a = Color(st.background)
+    val b = Color(st.background2)
+    return when (st.gradient) {
+        1 -> Brush.verticalGradient(listOf(a, b))
+        2 -> Brush.horizontalGradient(listOf(a, b))
+        3 -> Brush.linearGradient(listOf(a, b), start = Offset.Zero, end = Offset.Infinite)
+        4 -> Brush.radialGradient(listOf(a, b))
+        else -> SolidColor(a)
+    }
 }
 
 @Composable
-private fun T(text: String, style: TextStyle, modifier: Modifier = Modifier, maxLines: Int = 1) {
+internal fun T(text: String, style: TextStyle, modifier: Modifier = Modifier, maxLines: Int = 1) {
     Text(text, style = style, modifier = modifier, maxLines = maxLines, softWrap = maxLines > 1, overflow = TextOverflow.Ellipsis)
 }
 
 /** Bieżący czas odświeżany co sekundę albo na początku każdej minuty. */
 @Composable
-private fun rememberNow(everySecond: Boolean): LocalDateTime {
+internal fun rememberNow(everySecond: Boolean): LocalDateTime {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(everySecond) {
         while (true) {
@@ -145,19 +247,6 @@ private fun rememberNow(everySecond: Boolean): LocalDateTime {
         }
     }
     return now
-}
-
-/** Stan pogody: null = ładowanie, failure = błąd sieci lub nieznane miasto. Odświeżane co 20 minut. */
-@Composable
-private fun rememberWeather(city: String, fahrenheit: Boolean): Result<WeatherNow>? {
-    val state by produceState<Result<WeatherNow>?>(null, city, fahrenheit) {
-        while (true) {
-            val r = runCatching { WeatherRepo.get(city, fahrenheit) }
-            value = r
-            delay(if (r.isSuccess) 20 * 60_000L else 2 * 60_000L)
-        }
-    }
-    return state
 }
 
 private fun batteryState(ctx: Context): Pair<Int, Boolean> = runCatching {
@@ -181,21 +270,7 @@ private fun rememberBattery(): Pair<Int, Boolean> {
     return state
 }
 
-fun weatherIcon(code: Int, isDay: Boolean = true): ImageVector = when (code) {
-    0, 1 -> if (isDay) Icons.Rounded.WbSunny else Icons.Rounded.NightsStay
-    2 -> Icons.Rounded.WbCloudy
-    3 -> Icons.Rounded.Cloud
-    45, 48 -> Icons.Rounded.Dehaze
-    in 51..57 -> Icons.Rounded.Grain
-    in 61..67, in 80..82 -> Icons.Rounded.Umbrella
-    in 71..77, 85, 86 -> Icons.Rounded.AcUnit
-    in 95..99 -> Icons.Rounded.Thunderstorm
-    else -> Icons.Rounded.Cloud
-}
-
-private fun deg(v: Double) = "${v.roundToInt()}°"
-
-private fun cap(s: String, locale: Locale) = s.replaceFirstChar { it.titlecase(locale) }
+internal fun cap(s: String, locale: Locale) = s.replaceFirstChar { it.titlecase(locale) }
 
 /** Akcja po stuknięciu – otwiera aplikację systemową pasującą do widżetu. */
 fun openGadgetTarget(ctx: Context, kind: GadgetKind?) {
@@ -219,6 +294,12 @@ fun openGadgetTarget(ctx: Context, kind: GadgetKind?) {
 fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
     val shape = RoundedCornerShape(style.radius.coerceIn(0, 60).dp)
     val p = remember(style) { GadgetPaint(style) }
+    // Tło pogodowe potrzebuje danych – to samo zapytanie co treść widżetu (wspólna pamięć podręczna)
+    val weather = if (kind?.isWeather == true && style.weatherBackground) rememberWeather(style.city)?.getOrNull() else null
+    val brush = if (weather != null) {
+        weatherBrush(weather.code, weather.isDay, ((style.background ushr 24) and 0xFF) / 255f)
+    } else backgroundBrush(style)
+    val borderColor = if (style.borderColor != 0L) Color(style.borderColor) else p.fg.copy(alpha = 0.22f)
     Box(modifier.padding(4.dp)) {
         Box(
             Modifier
@@ -228,8 +309,8 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                     else Modifier
                 )
                 .clip(shape)
-                .background(Color(style.background))
-                .then(if (style.border) Modifier.border(1.dp, p.fg.copy(alpha = 0.22f), shape) else Modifier)
+                .background(brush)
+                .then(if (style.border) Modifier.border(style.borderWidth.coerceIn(0.5f, 6f).dp, borderColor, shape) else Modifier)
                 .padding(style.padding.coerceIn(0, 40).dp),
             contentAlignment = p.boxAlign,
         ) {
@@ -239,6 +320,10 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                 GadgetKind.ClockWeather -> ClockWeather(p)
                 GadgetKind.Weather -> WeatherNowView(p)
                 GadgetKind.Forecast -> Forecast(p)
+                GadgetKind.HourlyForecast -> HourlyForecast(p)
+                GadgetKind.WeatherFull -> WeatherFull(p)
+                GadgetKind.WeatherDetails -> WeatherDetails(p)
+                GadgetKind.SunArc -> SunArc(p)
                 GadgetKind.Calendar -> MonthCalendar(p)
                 GadgetKind.DateCard -> DateCard(p)
                 GadgetKind.Battery -> BatteryView(p)
@@ -249,6 +334,8 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                 GadgetKind.Progress -> TimeProgress(p)
                 GadgetKind.Proverb -> Proverb(p)
                 GadgetKind.Storage -> StorageView(p)
+                GadgetKind.MoonPhase -> MoonPhaseView(p)
+                GadgetKind.YearDots -> YearDots(p)
                 null -> Unit
             }
         }
@@ -257,7 +344,7 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
 
 // ---------- Zegary ----------
 
-private fun timeText(now: LocalDateTime, st: GadgetStyle, locale: Locale): Pair<String, String> {
+internal fun timeText(now: LocalDateTime, st: GadgetStyle, locale: Locale): Pair<String, String> {
     val pattern = (if (st.use24h) "HH:mm" else "h:mm") + if (st.showSeconds) ":ss" else ""
     val ampm = if (st.use24h) "" else now.format(DateTimeFormatter.ofPattern("a", Locale.ENGLISH))
     return now.format(DateTimeFormatter.ofPattern(pattern, locale)) to ampm
@@ -343,129 +430,6 @@ private fun AnalogClock(p: GadgetPaint) {
             drawLine(p.accent, at(now.second * 6f + 180f, r * 0.15f), at(now.second * 6f, r * 0.86f), r * 0.02f, StrokeCap.Round)
         }
         drawCircle(p.accent, r * 0.06f, c)
-    }
-}
-
-@Composable
-private fun ClockWeather(p: GadgetPaint) {
-    val st = p.st
-    val now = rememberNow(st.showSeconds)
-    val weather = rememberWeather(st.city, st.fahrenheit)
-    val locale = Locale.getDefault()
-    val (time, ampm) = timeText(now, st, locale)
-    val date = cap(now.format(DateTimeFormatter.ofPattern("EEE, d MMM", locale)), locale)
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val big = minOf(maxHeight.value * 0.5f, maxWidth.value * 0.55f / ((time.length + 0.5f) * 0.58f)).coerceAtLeast(14f)
-        val small = (big * 0.24f).coerceIn(11f, 20f)
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1.3f), horizontalAlignment = Alignment.Start) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    T(time, p.text(big).copy(letterSpacing = (-1).sp, textAlign = TextAlign.Start))
-                    if (ampm.isNotEmpty()) T(" $ampm", p.text(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
-                }
-                if (st.showDate) T(date, p.text(small, FontWeight.Normal, 0.9f).copy(textAlign = TextAlign.Start))
-            }
-            Box(Modifier.width(1.dp).fillMaxHeight(0.6f).background(p.fg.copy(alpha = 0.3f)))
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                val w = weather?.getOrNull()
-                if (w != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ShadowedGlyph(weatherIcon(w.code, w.isDay), p.accent, (big * 0.62f).dp, p.st.textShadow)
-                        Spacer(Modifier.width(6.dp))
-                        T(deg(w.temp), p.text(big * 0.62f))
-                    }
-                    T(WeatherRepo.describe(w.code), p.text(small * 0.9f, FontWeight.Normal, 0.85f))
-                    if (st.showDetails) T(w.place, p.text(small * 0.8f, FontWeight.Normal, 0.65f))
-                } else WeatherPlaceholder(p, weather, small)
-            }
-        }
-    }
-}
-
-// ---------- Pogoda ----------
-
-@Composable
-private fun ShadowedGlyph(icon: ImageVector, tint: Color, size: Dp, shadow: Boolean) {
-    Box {
-        if (shadow) Icon(icon, null, tint = Color.Black.copy(alpha = 0.35f), modifier = Modifier.size(size).padding(top = 1.5.dp))
-        Icon(icon, null, tint = tint, modifier = Modifier.size(size))
-    }
-}
-
-@Composable
-private fun WeatherPlaceholder(p: GadgetPaint, state: Result<WeatherNow>?, size: Float) {
-    Column(horizontalAlignment = p.hAlign) {
-        if (state == null) T("Pobieranie pogody…", p.text(size, FontWeight.Normal, 0.8f))
-        else {
-            ShadowedGlyph(Icons.Rounded.CloudOff, p.fg.copy(alpha = 0.7f), (size * 1.8f).dp, p.st.textShadow)
-            T(if (state.exceptionOrNull()?.message?.startsWith("Nie znaleziono") == true) "Nie znam: ${p.st.city}" else "Brak połączenia", p.text(size, FontWeight.Normal, 0.8f))
-        }
-    }
-}
-
-@Composable
-private fun WeatherNowView(p: GadgetPaint) {
-    val st = p.st
-    val state = rememberWeather(st.city, st.fahrenheit)
-    val w = state?.getOrNull()
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = p.boxAlign) {
-        val big = minOf(maxHeight.value * 0.42f, maxWidth.value * 0.26f).coerceAtLeast(14f)
-        val small = (big * 0.3f).coerceIn(10f, 18f)
-        if (w == null) {
-            WeatherPlaceholder(p, state, small)
-            return@BoxWithConstraints
-        }
-        Column(horizontalAlignment = p.hAlign) {
-            T(w.place, p.text(small, FontWeight.SemiBold, 0.85f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ShadowedGlyph(weatherIcon(w.code, w.isDay), p.accent, (big * 0.95f).dp, st.textShadow)
-                Spacer(Modifier.width(8.dp))
-                T(deg(w.temp), p.text(big))
-            }
-            val today = w.days.firstOrNull()
-            T(WeatherRepo.describe(w.code) + (today?.let { "  ${deg(it.max)} / ${deg(it.min)}" } ?: ""), p.text(small, FontWeight.Normal, 0.9f))
-            if (st.showDetails) {
-                val speed = if (st.fahrenheit) "mph" else "km/h"
-                T("Odczuwalna ${deg(w.feels)} · ${w.wind.roundToInt()} $speed · ${w.humidity}%", p.text(small * 0.85f, FontWeight.Normal, 0.7f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun Forecast(p: GadgetPaint) {
-    val st = p.st
-    val state = rememberWeather(st.city, st.fahrenheit)
-    val w = state?.getOrNull()
-    val locale = Locale.getDefault()
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val small = (maxHeight.value * 0.12f).coerceIn(10f, 18f)
-        if (w == null) {
-            WeatherPlaceholder(p, state, small)
-            return@BoxWithConstraints
-        }
-        val days = w.days.take(st.days.coerceIn(2, 7))
-        val icon = minOf(maxHeight.value * 0.3f, maxWidth.value / days.size * 0.6f).dp
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
-            if (st.showDetails) {
-                T(
-                    "${w.place} · ${deg(w.temp)} · ${WeatherRepo.describe(w.code)}",
-                    p.text(small, FontWeight.SemiBold, 0.9f),
-                    Modifier.fillMaxWidth(),
-                )
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                days.forEachIndexed { i, d ->
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        val name = if (i == 0) "Dziś" else cap(d.date.dayOfWeek.getDisplayName(JTextStyle.SHORT, locale), locale)
-                        T(name, p.text(small, if (i == 0) FontWeight.Bold else FontWeight.Medium, 0.9f).copy(textAlign = TextAlign.Center))
-                        ShadowedGlyph(weatherIcon(d.code), p.accent, icon, st.textShadow)
-                        T(deg(d.max), p.text(small * 1.05f, FontWeight.SemiBold).copy(textAlign = TextAlign.Center))
-                        T(deg(d.min), p.text(small * 0.9f, FontWeight.Normal, 0.6f).copy(textAlign = TextAlign.Center))
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -881,6 +845,123 @@ private fun StorageView(p: GadgetPaint) {
                         )
                     }
                     if (p.st.showDetails) T("${gb(u.used)} z ${gb(u.total)}", p.text(fs * 0.8f, FontWeight.Normal, 0.65f).copy(textAlign = TextAlign.Start))
+                }
+            }
+        }
+    }
+}
+
+// ---------- Księżyc ----------
+
+@Composable
+private fun MoonPhaseView(p: GadgetPaint) {
+    val st = p.st
+    val today = rememberNow(false).toLocalDate()
+    val phase = Moon.phase(today)
+    val lit = Moon.illumination(phase)
+    val name = Moon.name(phase)
+    val toFull = Moon.daysUntil(phase, 0.5)
+    val toNew = Moon.daysUntil(phase, 0.0)
+    val litColor = when (st.mode) {
+        1 -> p.accent
+        2 -> p.fg
+        else -> Color(0xFFF4EEDC)
+    }
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = p.boxAlign) {
+        val wide = maxWidth > maxHeight * 1.35f
+        val moonSize = if (wide) minOf(maxHeight, maxWidth * 0.45f) else minOf(maxWidth, maxHeight * 0.62f)
+        val fs = (moonSize.value * 0.13f).coerceIn(9f, 18f)
+        val texts: @Composable () -> Unit = {
+            T(name, p.text(fs * 1.1f, FontWeight.SemiBold))
+            T("Oświetlenie $lit%", p.text(fs * 0.85f, FontWeight.Normal, 0.75f))
+            if (st.showDetails) {
+                T(
+                    if (toFull == 0) "Pełnia dziś" else "Pełnia za $toFull ${dayWord(toFull.toLong())}",
+                    p.text(fs * 0.8f, FontWeight.Normal, 0.65f, color = p.accent),
+                )
+                if (wide) T(if (toNew == 0) "Nów dziś" else "Nów za $toNew ${dayWord(toNew.toLong())}", p.text(fs * 0.8f, FontWeight.Normal, 0.6f))
+            }
+        }
+        if (wide) {
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                MoonDisk(phase, litColor, p.faint, st.southern, Modifier.size(moonSize))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) { texts() }
+            }
+        } else {
+            Column(horizontalAlignment = p.hAlign, verticalArrangement = Arrangement.Center) {
+                MoonDisk(phase, litColor, p.faint, st.southern, Modifier.size(moonSize).align(p.hAlign))
+                Spacer(Modifier.height(4.dp))
+                texts()
+            }
+        }
+    }
+}
+
+/** Tarcza Księżyca: ciemny dysk, oświetlona część z półokręgu i elipsy terminatora. */
+@Composable
+private fun MoonDisk(phase: Double, lit: Color, dark: Color, southern: Boolean, modifier: Modifier) {
+    Canvas(modifier) {
+        val r = size.minDimension / 2f * 0.94f
+        val c = center
+        drawCircle(dark, r, c)
+        val k = cos(2 * PI * phase).toFloat()
+        val rx = abs(k) * r
+        val waxing = phase < 0.5
+        val path = Path().apply {
+            moveTo(c.x, c.y - r)
+            arcTo(Rect(c.x - r, c.y - r, c.x + r, c.y + r), -90f, if (waxing) 180f else -180f, false)
+            arcTo(Rect(c.x - rx, c.y - r, c.x + rx, c.y + r), 90f, if (waxing == (k > 0)) -180f else 180f, false)
+            close()
+        }
+        scale(if (southern) -1f else 1f, 1f, c) {
+            drawPath(path, lit)
+            // Kilka „mórz”, widocznych tylko na oświetlonej części
+            clipPath(path) {
+                listOf(Triple(-0.28f, -0.22f, 0.22f), Triple(0.18f, -0.3f, 0.14f), Triple(0.05f, 0.18f, 0.2f), Triple(-0.35f, 0.3f, 0.1f), Triple(0.38f, 0.12f, 0.09f))
+                    .forEach { (x, y, rr) -> drawCircle(Color.Black.copy(alpha = 0.08f), r * rr, Offset(c.x + x * r, c.y + y * r)) }
+            }
+        }
+        drawCircle(lit.copy(alpha = 0.25f), r, c, style = Stroke(r * 0.025f))
+    }
+}
+
+// ---------- Rok w kropkach ----------
+
+@Composable
+private fun YearDots(p: GadgetPaint) {
+    val st = p.st
+    val today = rememberNow(false).toLocalDate()
+    val locale = Locale.getDefault()
+    val month = st.mode == 1
+    val total = if (month) today.lengthOfMonth() else today.lengthOfYear()
+    val index = if (month) today.dayOfMonth else today.dayOfYear
+    val pct = (index - 1) * 100 / total
+    val title = st.label.ifBlank { if (month) cap(today.format(DateTimeFormatter.ofPattern("LLLL", locale)), locale) else "${today.year}" }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val fs = (maxHeight.value * 0.11f).coerceIn(9f, 16f)
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                T(title, p.text(fs * 1.1f, FontWeight.SemiBold, color = p.accent).copy(textAlign = TextAlign.Start), Modifier.weight(1f))
+                if (st.showDetails) T("dzień $index z $total · $pct%", p.text(fs * 0.85f, FontWeight.Normal, 0.75f).copy(textAlign = TextAlign.End))
+            }
+            Spacer(Modifier.height((fs * 0.4f).dp))
+            Canvas(Modifier.fillMaxWidth().weight(1f)) {
+                val aspect = size.width / size.height.coerceAtLeast(1f)
+                val cols = ceil(sqrt(total * aspect)).toInt().coerceIn(1, total)
+                val rows = ceil(total / cols.toFloat()).toInt()
+                val cell = minOf(size.width / cols, size.height / rows)
+                val ox = (size.width - cell * cols) / 2f
+                val oy = (size.height - cell * rows) / 2f
+                for (i in 0 until total) {
+                    val cx = ox + (i % cols + 0.5f) * cell
+                    val cy = oy + (i / cols + 0.5f) * cell
+                    val day = i + 1
+                    when {
+                        day == index -> drawCircle(p.accent, cell * 0.42f, Offset(cx, cy))
+                        day < index -> drawCircle(p.fg.copy(alpha = 0.85f), cell * 0.32f, Offset(cx, cy))
+                        else -> drawCircle(p.fg.copy(alpha = 0.2f), cell * 0.32f, Offset(cx, cy))
+                    }
                 }
             }
         }

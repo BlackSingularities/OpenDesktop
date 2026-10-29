@@ -1,3 +1,8 @@
+## 2.4.0 — Cienie w widżetach
+
+- Nowa sekcja „Cienie” w karcie Styl okna „Dostosuj”: cień pod kartą, cień całej treści (tekst, ikony, wykresy, wskazówki zegara) z regulacją siły, rozmycia i przesunięcia, wybór koloru cienia (także biała poświata) i gotowe zestawy: Brak, Delikatne, Miękkie, Wyraźne, Uniesione.
+- Cień treści działa na Androidzie 12 i nowszym; na starszych zostaje klasyczny cień tekstu.
+
 ## 2.3.0 — Nowe okno „Dostosuj”, własna lokalizacja i bogatsza prognoza godzinowa
 
 ## 2.3.1

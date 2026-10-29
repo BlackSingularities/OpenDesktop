@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -305,15 +307,20 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
             Modifier
                 .fillMaxSize()
                 .then(
-                    if (style.shadow > 0.01f) Modifier.shadow((style.shadow * 18f).dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+                    if (style.shadow > 0.01f) Modifier.shadow((style.shadow * 18f).dp, shape, ambientColor = Color(style.shadowColor), spotColor = Color(style.shadowColor))
                     else Modifier
                 )
                 .clip(shape)
                 .background(brush)
-                .then(if (style.border) Modifier.border(style.borderWidth.coerceIn(0.5f, 6f).dp, borderColor, shape) else Modifier)
+                .then(if (style.border) Modifier.border(style.borderWidth.coerceIn(0.5f, 6f).dp, borderColor, shape) else Modifier),
+        ) {
+          Box(
+            Modifier
+                .fillMaxSize()
+                .contentShadow(style)
                 .padding(style.padding.coerceIn(0, 40).dp),
             contentAlignment = p.boxAlign,
-        ) {
+          ) {
             when (kind) {
                 GadgetKind.DigitalClock -> DigitalClock(p)
                 GadgetKind.AnalogClock -> AnalogClock(p)
@@ -338,10 +345,36 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                 GadgetKind.YearDots -> YearDots(p)
                 null -> Unit
             }
+          }
         }
         if (kind?.isWeather == true && style.showRefresh) {
             RefreshButton(p, Modifier.align(Alignment.TopEnd).padding((style.radius.coerceIn(0, 60) * 0.18f + 5f).dp))
         }
+    }
+}
+
+/**
+ * Cień pod całą treścią widżetu – tekstem, ikonami, wykresami i wskazówkami – liczony z jej kształtu
+ * (Android 12+). Na starszych zostaje klasyczny cień tekstu.
+ */
+internal fun Modifier.contentShadow(st: GadgetStyle): Modifier {
+    if (st.contentShadow <= 0.01f || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return this
+    return graphicsLayer {
+        val color = Color(st.shadowColor).copy(alpha = st.contentShadow.coerceIn(0f, 1f)).toArgb()
+        val off = st.shadowOffset.dp.toPx()
+        val blur = st.shadowBlur.coerceIn(0f, 16f).dp.toPx().coerceAtLeast(0.5f)
+        val shadow = android.graphics.RenderEffect.createColorFilterEffect(
+            android.graphics.BlendModeColorFilter(color, android.graphics.BlendMode.SRC_IN),
+            android.graphics.RenderEffect.createBlurEffect(
+                blur, blur,
+                android.graphics.RenderEffect.createOffsetEffect(off * 0.3f, off),
+                android.graphics.Shader.TileMode.DECAL,
+            ),
+        )
+        // Treść (efekt tożsamościowy) rysowana na swoim cieniu
+        renderEffect = android.graphics.RenderEffect.createBlendModeEffect(
+            shadow, android.graphics.RenderEffect.createOffsetEffect(0f, 0f), android.graphics.BlendMode.SRC_OVER,
+        ).asComposeRenderEffect()
     }
 }
 

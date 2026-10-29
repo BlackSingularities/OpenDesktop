@@ -205,6 +205,14 @@ data class GadgetStyle(
     /** Siła cienia pod kartą 0–1. */
     val shadow: Float = 0f,
     val textShadow: Boolean = false,
+    /** Cień pod całą treścią (tekst, ikony, wykresy, wskazówki) 0–1. */
+    val contentShadow: Float = 0f,
+    /** Rozmycie cienia treści w dp. */
+    val shadowBlur: Float = 3f,
+    /** Przesunięcie cienia w dół w dp. */
+    val shadowOffset: Float = 1.5f,
+    /** Kolor cieni (karty i treści); biały daje poświatę. */
+    val shadowColor: Long = 0xFF000000,
     /** Mnożnik wielkości tekstu. */
     val textScale: Float = 1f,
     /** Grubość głównego tekstu (100–900). */

@@ -135,6 +135,7 @@ private fun GadgetStyle.withAppearance(o: GadgetStyle) = withLook(o).copy(
     padding = o.padding, textScale = o.textScale, weight = o.weight, fontFamily = o.fontFamily,
     iconStyle = o.iconStyle, iconScale = o.iconScale, tempColors = o.tempColors, weatherBackground = o.weatherBackground,
     separators = o.separators,
+    contentShadow = o.contentShadow, shadowBlur = o.shadowBlur, shadowOffset = o.shadowOffset, shadowColor = o.shadowColor,
 )
 
 /** Schowek wyglądu, żeby nadać kilku widżetom ten sam styl (do zamknięcia aplikacji). */
@@ -441,16 +442,43 @@ private fun CardOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
     Section("Kształt", Icons.Rounded.BorderStyle) {
         ValueSlider("Zaokrąglenie rogów", st.radius.toFloat(), 0f..48f, { "${it.toInt()} dp" }) { set(st.copy(radius = it.toInt())) }
         ValueSlider("Margines wewnętrzny", st.padding.toFloat(), 0f..32f, { "${it.toInt()} dp" }) { set(st.copy(padding = it.toInt())) }
-        ValueSlider("Cień pod kartą", st.shadow * 100f, 0f..100f, { "${it.toInt()}%" }) { set(st.copy(shadow = it / 100f)) }
-        Toggles(
-            listOf(
-                Tile(Icons.Rounded.BorderStyle, "Obrys", st.border) { set(st.copy(border = it)) },
-                Tile(Icons.Rounded.BlurOn, "Cień tekstu", st.textShadow) { set(st.copy(textShadow = it)) },
-            )
-        )
+        Toggles(listOf(Tile(Icons.Rounded.BorderStyle, "Obrys", st.border) { set(st.copy(border = it)) }))
         if (st.border) ValueSlider("Grubość obrysu", st.borderWidth, 0.5f..4f, { "%.1f dp".format(it) }) { set(st.copy(borderWidth = it)) }
     }
+    Section("Cienie", Icons.Rounded.BlurOn, "Cień treści obejmuje tekst, ikony, wykresy i wskazówki zegara (Android 12+).") {
+        FlowChips(shadowLooks.map { it.first }, shadowLooks.indexOfFirst { it.second.matches(st) }) { i -> set(shadowLooks[i].second.applyTo(st)) }
+        ValueSlider("Cień pod kartą", st.shadow * 100f, 0f..100f, { "${it.toInt()}%" }) { set(st.copy(shadow = it / 100f)) }
+        ValueSlider("Cień treści", st.contentShadow * 100f, 0f..100f, { "${it.toInt()}%" }) { set(st.copy(contentShadow = it / 100f)) }
+        if (st.contentShadow > 0.01f) {
+            ValueSlider("Rozmycie", st.shadowBlur, 0f..12f, { "%.1f dp".format(it) }) { set(st.copy(shadowBlur = it)) }
+            ValueSlider("Przesunięcie", st.shadowOffset, 0f..8f, { "%.1f dp".format(it) }) { set(st.copy(shadowOffset = it)) }
+        }
+        if (st.shadow > 0.01f || st.contentShadow > 0.01f) {
+            SubLabel("Kolor cienia")
+            FlowChips(shadowColors.map { it.first }, shadowColors.indexOfFirst { it.second == st.shadowColor }) { set(st.copy(shadowColor = shadowColors[it].second)) }
+        }
+        Toggles(listOf(Tile(Icons.Rounded.BlurOn, "Klasyczny cień tekstu", st.textShadow) { set(st.copy(textShadow = it)) }))
+    }
 }
+
+private val shadowColors = listOf(
+    "Czarny" to 0xFF000000, "Grafit" to 0xFF263238, "Granat" to 0xFF0D1B3E, "Brąz" to 0xFF3E2723, "Poświata" to 0xFFFFFFFF,
+)
+
+/** Gotowy zestaw cieni: karta, treść, rozmycie, przesunięcie. */
+private class ShadowLook(val card: Float, val content: Float, val blur: Float, val offset: Float) {
+    fun matches(st: GadgetStyle) = st.shadow == card && st.contentShadow == content &&
+        (content == 0f || (st.shadowBlur == blur && st.shadowOffset == offset))
+    fun applyTo(st: GadgetStyle) = st.copy(shadow = card, contentShadow = content, shadowBlur = blur, shadowOffset = offset)
+}
+
+private val shadowLooks = listOf(
+    "Brak" to ShadowLook(0f, 0f, 3f, 1.5f),
+    "Delikatne" to ShadowLook(0.2f, 0.35f, 2f, 1f),
+    "Miękkie" to ShadowLook(0.4f, 0.55f, 5f, 2f),
+    "Wyraźne" to ShadowLook(0.6f, 0.8f, 1.5f, 2.5f),
+    "Uniesione" to ShadowLook(0.9f, 0.6f, 8f, 5f),
+)
 
 /** Gotowe style jako miniatury karty: tło, kolor tekstu i akcentu. */
 @OptIn(ExperimentalLayoutApi::class)

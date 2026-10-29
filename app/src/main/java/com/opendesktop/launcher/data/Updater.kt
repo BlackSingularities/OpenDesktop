@@ -54,7 +54,7 @@ object Updater {
     /** Zwraca najnowsze wydanie, gdy jest nowsze niż zainstalowane. */
     suspend fun check(repo: String): UpdateInfo? {
         val body = try {
-            Http.get("https://api.github.com/repos/${repo.trim()}/releases/latest", mapOf("Accept" to "application/vnd.github+json"))
+            Http.get("${if (repo.trim().equals(Config.DEFAULT_REPO, ignoreCase = true)) "https://redzikowski.com/api/github/repos/" else "https://api.github.com/repos/"}${repo.trim()}/releases/latest", mapOf("Accept" to "application/vnd.github+json"))
         } catch (e: HttpException) {
             if (e.code == 404) throw IOException("Repozytorium $repo nie ma jeszcze wydań")
             throw IOException("GitHub: HTTP ${e.code}")

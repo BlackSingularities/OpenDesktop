@@ -303,7 +303,7 @@ fun UpdateDialog(vm: LauncherViewModel, state: UpdateState, onlyAuto: Boolean, o
             icon = Icons.Rounded.SystemUpdate,
             onDismiss = close,
             buttons = {
-                PillButton("Otwórz GitHub", primary = false) { SystemActions.openUrl(ctx, "https://github.com/${vm.config.value.updateRepo}/releases") }
+                PillButton("Historia wydań", primary = false) { SystemActions.openUrl(ctx, if (vm.config.value.updateRepo.equals(Config.DEFAULT_REPO, ignoreCase = true)) "https://redzikowski.com/portfolio/opendesktop#zmiany" else "https://github.com/${vm.config.value.updateRepo}/releases") }
                 PillButton("OK", onClick = close)
             },
         ) {

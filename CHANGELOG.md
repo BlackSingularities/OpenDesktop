@@ -1,4 +1,4 @@
-## next CI release — Rozbudowane widżety i pogoda wielodniowa
+## 2.2.0 — Rozbudowane widżety i pogoda wielodniowa
 
 - Nowe widżety: prognoza godzinowa (wykres, kolumny, lista), pogoda – pełny panel, szczegóły pogody, słońce (łuk, wschód/zachód, długość dnia), faza Księżyca, rok w kropkach.
 - Prognoza dzienna do 16 dni w czterech układach: kolumny, lista z paskami zakresu temperatur, wykres max/min, kompaktowy; nazwy dni, start od jutra, wyróżnienie dziś, opis warunków, opady, suma opadów, wiatr, UV.

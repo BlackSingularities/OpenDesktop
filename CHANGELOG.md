@@ -1,5 +1,11 @@
 ## 2.3.0 — Nowe okno „Dostosuj”, własna lokalizacja i bogatsza prognoza godzinowa
 
+## 2.3.1
+
+- Dopasowane kolorystycznie tła ikon aplikacji i spójne zasoby graficzne.
+- Nowa ikona aplikacji, warianty systemowe i odświeżona grafika na stronie projektu.
+- Znak OpenDesktop składa się z czterech kolorowych kafelków, bez ekranu i podstawki.
+
 - Okno „Dostosuj” od nowa, na pełnym ekranie: pasek z zapisem i przywracaniem domyślnych, duży podgląd na jasnym, mieszanym lub ciemnym tle, karty z ikonami (Miejsce, Treść, Styl, Kolory, Tekst), ustawienia w sekcjach, przełączniki segmentowe zamiast przewijanych chipów, gotowe style jako miniatury, suwaki zmieniające podgląd na żywo.
 - Pogoda dla bieżącego położenia telefonu („Moja lokalizacja”, zgrubna lokalizacja) albo wybranego miejsca z wyszukiwarki z podpowiedziami (zapisuje współrzędne).
 - Mały przycisk odświeżania w rogu widżetów pogody (można ukryć) i „Odśwież teraz” w oknie.

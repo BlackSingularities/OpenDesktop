@@ -1,5 +1,7 @@
 # OpenDesktop
 
+<img src="artwork/app-icon.png" alt="OpenDesktop" width="128" />
+
 Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie i Jetpack Compose.
 
 ## Pulpit

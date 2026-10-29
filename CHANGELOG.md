@@ -1,3 +1,8 @@
+## 2.4.1 — Aktualizacje tylko przez redzikowski.com
+
+- Aplikacja sprawdza i pobiera aktualizacje wyłącznie przez redzikowski.com; usunięto wybór repozytorium i wszystkie odwołania do GitHuba.
+- „Historia wydań” prowadzi do strony OpenDesktop na redzikowski.com.
+
 ## 2.4.0 — Cienie w widżetach
 
 - Nowa sekcja „Cienie” w karcie Styl okna „Dostosuj”: cień pod kartą, cień całej treści (tekst, ikony, wykresy, wskazówki zegara) z regulacją siły, rozmycia i przesunięcia, wybór koloru cienia (także biała poświata) i gotowe zestawy: Brak, Delikatne, Miękkie, Wyraźne, Uniesione.

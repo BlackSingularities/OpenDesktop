@@ -181,58 +181,6 @@ private fun ModelRow(m: AiModel, selected: Boolean, priced: Boolean, onClick: ()
     }
 }
 
-/** Wyszukiwanie repozytorium z wydaniami na GitHubie – źródło aktualizacji. */
-@Composable
-fun RepoSearchDialog(vm: LauncherViewModel, onDismiss: () -> Unit) {
-    val cfg by vm.config.collectAsStateWithLifecycle()
-    val hits by vm.repoSearch.collectAsStateWithLifecycle()
-    var query by remember { mutableStateOf("OpenDesktop launcher") }
-    var manual by remember { mutableStateOf(cfg.updateRepo) }
-    LaunchedEffect(Unit) { vm.searchRepos(query) }
-    DarkDialog(
-        title = "Źródło aktualizacji",
-        icon = Icons.Rounded.Code,
-        onDismiss = onDismiss,
-        scrollable = false,
-        buttons = {
-            PillButton("Anuluj", primary = false, onClick = onDismiss)
-            PillButton("Zapisz i sprawdź") {
-                if (manual.contains('/')) vm.updateConfig { it.copy(updateRepo = manual) }
-                onDismiss()
-                vm.checkUpdates()
-            }
-        },
-    ) {
-        DialogTextField(manual, { manual = it.trim() }, label = "właściciel/repozytorium")
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
-            DialogChip("Domyślne: ${Config.DEFAULT_REPO}", manual == Config.DEFAULT_REPO) { manual = Config.DEFAULT_REPO }
-        }
-        DialogTextField(
-            query, { query = it },
-            label = "Szukaj na GitHubie",
-            trailing = { DialogIconButton(Icons.Rounded.Search, "Szukaj") { vm.searchRepos(query) } },
-        )
-        LazyColumn(Modifier.heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(hits, key = { it.fullName }) { h ->
-                val sel = h.fullName == manual
-                Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .background(if (sel) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.04f))
-                        .clickable { manual = h.fullName }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(h.fullName, color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Icon(Icons.Rounded.Star, null, Modifier.size(14.dp), tint = Palette.TextDim)
-                        Text(" ${h.stars}", fontSize = 12.sp, color = Palette.TextDim)
-                    }
-                    if (h.description.isNotBlank()) Text(h.description, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = Palette.TextDim)
-                }
-            }
-        }
-    }
-}
-
 /**
  * Dialog aktualizacji. Przy `onlyAuto` pokazuje się sam, gdy automatyczne sprawdzenie znajdzie
  * nowe wydanie; w ustawieniach pokazuje też stan „aktualna wersja” i błędy.
@@ -303,7 +251,7 @@ fun UpdateDialog(vm: LauncherViewModel, state: UpdateState, onlyAuto: Boolean, o
             icon = Icons.Rounded.SystemUpdate,
             onDismiss = close,
             buttons = {
-                PillButton("Historia wydań", primary = false) { SystemActions.openUrl(ctx, if (vm.config.value.updateRepo.equals(Config.DEFAULT_REPO, ignoreCase = true)) "https://redzikowski.com/portfolio/opendesktop#zmiany" else "https://github.com/${vm.config.value.updateRepo}/releases") }
+                PillButton("Historia wydań", primary = false) { SystemActions.openUrl(ctx, "https://redzikowski.com/portfolio/opendesktop#zmiany") }
                 PillButton("OK", onClick = close)
             },
         ) {

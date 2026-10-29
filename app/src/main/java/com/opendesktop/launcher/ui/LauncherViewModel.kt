@@ -30,7 +30,6 @@ import com.opendesktop.launcher.data.aiKey
 import com.opendesktop.launcher.data.aiModelId
 import com.opendesktop.launcher.data.aiModelLabel
 import com.opendesktop.launcher.data.Page
-import com.opendesktop.launcher.data.RepoHit
 import com.opendesktop.launcher.data.SearchStyle
 import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.data.GadgetStyle
@@ -106,7 +105,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private var modelsJob: Job? = null
     val aiJob = MutableStateFlow<AiJob>(AiJob.Idle)
     val update = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    val repoSearch = MutableStateFlow<List<RepoHit>>(emptyList())
     val aiSearch = MutableStateFlow<List<String>>(emptyList())
     val aiSearchBusy = MutableStateFlow(false)
     private var aiSearchJob: Job? = null
@@ -848,7 +846,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (update.value is UpdateState.Checking || update.value is UpdateState.Downloading) return
         viewModelScope.launch {
             update.value = UpdateState.Checking
-            runCatching { Updater.check(config.value.updateRepo) }
+            runCatching { Updater.check() }
                 .onSuccess { info ->
                     update.value = when {
                         info == null -> if (silent) UpdateState.Idle else UpdateState.UpToDate
@@ -879,13 +877,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         update.value = UpdateState.Idle
     }
 
-    fun searchRepos(query: String) {
-        viewModelScope.launch {
-            runCatching { Updater.searchRepos(query) }
-                .onSuccess { repoSearch.value = it }
-                .onFailure { toast("GitHub: ${it.message}") }
-        }
-    }
 
     // ---------------------------------------------------------------- kopia zapasowa
 

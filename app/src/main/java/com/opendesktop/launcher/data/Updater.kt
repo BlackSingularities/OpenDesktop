@@ -28,10 +28,8 @@ data class UpdateInfo(
     val pageUrl: String,
 )
 
-data class RepoHit(val fullName: String, val description: String, val stars: Int, val url: String)
-
 /**
- * Aktualizacje z GitHub Releases. Tag ma postać v<główna>.<poboczna>.<poprawka>; wersje
+ * Aktualizacje przez redzikowski.com. Tag ma postać v<główna>.<poboczna>.<poprawka>; wersje
  * porównujemy część po części jako liczby (1.2.0 > 1.0.37), nie jako napisy.
  */
 object Updater {
@@ -52,12 +50,12 @@ object Updater {
         (o[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
 
     /** Zwraca najnowsze wydanie, gdy jest nowsze niż zainstalowane. */
-    suspend fun check(repo: String): UpdateInfo? {
+    suspend fun check(): UpdateInfo? {
         val body = try {
-            Http.get("${if (repo.trim().equals(Config.DEFAULT_REPO, ignoreCase = true)) "https://redzikowski.com/api/github/repos/" else "https://api.github.com/repos/"}${repo.trim()}/releases/latest", mapOf("Accept" to "application/vnd.github+json"))
+            Http.get("https://redzikowski.com/api/github/repos/${Config.DEFAULT_REPO}/releases/latest", mapOf("Accept" to "application/json"))
         } catch (e: HttpException) {
-            if (e.code == 404) throw IOException("Repozytorium $repo nie ma jeszcze wydań")
-            throw IOException("GitHub: HTTP ${e.code}")
+            if (e.code == 404) throw IOException("Brak wydań do pobrania")
+            throw IOException("redzikowski.com: HTTP ${e.code}")
         }
         val o = json.parseToJsonElement(body).jsonObject
         val tag = s(o, "tag_name").removePrefix("v")
@@ -76,19 +74,6 @@ object Updater {
         )
     }
 
-    /** Wyszukiwanie repozytorium z wydaniami OpenDesktop na GitHubie. */
-    suspend fun searchRepos(query: String): List<RepoHit> {
-        val q = URLEncoder.encode("${query.trim()} in:name,description", "UTF-8")
-        val body = Http.get("https://api.github.com/search/repositories?q=$q&per_page=20&sort=stars")
-        return json.parseToJsonElement(body).jsonObject["items"]?.jsonArray.orEmpty().map { it.jsonObject }.map {
-            RepoHit(
-                fullName = s(it, "full_name"),
-                description = s(it, "description"),
-                stars = (it["stargazers_count"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0,
-                url = s(it, "html_url"),
-            )
-        }
-    }
 
     /** Pobiera APK do cache aplikacji, raportując postęp 0..1. */
     suspend fun download(context: Context, info: UpdateInfo, onProgress: (Float) -> Unit): File = withContext(Dispatchers.IO) {

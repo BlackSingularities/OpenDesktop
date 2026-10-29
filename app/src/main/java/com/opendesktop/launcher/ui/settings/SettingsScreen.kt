@@ -589,12 +589,10 @@ private fun AiSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
 private fun UpdatesSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
     val ctx = LocalContext.current
     val update by vm.update.collectAsStateWithLifecycle()
-    var repoSearch by remember { mutableStateOf(false) }
     var manualUpdate by remember { mutableStateOf(false) }
     Group {
         ActionRow(Icons.Rounded.Info, "Zainstalowana wersja", BuildConfig.VERSION_NAME) {}
         ActionRow(Icons.Rounded.RestartAlt, "Uruchom ponownie", "Zamyka i od razu włącza launcher") { SystemActions.restartApp(ctx) }
-        ActionRow(Icons.Rounded.Code, "Repozytorium na GitHubie", cfg.updateRepo, chevron = true) { repoSearch = true }
         SwitchRow(Icons.Rounded.Autorenew, "Sprawdzaj automatycznie", "Przy uruchomieniu launchera", cfg.autoUpdate) { v -> set { it.copy(autoUpdate = v) } }
     }
     Row(Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -612,7 +610,6 @@ private fun UpdatesSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
             color = Palette.TextDim, fontSize = 13.sp, maxLines = 2,
         )
     }
-    if (repoSearch) RepoSearchDialog(vm, onDismiss = { repoSearch = false })
     if (manualUpdate) UpdateDialog(vm, update, onlyAuto = false, onClosed = { manualUpdate = false })
 }
 

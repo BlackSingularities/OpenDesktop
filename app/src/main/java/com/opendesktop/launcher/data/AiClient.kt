@@ -124,7 +124,7 @@ object AiClient {
         AiApi.OpenAi -> buildMap {
             if (e.key.isNotBlank()) put("Authorization", "Bearer ${e.key}")
             if (e.provider == AiProvider.OpenRouter) {
-                put("HTTP-Referer", "https://github.com/${Config.DEFAULT_REPO}")
+                put("HTTP-Referer", "https://redzikowski.com/portfolio/opendesktop")
                 put("X-Title", "OpenDesktop Launcher")
             }
         }

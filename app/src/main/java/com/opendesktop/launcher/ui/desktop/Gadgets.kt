@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -144,6 +145,10 @@ internal class GadgetPaint(val st: GadgetStyle) {
         shadow = shadow,
         textAlign = textAlign,
     )
+
+/** Przesunięcie treści pod godziną – suwak „Odstęp pod godziną”. */
+    val gap: Modifier
+        get() = if (st.timeGap == 0) Modifier else Modifier.offset(y = st.timeGap.dp)
 
     /**
      * Główna wartość widżetu – godzina, liczba dni, nazwa fazy. Poza wspólną skalą tekstu
@@ -420,7 +425,7 @@ private fun DigitalClock(p: GadgetPaint) {
             }
             if (st.showDate || battery >= 0) {
                 val line = listOfNotNull(date.takeIf { st.showDate }, if (battery >= 0) "$battery%" else null).joinToString("  ·  ")
-                T(line, p.text(small, FontWeight.Normal, 0.9f))
+                T(line, p.text(small, FontWeight.Normal, 0.9f), p.gap)
             }
         }
     }
@@ -557,6 +562,7 @@ private fun DateCard(p: GadgetPaint) {
             T(
                 cap(today.format(DateTimeFormatter.ofPattern(if (p.st.showDetails) "LLLL yyyy" else "LLLL", locale)), locale),
                 p.text(big * 0.2f, FontWeight.Normal, 0.85f),
+                p.gap,
             )
         }
     }
@@ -721,7 +727,7 @@ private fun Countdown(p: GadgetPaint) {
                         T("${kotlin.math.abs(days)}", p.hero(big))
                         T(" " + dayWord(kotlin.math.abs(days)), p.hero(big * 0.3f, FontWeight.Normal, 0.85f), Modifier.padding(bottom = (big * 0.15f).dp))
                     }
-                    T(if (days > 0) "zostało" else "minęło", p.text(small, FontWeight.Normal, 0.7f))
+                    T(if (days > 0) "zostało" else "minęło", p.text(small, FontWeight.Normal, 0.7f), p.gap)
                 }
             }
             if (st.showDetails) {

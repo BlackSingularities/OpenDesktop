@@ -1,3 +1,9 @@
+## 2.7.0 — Odstęp pod godziną i kroki bez Health Connect
+
+- Nowy suwak „Odstęp pod godziną” (−24…24 dp) w karcie Tekst: zmienia odległość między dużą godziną a datą, dniem tygodnia albo podpisem; działa w widżetach Zegar cyfrowy, Zegar z pogodą, Zegar ze słońcem i Księżycem, Odliczanie i Data.
+- Widżet „Kroki i kalorie” ma wybór źródła: Automatycznie, Health Connect albo czujnik telefonu. Czujnik liczy kroki sam, bez Health Connect i bez aplikacji producenta — działa m.in. na telefonach Huawei, gdzie „Zdrowie Huawei” nie zapisuje kroków do Health Connect.
+- Tryb automatyczny bierze dane z Health Connect, a gdy ich tam nie ma, przełącza się na czujnik telefonu. W trybie czujnika kalorie i dystans są szacowane z liczby kroków (oznaczone „≈”), a historia tygodnia zbiera się od dnia włączenia.
+
 ## 2.6.0 — Osobna wielkość godziny i Księżyc ze zdjęcia
 
 - Nowy suwak „Wielkość godziny” w karcie Tekst: powiększa samą godzinę (a w odliczaniu, dacie i Księżycu – główną wartość), niezależnie od wielkości reszty tekstu; działa w widżetach Zegar cyfrowy, Zegar z pogodą, Zegar ze słońcem i Księżycem, Zegar światowy, Odliczanie, Data, Faza Księżyca i Księżyc.

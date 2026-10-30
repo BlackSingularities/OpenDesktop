@@ -32,7 +32,14 @@ object Health {
     data class Day(val date: LocalDate, val steps: Long, val activeKcal: Double, val totalKcal: Double, val meters: Double)
 
     /** Dzisiejszy dzień i 7 ostatnich (z dzisiejszym na końcu). */
-    data class Summary(val today: Day, val week: List<Day>, val hasCalories: Boolean, val hasDistance: Boolean)
+    data class Summary(
+        val today: Day,
+        val week: List<Day>,
+        val hasCalories: Boolean,
+        val hasDistance: Boolean,
+        /** Kalorie i dystans policzone z kroków (czujnik telefonu), nie zmierzone. */
+        val estimated: Boolean = false,
+    )
 
     enum class Status { Ready, NeedsUpdate, Missing }
 

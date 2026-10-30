@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.HorizontalRule
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MyLocation
@@ -133,7 +134,7 @@ private fun GadgetStyle.withLook(o: GadgetStyle) = copy(
 
 /** Pełny wygląd (z czcionką i ikonami) – do kopiowania między widżetami. */
 private fun GadgetStyle.withAppearance(o: GadgetStyle) = withLook(o).copy(
-    padding = o.padding, textScale = o.textScale, timeScale = o.timeScale, weight = o.weight, fontFamily = o.fontFamily,
+    padding = o.padding, textScale = o.textScale, timeScale = o.timeScale, timeGap = o.timeGap, weight = o.weight, fontFamily = o.fontFamily,
     iconStyle = o.iconStyle, iconScale = o.iconScale, tempColors = o.tempColors, weatherBackground = o.weatherBackground,
     separators = o.separators,
     contentShadow = o.contentShadow, shadowBlur = o.shadowBlur, shadowOffset = o.shadowOffset, shadowColor = o.shadowColor,
@@ -554,6 +555,11 @@ private fun TextOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
         if (kind.heroLabel() != null) {
             ValueSlider(kind.heroLabel()!!, st.timeScale * 100f, 50f..200f, { "${it.toInt()}%" }) { set(st.copy(timeScale = it / 100f)) }
         }
+        if (kind.usesTimeGap()) {
+            ValueSlider("Odstęp pod godziną", st.timeGap.toFloat().coerceIn(-24f, 24f), -24f..24f, { "${it.toInt()} dp" }, steps = 47) {
+                set(st.copy(timeGap = it.toInt()))
+            }
+        }
         FlowChips(weights.map { it.first }, weights.indexOfFirst { it.second == st.weight }) { set(st.copy(weight = weights[it].second)) }
     }
     Section("Krój pisma", Icons.Rounded.Title) {
@@ -585,6 +591,11 @@ private fun GadgetKind.heroLabel(): String? = when (this) {
     GadgetKind.MoonPhase, GadgetKind.MoonRound -> "Wielkość nazwy fazy"
     else -> null
 }
+
+/** Widżety, w których pod główną wartością jest jeszcze jedna linia (data, dzień, podpis). */
+private fun GadgetKind.usesTimeGap() = this in setOf(
+    GadgetKind.DigitalClock, GadgetKind.ClockWeather, GadgetKind.SkyClock, GadgetKind.Countdown, GadgetKind.DateCard,
+)
 
 private fun GadgetKind.usesAlign() = this !in setOf(
     GadgetKind.AnalogClock, GadgetKind.Forecast, GadgetKind.Calendar, GadgetKind.Progress, GadgetKind.Storage, GadgetKind.ClockWeather,
@@ -752,6 +763,16 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
         }
         GadgetKind.Steps -> {
             layout(listOf("Pierścień", "Pasek", "Tydzień"), 2)
+            Section("Źródło kroków", Icons.Rounded.DirectionsWalk) {
+                Segmented(listOf("Automatycznie", "Health Connect", "Czujnik telefonu"), st.stepSource.coerceIn(0, 2)) { set(st.copy(stepSource = it)) }
+                Hint(
+                    when (st.stepSource) {
+                        1 -> "Dane z Health Connect (Google Fit, Samsung Health, opaski). Zdrowie Huawei tam nie zapisuje."
+                        2 -> "Kroki liczy sam telefon. Kalorie i dystans są szacowane z liczby kroków, a historia zbiera się od dziś."
+                        else -> "Najpierw Health Connect, a gdy nie ma stamtąd kroków – czujnik telefonu."
+                    }
+                )
+            }
             Section("Cel", Icons.Rounded.Info) {
                 ValueSlider("Dzienny cel kroków", st.goal.toFloat().coerceIn(2000f, 20000f), 2000f..20000f, { "%,d".format(it.toInt()) }, steps = 35) {
                     set(st.copy(goal = ((it / 500f).toInt() * 500).coerceIn(2000, 20000)))

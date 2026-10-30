@@ -1,6 +1,12 @@
 package com.opendesktop.launcher.ui.desktop
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +32,7 @@ import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Straighten
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -49,6 +56,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.opendesktop.launcher.data.Health
+import com.opendesktop.launcher.data.StepSensor
 import kotlinx.coroutines.delay
 import java.time.format.TextStyle as JTextStyle
 import java.util.Locale
@@ -65,9 +73,56 @@ private sealed interface StepsState {
     data class Ready(val data: Health.Summary) : StepsState
 }
 
-/** Kroki i kalorie dziś. Układ: 0 = pierścień, 1 = pasek, 2 = tydzień. */
+/**
+ * Kroki i kalorie dziś. Układ: 0 = pierścień, 1 = pasek, 2 = tydzień.
+ * Źródło ([GadgetStyle.stepSource]): 0 = automatycznie, 1 = Health Connect, 2 = czujnik telefonu.
+ */
 @Composable
 internal fun StepsView(p: GadgetPaint) {
+    val ctx = LocalContext.current
+    val hasSensor = remember { StepSensor.available(ctx) }
+    when {
+        p.st.stepSource == 2 -> SensorSteps(p)
+        p.st.stepSource == 1 -> HealthConnectSteps(p, fallbackToSensor = false)
+        else -> HealthConnectSteps(p, fallbackToSensor = hasSensor)
+    }
+}
+
+/** Kroki z czujnika telefonu – bez Health Connect i bez aplikacji zdrowotnej producenta. */
+@Composable
+private fun SensorSteps(p: GadgetPaint) {
+    val ctx = LocalContext.current
+    val sensor = remember { StepSensor.sensor(ctx) }
+    var granted by remember { mutableStateOf(StepSensor.hasPermission(ctx)) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { granted = StepSensor.hasPermission(ctx) }
+    when {
+        sensor == null -> StepsProblem(p, StepsState.Problem("Ten telefon nie ma czujnika kroków")) {}
+        !granted -> StepsProblem(p, StepsState.Problem("Pozwól na rozpoznawanie aktywności, żeby liczyć kroki", "Pozwól")) {
+            ask.launch(StepSensor.PERMISSION)
+        }
+        else -> {
+            var data by remember { mutableStateOf(StepSensor.last(ctx)) }
+            DisposableEffect(sensor) {
+                val manager = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+                val listener = object : SensorEventListener {
+                    override fun onSensorChanged(event: SensorEvent) {
+                        data = StepSensor.record(ctx, event.values.firstOrNull()?.toLong() ?: return)
+                    }
+
+                    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+                }
+                manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+                onDispose { manager.unregisterListener(listener) }
+            }
+            StepsContent(p, data)
+        }
+    }
+}
+
+/** Kroki z Health Connect; [fallbackToSensor] przełącza na czujnik, gdy nie ma stamtąd danych. */
+@Composable
+private fun HealthConnectSteps(p: GadgetPaint, fallbackToSensor: Boolean) {
     val ctx = LocalContext.current
     val status = remember { Health.status(ctx) }
     var state by remember { mutableStateOf<StepsState>(StepsState.Loading) }
@@ -94,18 +149,28 @@ internal fun StepsView(p: GadgetPaint) {
             delay(5 * 60_000L)
         }
     }
-    when (val s = state) {
+    val s = state
+    // Health Connect bez danych (np. Huawei, gdzie „Zdrowie” tam nie zapisuje) – licz kroki sam
+    if (fallbackToSensor && (s is StepsState.Problem || (s is StepsState.Ready && s.data.today.steps == 0L))) {
+        SensorSteps(p)
+        return
+    }
+    when (s) {
         StepsState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { T("Wczytywanie…", p.text(13f, FontWeight.Normal, 0.7f)) }
         is StepsState.Problem -> StepsProblem(p, s) {
             if (status == Health.Status.Ready) ask.launch(Health.permissions)
             else runCatching { ctx.startActivity(Health.storeIntent()) }
         }
-        is StepsState.Ready -> when (p.st.mode) {
-            1 -> StepsBar(p, s.data)
-            2 -> StepsWeek(p, s.data)
-            else -> StepsRing(p, s.data)
-        }
+        is StepsState.Ready -> StepsContent(p, s.data)
     }
+}
+
+/** Wybrany układ widżetu dla gotowych danych – wspólny dla obu źródeł. */
+@Composable
+private fun StepsContent(p: GadgetPaint, data: Health.Summary) = when (p.st.mode) {
+    1 -> StepsBar(p, data)
+    2 -> StepsWeek(p, data)
+    else -> StepsRing(p, data)
 }
 
 @Composable
@@ -142,8 +207,9 @@ private fun StatLines(p: GadgetPaint, data: Health.Summary, fs: Float, align: Al
     val d = data.today
     val pct = (d.steps * 100 / p.st.goal.coerceAtLeast(1)).toInt()
     Column(horizontalAlignment = align, verticalArrangement = Arrangement.spacedBy((fs * 0.25f).dp)) {
-        if (p.st.showDetails && data.hasCalories) StatLine(p, Icons.Rounded.LocalFireDepartment, "${kcal(d)}", kcalLabel(d), fs)
-        if (p.st.showDetails && data.hasDistance) StatLine(p, Icons.Rounded.Straighten, km(d.meters), "", fs)
+        val about = if (data.estimated) "≈" else ""
+        if (p.st.showDetails && data.hasCalories) StatLine(p, Icons.Rounded.LocalFireDepartment, "$about${kcal(d)}", kcalLabel(d), fs)
+        if (p.st.showDetails && data.hasDistance) StatLine(p, Icons.Rounded.Straighten, about + km(d.meters), "", fs)
         StatLine(p, Icons.Rounded.Flag, "$pct%", "z ${count(p.st.goal.toLong())}", fs)
     }
 }
@@ -227,7 +293,7 @@ private fun StepsWeek(p: GadgetPaint, data: Health.Summary) {
                 Icon(Icons.Rounded.DirectionsWalk, null, tint = p.accent, modifier = Modifier.size((fs * 1.4f).dp))
                 T(count(d.steps), p.text(fs * 1.5f, FontWeight.SemiBold))
                 T(" kroków", p.text(fs * 0.9f, FontWeight.Normal, 0.65f), Modifier.weight(1f))
-                if (p.st.showDetails && data.hasCalories) StatLine(p, Icons.Rounded.LocalFireDepartment, "${kcal(d)}", "kcal", fs)
+                if (p.st.showDetails && data.hasCalories) StatLine(p, Icons.Rounded.LocalFireDepartment, (if (data.estimated) "≈" else "") + kcal(d), "kcal", fs)
             }
             Spacer(Modifier.height((fs * 0.5f).dp))
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {

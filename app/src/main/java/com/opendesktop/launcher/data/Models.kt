@@ -159,7 +159,7 @@ enum class GadgetKind(val label: String, val description: String, val w: Int, va
     YearDots("Rok w kropkach", "Każdy dzień roku albo miesiąca jako kropka", 4, 2),
     MoonRound("Księżyc", "Okrągły widżet z dzisiejszą fazą", 2, 2),
     SkyClock("Zegar ze słońcem i Księżycem", "Godzina, dzień i data; wschody i zachody słońca i Księżyca", 4, 2),
-    Steps("Kroki i kalorie", "Dzisiejsza aktywność z Health Connect", 4, 2),
+    Steps("Kroki i kalorie", "Dzisiejsza aktywność z czujnika telefonu albo Health Connect", 4, 2),
     ;
 
     /** Widżet korzystający z danych pogodowych (miasto, jednostki, tło zależne od pogody). */
@@ -222,6 +222,8 @@ data class GadgetStyle(
     val textScale: Float = 1f,
     /** Dodatkowy mnożnik wielkości samej godziny (w widżetach z zegarem: głównej wartości). */
     val timeScale: Float = 1f,
+    /** Odstęp pod godziną w dp; ujemny przysuwa datę bliżej. */
+    val timeGap: Int = 0,
     /** Grubość głównego tekstu (100–900). */
     val weight: Int = 300,
     /** Wyrównanie: 0 = do lewej, 1 = środek, 2 = do prawej. */
@@ -302,6 +304,8 @@ data class GadgetStyle(
     val realMoon: Boolean = false,
     /** Dzienny cel kroków. */
     val goal: Int = 8000,
+    /** Źródło kroków: 0 = automatycznie, 1 = Health Connect, 2 = czujnik telefonu. */
+    val stepSource: Int = 0,
     /** Współrzędne wybranego miejsca („lat, lon”); puste = szukanie po nazwie z [city]. */
     val coords: String = "",
     /** Pogoda dla bieżącego położenia telefonu zamiast [city]. */

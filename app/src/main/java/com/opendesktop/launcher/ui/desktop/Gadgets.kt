@@ -46,7 +46,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
@@ -61,14 +63,18 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.opendesktop.launcher.R
 import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.data.GadgetStyle
 import com.opendesktop.launcher.data.WeatherUnits
@@ -138,6 +144,12 @@ internal class GadgetPaint(val st: GadgetStyle) {
         shadow = shadow,
         textAlign = textAlign,
     )
+
+    /**
+     * Główna wartość widżetu – godzina, liczba dni, nazwa fazy. Poza wspólną skalą tekstu
+     * ma własny mnożnik [GadgetStyle.timeScale], żeby powiększyć samą godzinę.
+     */
+    fun hero(size: Float, w: FontWeight = weight, alpha: Float = 1f, color: Color = fg) = text(size * st.timeScale, w, alpha, color)
 
     // ----- Jednostki pogody (dane zawsze metryczne) -----
 
@@ -403,8 +415,8 @@ private fun DigitalClock(p: GadgetPaint) {
         val small = (big * 0.2f).coerceIn(11f, 22f)
         Column(horizontalAlignment = p.hAlign) {
             Row(verticalAlignment = Alignment.Bottom) {
-                T(time, p.text(big).copy(letterSpacing = (-1).sp))
-                if (ampm.isNotEmpty()) T(" $ampm", p.text(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
+                T(time, p.hero(big).copy(letterSpacing = (-1).sp))
+                if (ampm.isNotEmpty()) T(" $ampm", p.hero(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
             }
             if (st.showDate || battery >= 0) {
                 val line = listOfNotNull(date.takeIf { st.showDate }, if (battery >= 0) "$battery%" else null).joinToString("  ·  ")
@@ -541,7 +553,7 @@ private fun DateCard(p: GadgetPaint) {
         val big = minOf(maxHeight.value * 0.48f, maxWidth.value * 0.55f).coerceAtLeast(14f)
         Column(horizontalAlignment = p.hAlign) {
             T(cap(today.dayOfWeek.getDisplayName(JTextStyle.FULL_STANDALONE, locale), locale), p.text(big * 0.24f, FontWeight.Bold, color = p.accent))
-            T("${today.dayOfMonth}", p.text(big).copy(lineHeight = (big * 1.05f * p.st.textScale).sp))
+            T("${today.dayOfMonth}", p.hero(big).copy(lineHeight = (big * 1.05f * p.st.textScale * p.st.timeScale).sp))
             T(
                 cap(today.format(DateTimeFormatter.ofPattern(if (p.st.showDetails) "LLLL yyyy" else "LLLL", locale)), locale),
                 p.text(big * 0.2f, FontWeight.Normal, 0.85f),
@@ -652,7 +664,7 @@ private fun WorldClock(p: GadgetPaint) {
                     val z = ZonedDateTime.now(zone)
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         T(zoneName(id), p.text(big * 0.38f, FontWeight.SemiBold, color = p.accent).copy(textAlign = TextAlign.Center))
-                        T(z.format(fmt), p.text(big).copy(textAlign = TextAlign.Center))
+                        T(z.format(fmt), p.hero(big).copy(textAlign = TextAlign.Center))
                         if (st.showDetails) T(diff(z), p.text(big * 0.32f, FontWeight.Normal, 0.65f).copy(textAlign = TextAlign.Center))
                     }
                 }
@@ -668,7 +680,7 @@ private fun WorldClock(p: GadgetPaint) {
                             T(zoneName(id), p.text(fs * 0.7f, FontWeight.SemiBold).copy(textAlign = TextAlign.Start))
                             if (st.showDetails) T(diff(z), p.text(fs * 0.5f, FontWeight.Normal, 0.6f).copy(textAlign = TextAlign.Start))
                         }
-                        T(z.format(fmt), p.text(fs).copy(textAlign = TextAlign.End))
+                        T(z.format(fmt), p.hero(fs).copy(textAlign = TextAlign.End))
                     }
                 }
             }
@@ -695,19 +707,19 @@ private fun Countdown(p: GadgetPaint) {
             val days = ChronoUnit.DAYS.between(now.toLocalDate(), target)
             if (st.label.isNotBlank()) T(st.label, p.text(small * 1.1f, FontWeight.SemiBold, color = p.accent))
             when {
-                days == 0L -> T("To dziś!", p.text(big * 0.8f, FontWeight.Bold))
+                days == 0L -> T("To dziś!", p.hero(big * 0.8f, FontWeight.Bold))
                 st.mode == 1 && days > 0 -> {
                     val d = Duration.between(now, target.atStartOfDay())
                     val parts = buildString {
                         append("${d.toDays()} d ${d.toHours() % 24} h ${d.toMinutes() % 60} min")
                         if (st.showSeconds) append(" ${d.seconds % 60} s")
                     }
-                    T(parts, p.text(big * 0.42f))
+                    T(parts, p.hero(big * 0.42f))
                 }
                 else -> {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        T("${kotlin.math.abs(days)}", p.text(big))
-                        T(" " + dayWord(kotlin.math.abs(days)), p.text(big * 0.3f, FontWeight.Normal, 0.85f), Modifier.padding(bottom = (big * 0.15f).dp))
+                        T("${kotlin.math.abs(days)}", p.hero(big))
+                        T(" " + dayWord(kotlin.math.abs(days)), p.hero(big * 0.3f, FontWeight.Normal, 0.85f), Modifier.padding(bottom = (big * 0.15f).dp))
                     }
                     T(if (days > 0) "zostało" else "minęło", p.text(small, FontWeight.Normal, 0.7f))
                 }
@@ -907,7 +919,7 @@ private fun MoonPhaseView(p: GadgetPaint) {
         val moonSize = if (wide) minOf(maxHeight, maxWidth * 0.45f) else minOf(maxWidth, maxHeight * 0.62f)
         val fs = (moonSize.value * 0.13f).coerceIn(9f, 18f)
         val texts: @Composable () -> Unit = {
-            T(name, p.text(fs * 1.1f, FontWeight.SemiBold))
+            T(name, p.hero(fs * 1.1f, FontWeight.SemiBold))
             T("Oświetlenie $lit%", p.text(fs * 0.85f, FontWeight.Normal, 0.75f))
             if (st.showDetails) {
                 T(
@@ -919,13 +931,13 @@ private fun MoonPhaseView(p: GadgetPaint) {
         }
         if (wide) {
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                MoonDisk(phase, litColor, p.faint, st.southern, Modifier.size(moonSize))
+                MoonDisk(phase, litColor, p.faint, st.southern, Modifier.size(moonSize), st.realMoon)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) { texts() }
             }
         } else {
             Column(horizontalAlignment = p.hAlign, verticalArrangement = Arrangement.Center) {
-                MoonDisk(phase, litColor, p.faint, st.southern, Modifier.size(moonSize).align(p.hAlign))
+                MoonDisk(phase, litColor, p.faint, st.southern, Modifier.size(moonSize).align(p.hAlign), st.realMoon)
                 Spacer(Modifier.height(4.dp))
                 texts()
             }
@@ -949,29 +961,41 @@ private fun MoonRoundView(p: GadgetPaint) {
         val s = minOf(maxWidth, maxHeight)
         if (st.showDetails) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(s * 0.78f))
-                T("${Moon.illumination(phase)}%", p.text((s.value * 0.09f).coerceIn(8f, 14f), FontWeight.Medium, 0.8f))
+                MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(s * 0.78f), st.realMoon)
+                T("${Moon.illumination(phase)}%", p.hero((s.value * 0.09f).coerceIn(8f, 14f), FontWeight.Medium, 0.8f))
             }
-        } else MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(s * 0.96f))
+        } else MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(s * 0.96f), st.realMoon)
     }
 }
 
-/** Tarcza Księżyca: ciemny dysk, oświetlona część z półokręgu i elipsy terminatora. */
+/** Kształt oświetlonej części tarczy: półokrąg domknięty elipsą terminatora. */
+private fun litPath(phase: Double, c: Offset, r: Float): Path {
+    val k = cos(2 * PI * phase).toFloat()
+    val rx = abs(k) * r
+    val waxing = phase < 0.5
+    return Path().apply {
+        moveTo(c.x, c.y - r)
+        arcTo(Rect(c.x - r, c.y - r, c.x + r, c.y + r), -90f, if (waxing) 180f else -180f, false)
+        arcTo(Rect(c.x - rx, c.y - r, c.x + rx, c.y + r), 90f, if (waxing == (k > 0)) -180f else 180f, false)
+        close()
+    }
+}
+
+/**
+ * Tarcza Księżyca: ciemny dysk, oświetlona część z półokręgu i elipsy terminatora.
+ * Z [real] zamiast rysowanej tarczy pokazuje zdjęcie Księżyca z wyciętym tłem.
+ */
 @Composable
-internal fun MoonDisk(phase: Double, lit: Color, dark: Color, southern: Boolean, modifier: Modifier) {
+internal fun MoonDisk(phase: Double, lit: Color, dark: Color, southern: Boolean, modifier: Modifier, real: Boolean = false) {
+    if (real) {
+        MoonPhoto(phase, southern, modifier)
+        return
+    }
     Canvas(modifier) {
         val r = size.minDimension / 2f * 0.94f
         val c = center
         drawCircle(dark, r, c)
-        val k = cos(2 * PI * phase).toFloat()
-        val rx = abs(k) * r
-        val waxing = phase < 0.5
-        val path = Path().apply {
-            moveTo(c.x, c.y - r)
-            arcTo(Rect(c.x - r, c.y - r, c.x + r, c.y + r), -90f, if (waxing) 180f else -180f, false)
-            arcTo(Rect(c.x - rx, c.y - r, c.x + rx, c.y + r), 90f, if (waxing == (k > 0)) -180f else 180f, false)
-            close()
-        }
+        val path = litPath(phase, c, r)
         scale(if (southern) -1f else 1f, 1f, c) {
             drawPath(path, lit)
             // Kilka „mórz”, widocznych tylko na oświetlonej części
@@ -981,6 +1005,31 @@ internal fun MoonDisk(phase: Double, lit: Color, dark: Color, southern: Boolean,
             }
         }
         drawCircle(lit.copy(alpha = 0.25f), r, c, style = Stroke(r * 0.025f))
+    }
+}
+
+/**
+ * Prawdziwy Księżyc: zdjęcie pełni z wyciętym tłem, a nieoświetlona część przykryta
+ * ciemną zasłoną o kryciu 95% – ledwie widoczna, ale widać, gdzie kończy się tarcza.
+ */
+@Composable
+private fun MoonPhoto(phase: Double, southern: Boolean, modifier: Modifier) {
+    val photo = ImageBitmap.imageResource(R.drawable.moon_photo)
+    Canvas(modifier) {
+        val r = size.minDimension / 2f * 0.94f
+        val c = center
+        val d = (r * 2f).roundToInt()
+        val path = litPath(phase, c, r)
+        scale(if (southern) -1f else 1f, 1f, c) {
+            drawImage(
+                photo,
+                dstOffset = IntOffset((c.x - r).roundToInt(), (c.y - r).roundToInt()),
+                dstSize = IntSize(d, d),
+            )
+            clipPath(path, ClipOp.Difference) {
+                drawCircle(Color(0xFF05070B).copy(alpha = 0.95f), r, c)
+            }
+        }
     }
 }
 

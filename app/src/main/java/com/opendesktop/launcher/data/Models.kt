@@ -220,6 +220,8 @@ data class GadgetStyle(
     val shadowColor: Long = 0xFF000000,
     /** Mnożnik wielkości tekstu. */
     val textScale: Float = 1f,
+    /** Dodatkowy mnożnik wielkości samej godziny (w widżetach z zegarem: głównej wartości). */
+    val timeScale: Float = 1f,
     /** Grubość głównego tekstu (100–900). */
     val weight: Int = 300,
     /** Wyrównanie: 0 = do lewej, 1 = środek, 2 = do prawej. */
@@ -296,6 +298,8 @@ data class GadgetStyle(
     val showCondition: Boolean = false,
     /** Półkula południowa (lustrzane odbicie Księżyca). */
     val southern: Boolean = false,
+    /** Księżyc ze zdjęcia zamiast rysowanej tarczy. */
+    val realMoon: Boolean = false,
     /** Dzienny cel kroków. */
     val goal: Int = 8000,
     /** Współrzędne wybranego miejsca („lat, lon”); puste = szukanie po nazwie z [city]. */

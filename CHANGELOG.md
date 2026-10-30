@@ -1,3 +1,8 @@
+## 2.6.0 — Osobna wielkość godziny i Księżyc ze zdjęcia
+
+- Nowy suwak „Wielkość godziny” w karcie Tekst: powiększa samą godzinę (a w odliczaniu, dacie i Księżycu – główną wartość), niezależnie od wielkości reszty tekstu; działa w widżetach Zegar cyfrowy, Zegar z pogodą, Zegar ze słońcem i Księżycem, Zegar światowy, Odliczanie, Data, Faza Księżyca i Księżyc.
+- Nowy przełącznik „Księżyc ze zdjęcia” w widżetach Faza Księżyca, Księżyc i Zegar ze słońcem i Księżycem: zamiast rysowanej tarczy prawdziwe zdjęcie Księżyca z wyciętym tłem; część nieoświetlona przykryta ciemną zasłoną o kryciu 95%.
+
 ## 2.5.0 — Księżyc, zegar ze słońcem i Księżycem, kroki i kalorie
 
 - Nowy okrągły widżet „Księżyc”: sama tarcza z dzisiejszą fazą, kolor naturalny, akcentowy albo tekstu, opcjonalnie procent oświetlenia.

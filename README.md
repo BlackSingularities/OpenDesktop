@@ -55,6 +55,12 @@ gradle :app:assembleRelease
 
 Wymagane: JDK 17, Android SDK 35, Gradle 8.11. Podpis wydań pochodzi z sekretów repozytorium `SIGNING_*`; bez nich APK jest podpisane kluczem debug.
 
+## Zasoby graficzne
+
+Zdjęcie Księżyca (`app/src/main/res/drawable-nodpi/moon_photo.webp`) powstało z kadru
+[FullMoon2010.jpg](https://commons.wikimedia.org/wiki/File:FullMoon2010.jpg) autorstwa Gregory’ego H. Revery,
+na licencji [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/); tło zostało wycięte, a obraz przeskalowany.
+
 ---
 
 **Projekt i wykonanie: [redzikowski.com](https://redzikowski.com)**

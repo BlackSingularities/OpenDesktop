@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Numbers
 import androidx.compose.material.icons.rounded.Opacity
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material.icons.rounded.Public
@@ -132,7 +133,7 @@ private fun GadgetStyle.withLook(o: GadgetStyle) = copy(
 
 /** Pełny wygląd (z czcionką i ikonami) – do kopiowania między widżetami. */
 private fun GadgetStyle.withAppearance(o: GadgetStyle) = withLook(o).copy(
-    padding = o.padding, textScale = o.textScale, weight = o.weight, fontFamily = o.fontFamily,
+    padding = o.padding, textScale = o.textScale, timeScale = o.timeScale, weight = o.weight, fontFamily = o.fontFamily,
     iconStyle = o.iconStyle, iconScale = o.iconScale, tempColors = o.tempColors, weatherBackground = o.weatherBackground,
     separators = o.separators,
     contentShadow = o.contentShadow, shadowBlur = o.shadowBlur, shadowOffset = o.shadowOffset, shadowColor = o.shadowColor,
@@ -550,6 +551,9 @@ private fun ColorOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
 private fun TextOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) -> Unit) {
     Section("Wielkość i grubość", Icons.Rounded.TextFields) {
         ValueSlider("Wielkość tekstu", st.textScale * 100f, 60f..160f, { "${it.toInt()}%" }) { set(st.copy(textScale = it / 100f)) }
+        if (kind.heroLabel() != null) {
+            ValueSlider(kind.heroLabel()!!, st.timeScale * 100f, 50f..200f, { "${it.toInt()}%" }) { set(st.copy(timeScale = it / 100f)) }
+        }
         FlowChips(weights.map { it.first }, weights.indexOfFirst { it.second == st.weight }) { set(st.copy(weight = weights[it].second)) }
     }
     Section("Krój pisma", Icons.Rounded.Title) {
@@ -573,6 +577,15 @@ private fun TextOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
     }
 }
 
+/** Podpis suwaka osobnej wielkości głównej wartości; null = widżet jej nie ma. */
+private fun GadgetKind.heroLabel(): String? = when (this) {
+    GadgetKind.DigitalClock, GadgetKind.ClockWeather, GadgetKind.SkyClock, GadgetKind.WorldClock -> "Wielkość godziny"
+    GadgetKind.Countdown -> "Wielkość liczby dni"
+    GadgetKind.DateCard -> "Wielkość liczby dnia"
+    GadgetKind.MoonPhase, GadgetKind.MoonRound -> "Wielkość nazwy fazy"
+    else -> null
+}
+
 private fun GadgetKind.usesAlign() = this !in setOf(
     GadgetKind.AnalogClock, GadgetKind.Forecast, GadgetKind.Calendar, GadgetKind.Progress, GadgetKind.Storage, GadgetKind.ClockWeather,
     GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails, GadgetKind.SunArc, GadgetKind.YearDots,
@@ -593,6 +606,8 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
     val tomorrow = Tile(Icons.Rounded.SkipNext, "Od jutra", st.startTomorrow) { set(st.copy(startTomorrow = it)) }
     val fill = Tile(Icons.Rounded.ShowChart, "Wypełnienie wykresu", st.chartFill) { set(st.copy(chartFill = it)) }
     val summary = Tile(Icons.Rounded.Subject, "Podsumowanie", st.showSummary) { set(st.copy(showSummary = it)) }
+    val realMoon = Tile(Icons.Rounded.PhotoCamera, "Księżyc ze zdjęcia", st.realMoon) { set(st.copy(realMoon = it)) }
+    val southern = Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }
     val daysSlider: @Composable () -> Unit = {
         ValueSlider("Liczba dni", st.days.toFloat().coerceIn(1f, 16f), 1f..16f, { "${it.toInt()}" }, steps = 14) { set(st.copy(days = it.toInt())) }
     }
@@ -719,20 +734,20 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
         GadgetKind.MoonPhase -> {
             layout(listOf("Naturalny", "Akcent", "Kolor tekstu"), 2)
             Section("Pokazuj", Icons.Rounded.Info) {
-                Toggles(listOf(details("Pełnia i nów"), Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
+                Toggles(listOf(details("Pełnia i nów"), realMoon, southern))
             }
         }
         GadgetKind.MoonRound -> {
             Section("Kolor Księżyca", Icons.Rounded.Wallpaper) { Segmented(listOf("Naturalny", "Akcent", "Kolor tekstu"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) } }
             Section("Pokazuj", Icons.Rounded.Info) {
-                Toggles(listOf(details("Oświetlenie %"), Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
+                Toggles(listOf(details("Oświetlenie %"), realMoon, southern))
             }
         }
         GadgetKind.SkyClock -> {
             Section("Zegar", Icons.Rounded.AccessTime) { Toggles(listOf(clock, seconds, date, details("Temperatura i oświetlenie"))) }
             Section("Kolor Księżyca", Icons.Rounded.Wallpaper) {
                 Segmented(listOf("Naturalny", "Akcent", "Kolor tekstu"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) }
-                Toggles(listOf(Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
+                Toggles(listOf(realMoon, southern))
             }
         }
         GadgetKind.Steps -> {

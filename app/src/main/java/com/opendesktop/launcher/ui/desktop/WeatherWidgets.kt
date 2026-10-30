@@ -810,8 +810,8 @@ internal fun ClockWeather(p: GadgetPaint) {
         Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1.3f), horizontalAlignment = Alignment.Start) {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    T(time, p.text(big).copy(letterSpacing = (-1).sp, textAlign = TextAlign.Start))
-                    if (ampm.isNotEmpty()) T(" $ampm", p.text(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
+                    T(time, p.hero(big).copy(letterSpacing = (-1).sp, textAlign = TextAlign.Start))
+                    if (ampm.isNotEmpty()) T(" $ampm", p.hero(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
                 }
                 if (st.showDate) T(date, p.text(small, FontWeight.Normal, 0.9f).copy(textAlign = TextAlign.Start))
             }
@@ -862,14 +862,14 @@ internal fun SkyClock(p: GadgetPaint) {
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    T(time, p.text(big).copy(letterSpacing = (-1).sp, textAlign = TextAlign.Center))
-                    if (ampm.isNotEmpty()) T(" $ampm", p.text(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
+                    T(time, p.hero(big).copy(letterSpacing = (-1).sp, textAlign = TextAlign.Center))
+                    if (ampm.isNotEmpty()) T(" $ampm", p.hero(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
                 }
                 T(cap(now.format(DateTimeFormatter.ofPattern("EEEE", locale)), locale), p.text(small * 1.3f, FontWeight.Medium))
                 if (st.showDate) T(now.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale)), p.text(small * 1.05f, FontWeight.Normal, 0.75f))
             }
             SkyColumn(p, moon?.first, moon?.second, small) {
-                MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(icon.dp))
+                MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(icon.dp), st.realMoon)
                 if (st.showDetails) T("${Moon.illumination(phase)}%", p.text(small * 1.1f, FontWeight.SemiBold, 0.85f))
             }
         }

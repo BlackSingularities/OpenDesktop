@@ -77,6 +77,10 @@ data class WeatherNow(
     /** Czas lokalny miejsca prognozy w chwili pomiaru. */
     val localTime: LocalDateTime? = null,
     val fetchedAt: Long = System.currentTimeMillis(),
+    val lat: Double = 0.0,
+    val lon: Double = 0.0,
+    /** Przesunięcie czasu miejsca względem UTC w sekundach. */
+    val utcOffset: Int = 0,
 ) {
     val today: WeatherDay? get() = days.firstOrNull()
 }
@@ -184,6 +188,9 @@ object WeatherRepo {
             precip = cur.numOr("precipitation", 0.0),
             hours = hours,
             localTime = localTime,
+            lat = root["latitude"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            lon = root["longitude"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            utcOffset = root["utc_offset_seconds"]?.jsonPrimitive?.doubleOrNull?.toInt() ?: 0,
         )
     }
 

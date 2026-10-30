@@ -1,3 +1,9 @@
+## 2.5.0 — Księżyc, zegar ze słońcem i Księżycem, kroki i kalorie
+
+- Nowy okrągły widżet „Księżyc”: sama tarcza z dzisiejszą fazą, kolor naturalny, akcentowy albo tekstu, opcjonalnie procent oświetlenia.
+- Nowy „Zegar ze słońcem i Księżycem”: godzina, dzień tygodnia i data; po lewej pogoda teraz, po prawej Księżyc; nad nimi godzina wschodu, pod nimi zachodu (słońce z prognozy, Księżyc liczony w telefonie dla miejsca pogody).
+- Nowy widżet „Kroki i kalorie” z Health Connect (Google Fit, Samsung Health, opaski): kroki, kalorie aktywne, dystans i cel dzienny; układy pierścień, pasek i tydzień z wykresem; połączenie i uprawnienia jednym przyciskiem w widżecie.
+
 ## 2.4.1 — Aktualizacje tylko przez redzikowski.com
 
 - Aplikacja sprawdza i pobiera aktualizacje wyłącznie przez redzikowski.com; usunięto wybór repozytorium i wszystkie odwołania do GitHuba.

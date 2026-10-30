@@ -294,7 +294,7 @@ fun openGadgetTarget(ctx: Context, kind: GadgetKind?) {
  */
 @Composable
 fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
-    val shape = RoundedCornerShape(style.radius.coerceIn(0, 60).dp)
+    val shape = if (kind == GadgetKind.MoonRound) CircleShape else RoundedCornerShape(style.radius.coerceIn(0, 60).dp)
     val p = remember(style) { GadgetPaint(style) }
     // Tło pogodowe potrzebuje danych – to samo zapytanie co treść widżetu (wspólna pamięć podręczna)
     val weather = if (kind?.isWeather == true && style.weatherBackground) rememberWeather(style)?.getOrNull() else null
@@ -343,6 +343,9 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                 GadgetKind.Storage -> StorageView(p)
                 GadgetKind.MoonPhase -> MoonPhaseView(p)
                 GadgetKind.YearDots -> YearDots(p)
+                GadgetKind.MoonRound -> MoonRoundView(p)
+                GadgetKind.SkyClock -> SkyClock(p)
+                GadgetKind.Steps -> StepsView(p)
                 null -> Unit
             }
           }
@@ -898,11 +901,7 @@ private fun MoonPhaseView(p: GadgetPaint) {
     val name = Moon.name(phase)
     val toFull = Moon.daysUntil(phase, 0.5)
     val toNew = Moon.daysUntil(phase, 0.0)
-    val litColor = when (st.mode) {
-        1 -> p.accent
-        2 -> p.fg
-        else -> Color(0xFFF4EEDC)
-    }
+    val litColor = moonLit(p)
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = p.boxAlign) {
         val wide = maxWidth > maxHeight * 1.35f
         val moonSize = if (wide) minOf(maxHeight, maxWidth * 0.45f) else minOf(maxWidth, maxHeight * 0.62f)
@@ -934,9 +933,32 @@ private fun MoonPhaseView(p: GadgetPaint) {
     }
 }
 
+/** Kolor oświetlonej części Księżyca: naturalny, akcent albo kolor tekstu. */
+internal fun moonLit(p: GadgetPaint): Color = when (p.st.mode) {
+    1 -> p.accent
+    2 -> p.fg
+    else -> Color(0xFFF4EEDC)
+}
+
+/** Sam Księżyc w okrągłej karcie; w szczegółach procent oświetlenia na dole. */
+@Composable
+private fun MoonRoundView(p: GadgetPaint) {
+    val st = p.st
+    val phase = Moon.phase(rememberNow(false).toLocalDate())
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val s = minOf(maxWidth, maxHeight)
+        if (st.showDetails) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(s * 0.78f))
+                T("${Moon.illumination(phase)}%", p.text((s.value * 0.09f).coerceIn(8f, 14f), FontWeight.Medium, 0.8f))
+            }
+        } else MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(s * 0.96f))
+    }
+}
+
 /** Tarcza Księżyca: ciemny dysk, oświetlona część z półokręgu i elipsy terminatora. */
 @Composable
-private fun MoonDisk(phase: Double, lit: Color, dark: Color, southern: Boolean, modifier: Modifier) {
+internal fun MoonDisk(phase: Double, lit: Color, dark: Color, southern: Boolean, modifier: Modifier) {
     Canvas(modifier) {
         val r = size.minDimension / 2f * 0.94f
         val c = center

@@ -722,6 +722,28 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
                 Toggles(listOf(details("Pełnia i nów"), Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
             }
         }
+        GadgetKind.MoonRound -> {
+            Section("Kolor Księżyca", Icons.Rounded.Wallpaper) { Segmented(listOf("Naturalny", "Akcent", "Kolor tekstu"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) } }
+            Section("Pokazuj", Icons.Rounded.Info) {
+                Toggles(listOf(details("Oświetlenie %"), Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
+            }
+        }
+        GadgetKind.SkyClock -> {
+            Section("Zegar", Icons.Rounded.AccessTime) { Toggles(listOf(clock, seconds, date, details("Temperatura i oświetlenie"))) }
+            Section("Kolor Księżyca", Icons.Rounded.Wallpaper) {
+                Segmented(listOf("Naturalny", "Akcent", "Kolor tekstu"), st.mode.coerceIn(0, 2)) { set(st.copy(mode = it)) }
+                Toggles(listOf(Tile(Icons.Rounded.Public, "Półkula południowa", st.southern) { set(st.copy(southern = it)) }))
+            }
+        }
+        GadgetKind.Steps -> {
+            layout(listOf("Pierścień", "Pasek", "Tydzień"), 2)
+            Section("Cel", Icons.Rounded.Info) {
+                ValueSlider("Dzienny cel kroków", st.goal.toFloat().coerceIn(2000f, 20000f), 2000f..20000f, { "%,d".format(it.toInt()) }, steps = 35) {
+                    set(st.copy(goal = ((it / 500f).toInt() * 500).coerceIn(2000, 20000)))
+                }
+                Toggles(listOf(details("Kalorie i dystans")))
+            }
+        }
         GadgetKind.YearDots -> {
             layout(listOf("Rok", "Miesiąc"), 1)
             Section("Pokazuj", Icons.Rounded.Info) {

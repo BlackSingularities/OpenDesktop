@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.health.connect)
     // Google Drive - TODO: Uncomment when ready to implement
     // implementation(libs.google.drive)
     // implementation(libs.google.auth)

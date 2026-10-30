@@ -100,6 +100,9 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import java.time.format.TextStyle as JTextStyle
+import androidx.compose.material.icons.rounded.NorthEast
+import androidx.compose.material.icons.rounded.SouthEast
+import com.opendesktop.launcher.domain.Moon
 
 // ---------- Dane i pomocnicze ----------
 
@@ -826,6 +829,68 @@ internal fun ClockWeather(p: GadgetPaint) {
                 } else WeatherPlaceholder(p, weather, small)
             }
         }
+    }
+}
+
+/**
+ * Zegar z dniem tygodnia i datą; po lewej pogoda teraz, po prawej dzisiejszy Księżyc.
+ * Nad ikonami godzina wschodu, pod nimi zachodu (słońca – z prognozy, Księżyca – liczone lokalnie).
+ */
+@Composable
+internal fun SkyClock(p: GadgetPaint) {
+    val st = p.st
+    val now = rememberNow(st.showSeconds)
+    val state = rememberWeather(st)
+    val w = state?.getOrNull()
+    val locale = Locale.getDefault()
+    val (time, ampm) = timeText(now, st, locale)
+    val here = w?.let { placeNow(it) } ?: now
+    val day = here.toLocalDate()
+    val today = w?.days?.firstOrNull { it.date == day }
+    val phase = Moon.phase(day)
+    val moon = remember(w?.lat, w?.lon, w?.utcOffset, day) { w?.let { Moon.riseSet(day, it.lat, it.lon, it.utcOffset) } }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val icon = minOf(maxHeight.value * 0.34f, maxWidth.value * 0.15f).coerceAtLeast(16f)
+        val small = (icon * 0.32f).coerceIn(9f, 15f)
+        val big = minOf(maxHeight.value * 0.4f, maxWidth.value * 0.52f / ((time.length + 0.5f) * 0.58f)).coerceAtLeast(14f)
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            SkyColumn(p, today?.sunrise, today?.sunset, small) {
+                if (w != null) {
+                    WxIcon(p, w.code, w.isDay, icon.dp)
+                    if (st.showDetails) T(p.deg(w.temp), p.text(small * 1.1f, FontWeight.SemiBold, color = p.tempColor(w.temp)))
+                } else ShadowedGlyph(if (state == null) Icons.Rounded.Cloud else Icons.Rounded.CloudOff, p.fg.copy(alpha = 0.6f), icon.dp, st.textShadow)
+            }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    T(time, p.text(big).copy(letterSpacing = (-1).sp, textAlign = TextAlign.Center))
+                    if (ampm.isNotEmpty()) T(" $ampm", p.text(big * 0.28f, FontWeight.Medium, 0.85f), Modifier.padding(bottom = (big * 0.18f).dp))
+                }
+                T(cap(now.format(DateTimeFormatter.ofPattern("EEEE", locale)), locale), p.text(small * 1.3f, FontWeight.Medium))
+                if (st.showDate) T(now.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale)), p.text(small * 1.05f, FontWeight.Normal, 0.75f))
+            }
+            SkyColumn(p, moon?.first, moon?.second, small) {
+                MoonDisk(phase, moonLit(p), p.faint, st.southern, Modifier.size(icon.dp))
+                if (st.showDetails) T("${Moon.illumination(phase)}%", p.text(small * 1.1f, FontWeight.SemiBold, 0.85f))
+            }
+        }
+    }
+}
+
+/** Kolumna: wschód nad ikoną, zachód pod nią. */
+@Composable
+private fun SkyColumn(p: GadgetPaint, rise: LocalDateTime?, set: LocalDateTime?, fs: Float, center: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
+        SkyTime(p, Icons.Rounded.NorthEast, rise, fs)
+        center()
+        SkyTime(p, Icons.Rounded.SouthEast, set, fs)
+    }
+}
+
+@Composable
+private fun SkyTime(p: GadgetPaint, icon: ImageVector, t: LocalDateTime?, fs: Float) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = p.accent, modifier = Modifier.size((fs * 0.9f).dp))
+        T(clock(t, p.st), p.text(fs, FontWeight.Medium, 0.85f))
     }
 }
 

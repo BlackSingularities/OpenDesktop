@@ -9,6 +9,7 @@ serialization = "1.7.3"
 coroutines = "1.9.0"
 coreKtx = "1.15.0"
 junit = "4.13.2"
+healthConnect = "1.1.0-alpha07"
 googleDrive = "2.2.0"
 googleAuth = "21.2.0"
 
@@ -29,6 +30,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 google-drive = { group = "com.google.apis", name = "google-api-services-drive", version.ref = "googleDrive" }
 google-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "googleAuth" }
+health-connect = { group = "androidx.health.connect", name = "connect-client", version.ref = "healthConnect" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

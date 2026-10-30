@@ -157,13 +157,18 @@ enum class GadgetKind(val label: String, val description: String, val w: Int, va
     SunArc("Słońce", "Wschód, zachód i długość dnia", 4, 2),
     MoonPhase("Faza Księżyca", "Dzisiejsza faza i najbliższa pełnia", 2, 2),
     YearDots("Rok w kropkach", "Każdy dzień roku albo miesiąca jako kropka", 4, 2),
+    MoonRound("Księżyc", "Okrągły widżet z dzisiejszą fazą", 2, 2),
+    SkyClock("Zegar ze słońcem i Księżycem", "Godzina, dzień i data; wschody i zachody słońca i Księżyca", 4, 2),
+    Steps("Kroki i kalorie", "Dzisiejsza aktywność z Health Connect", 4, 2),
     ;
 
     /** Widżet korzystający z danych pogodowych (miasto, jednostki, tło zależne od pogody). */
-    val isWeather: Boolean get() = this in setOf(ClockWeather, Weather, Forecast, HourlyForecast, WeatherFull, WeatherDetails, SunArc)
+    val isWeather: Boolean get() = this in setOf(ClockWeather, Weather, Forecast, HourlyForecast, WeatherFull, WeatherDetails, SunArc, SkyClock)
 
     fun defaultStyle(): GadgetStyle = when (this) {
-        DigitalClock, AnalogClock, ClockWeather, Greeting -> GadgetStyle(background = 0x00000000, border = false, textShadow = true)
+        DigitalClock, AnalogClock, ClockWeather, Greeting, SkyClock -> GadgetStyle(background = 0x00000000, border = false, textShadow = true)
+        MoonRound -> GadgetStyle(background = 0xF00A0F1E, border = false, shadow = 0.4f, showDetails = false)
+        Steps -> GadgetStyle(background = 0xD9101418, border = false, shadow = 0.3f, accent = 0xFF5BE49B)
         Forecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip))
         HourlyForecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip, WeatherMetric.Wind, WeatherMetric.Feels), hours = 12)
         WeatherFull -> GadgetStyle(
@@ -291,6 +296,8 @@ data class GadgetStyle(
     val showCondition: Boolean = false,
     /** Półkula południowa (lustrzane odbicie Księżyca). */
     val southern: Boolean = false,
+    /** Dzienny cel kroków. */
+    val goal: Int = 8000,
     /** Współrzędne wybranego miejsca („lat, lon”); puste = szukanie po nazwie z [city]. */
     val coords: String = "",
     /** Pogoda dla bieżącego położenia telefonu zamiast [city]. */

@@ -1,3 +1,7 @@
+## 2.8.0 — Powrót na ostatni ekran
+
+- Nowy przełącznik „Powrót na ostatni ekran” (Ustawienia → Pulpit → Ekrany): po wyjściu z aplikacji uruchomionej z bocznego ekranu launcher wraca na ten ekran, a nie na ekran główny. Ponowne wciśnięcie Home na widocznym pulpicie nadal przenosi na ekran główny.
+
 ## 2.7.0 — Odstęp pod godziną i kroki bez Health Connect
 
 - Nowy suwak „Odstęp pod godziną” (−24…24 dp) w karcie Tekst: zmienia odległość między dużą godziną a datą, dniem tygodnia albo podpisem; działa w widżetach Zegar cyfrowy, Zegar z pogodą, Zegar ze słońcem i Księżycem, Odliczanie i Data.

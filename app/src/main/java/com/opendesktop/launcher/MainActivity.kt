@@ -27,7 +27,9 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val vm: LauncherViewModel by viewModels()
-    private val homePressed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** true = Home wciśnięty na widocznym launcherze, false = powrót z innej aplikacji. */
+    private val homePressed = MutableSharedFlow<Boolean>(extraBufferCapacity = 1)
+    private var resumed = false
 
     private data class PendingWidget(
         val id: Int, val info: AppWidgetProviderInfo,
@@ -72,11 +74,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) homePressed.tryEmit(Unit)
+        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) homePressed.tryEmit(resumed)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        resumed = false
     }
 
     override fun onResume() {
         super.onResume()
+        resumed = true
         restoreHomeAfterUpdate()
     }
 

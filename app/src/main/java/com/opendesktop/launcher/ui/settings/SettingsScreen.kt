@@ -213,6 +213,7 @@ private fun DesktopSection(vm: LauncherViewModel, cfg: Config, set: Setter, pick
             pick.choose("Przejście między ekranami", PageTransition.entries, cfg.transition, { it.label }) { t -> set { it.copy(transition = t) } }
         }
         SwitchRow(Icons.Rounded.Loop, "Przewijanie w pętli", "Za ostatnim ekranem wraca pierwszy, przed pierwszym ostatni", cfg.pageLoop) { v -> set { it.copy(pageLoop = v) } }
+        SwitchRow(Icons.Rounded.History, "Powrót na ostatni ekran", "Po wyjściu z aplikacji wraca ekran, z którego ją uruchomiono", cfg.returnToLastPage) { v -> set { it.copy(returnToLastPage = v) } }
     }
     TileGrid(
         listOf(

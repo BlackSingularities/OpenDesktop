@@ -208,7 +208,7 @@ private sealed interface MenuTarget {
 @Composable
 fun LauncherScreen(
     vm: LauncherViewModel,
-    homePressed: SharedFlow<Unit>,
+    homePressed: SharedFlow<Boolean>,
     onAddWidget: (AppWidgetProviderInfo, Int) -> Unit,
 ) {
     val cfg by vm.config.collectAsStateWithLifecycle()
@@ -330,7 +330,13 @@ fun LauncherScreen(
 
     // Przycisk Home: zamyka wszystko i wraca na ekran główny
     LaunchedEffect(Unit) {
-        homePressed.collect {
+        homePressed.collect { visible ->
+            // Powrót z aplikacji: opcjonalnie zostajemy na ekranie, z którego ją uruchomiono
+            if (!visible && cfg.returnToLastPage) {
+                menu = null; selected = null; lockPrompt = null
+                closeDrawer()
+                return@collect
+            }
             val wasIdle = drawer.value == 0f && !editMode && overlay == Overlay.None && openFolder == null && lockPrompt == null
             menu = null; openFolder = null; editMode = false; selected = null; overlay = Overlay.None; lockPrompt = null
             closeDrawer()

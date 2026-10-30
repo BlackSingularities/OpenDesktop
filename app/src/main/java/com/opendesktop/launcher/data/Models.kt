@@ -373,6 +373,8 @@ data class Config(
     val showPageIndicator: Boolean = true,
     /** Przewijanie ekranów w pętli: za ostatnim jest pierwszy, przed pierwszym ostatni. */
     val pageLoop: Boolean = false,
+    /** Po powrocie z aplikacji zostaje ekran, z którego ją uruchomiono (zamiast ekranu głównego). */
+    val returnToLastPage: Boolean = false,
     /** Blokada układu: bez przeciągania, zmiany rozmiaru i usuwania elementów. */
     val layoutLocked: Boolean = false,
     /** Wskaźnik ekranów widoczny stale, a nie tylko podczas przewijania. */

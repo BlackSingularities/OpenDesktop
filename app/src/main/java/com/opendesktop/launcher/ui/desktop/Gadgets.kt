@@ -294,11 +294,13 @@ internal fun cap(s: String, locale: Locale) = s.replaceFirstChar { it.titlecase(
 /** Akcja po stuknięciu – otwiera aplikację systemową pasującą do widżetu. */
 fun openGadgetTarget(ctx: Context, kind: GadgetKind?) {
     val intent = when (kind) {
-        GadgetKind.DigitalClock, GadgetKind.AnalogClock, GadgetKind.WorldClock, GadgetKind.ClockWeather ->
+        GadgetKind.DigitalClock, GadgetKind.AnalogClock, GadgetKind.WorldClock, GadgetKind.ClockWeather,
+        GadgetKind.FlipClock, GadgetKind.NextAlarm, GadgetKind.SkyClock ->
             Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)
-        GadgetKind.Calendar, GadgetKind.DateCard, GadgetKind.Countdown, GadgetKind.Progress ->
+        GadgetKind.Calendar, GadgetKind.DateCard, GadgetKind.Countdown, GadgetKind.Progress,
+        GadgetKind.WeekStrip, GadgetKind.Holidays, GadgetKind.Agenda, GadgetKind.YearDots ->
             Intent(Intent.ACTION_VIEW, CalendarContract.CONTENT_URI.buildUpon().appendPath("time").build())
-        GadgetKind.Battery -> Intent(Intent.ACTION_POWER_USAGE_SUMMARY)
+        GadgetKind.Battery, GadgetKind.DeviceStatus -> Intent(Intent.ACTION_POWER_USAGE_SUMMARY)
         GadgetKind.Storage -> Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
         else -> null
     } ?: return
@@ -311,7 +313,7 @@ fun openGadgetTarget(ctx: Context, kind: GadgetKind?) {
  */
 @Composable
 fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
-    val shape = if (kind == GadgetKind.MoonRound) CircleShape else RoundedCornerShape(style.radius.coerceIn(0, 60).dp)
+    val shape = if (kind == GadgetKind.MoonRound || (kind == GadgetKind.Wind && style.mode == 0)) CircleShape else RoundedCornerShape(style.radius.coerceIn(0, 60).dp)
     val p = remember(style) { GadgetPaint(style) }
     // Tło pogodowe potrzebuje danych – to samo zapytanie co treść widżetu (wspólna pamięć podręczna)
     val weather = if (kind?.isWeather == true && style.weatherBackground) rememberWeather(style)?.getOrNull() else null
@@ -363,11 +365,22 @@ fun GadgetWidget(kind: GadgetKind?, style: GadgetStyle, modifier: Modifier) {
                 GadgetKind.MoonRound -> MoonRoundView(p)
                 GadgetKind.SkyClock -> SkyClock(p)
                 GadgetKind.Steps -> StepsView(p)
+                GadgetKind.WeatherChart -> WeatherChartView(p)
+                GadgetKind.AirQuality -> AirQualityView(p)
+                GadgetKind.RainNow -> RainNowView(p)
+                GadgetKind.Wind -> WindView(p)
+                GadgetKind.FlipClock -> FlipClockView(p)
+                GadgetKind.WeekStrip -> WeekStripView(p)
+                GadgetKind.Holidays -> HolidaysView(p)
+                GadgetKind.Agenda -> AgendaView(p)
+                GadgetKind.NextAlarm -> NextAlarmView(p)
+                GadgetKind.DeviceStatus -> DeviceStatusView(p)
                 null -> Unit
             }
           }
         }
-        if (kind?.isWeather == true && style.showRefresh) {
+        // Na okrągłej karcie róg wypada poza kołem – tam bez przycisku (pogoda i tak odświeża się sama)
+        if (kind?.isWeather == true && style.showRefresh && shape != CircleShape) {
             RefreshButton(p, Modifier.align(Alignment.TopEnd).padding((style.radius.coerceIn(0, 60) * 0.18f + 5f).dp))
         }
     }

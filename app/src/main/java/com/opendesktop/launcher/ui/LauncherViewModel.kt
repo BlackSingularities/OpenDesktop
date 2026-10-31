@@ -33,6 +33,7 @@ import com.opendesktop.launcher.data.Page
 import com.opendesktop.launcher.data.SearchStyle
 import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.data.GadgetStyle
+import com.opendesktop.launcher.data.withAppearance
 import com.opendesktop.launcher.data.ShortcutEntry
 import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.UpdateInfo
@@ -294,9 +295,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         store.updateWorkspace { ws ->
             val (w2, spot) = ws.place(pageIndex, w, h)
             w2.updatePage(spot.first) { p ->
-                p.copy(items = p.items + DesktopItem(type = ItemType.Gadget, x = spot.second, y = spot.third, w = w, h = h, gadget = kind, gadgetStyle = kind.defaultStyle()))
+                p.copy(items = p.items + DesktopItem(type = ItemType.Gadget, x = spot.second, y = spot.third, w = w, h = h, gadget = kind, gadgetStyle = kind.defaultStyle(config.value.gadgetLook)))
             }
         }
+    }
+
+    /** Wygląd [look] dla wszystkich wbudowanych widżetów na wszystkich ekranach i dla nowych. */
+    fun applyGadgetLookToAll(look: GadgetStyle) {
+        val before = workspace.value
+        store.updateWorkspace { ws ->
+            ws.copy(pages = ws.pages.map { p ->
+                p.copy(items = p.items.map { if (it.type == ItemType.Gadget) it.copy(gadgetStyle = it.gadgetStyle.withAppearance(look)) else it })
+            })
+        }
+        updateConfig { it.copy(gadgetLook = look) }
+        offerUndo("Nowy wygląd wszystkich widżetów", before, emptyList())
     }
 
     fun setGadgetStyle(pageId: String, itemId: String, style: GadgetStyle) = store.updateWorkspace { ws ->

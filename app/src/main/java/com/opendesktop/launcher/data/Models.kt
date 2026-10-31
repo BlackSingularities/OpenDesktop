@@ -68,6 +68,16 @@ enum class IconShape(val label: String) {
     RoundedSquare("Zaokrąglony kwadrat"),
     Square("Kwadrat"),
     Teardrop("Kropla"),
+    /** Sam symbol z ikony adaptacyjnej, na przezroczystym tle i bez maski (nic nie jest wycinane). */
+    Transparent("Bez tła"),
+}
+
+/** Co widać po powrocie z aplikacji uruchomionej z launchera (przyciskiem Home albo gestem wstecz). */
+@Serializable
+enum class ReturnTarget(val label: String, val description: String) {
+    Home("Ekran główny", "Zawsze ekran główny pulpitu"),
+    LastPage("Ostatni ekran pulpitu", "Ekran pulpitu, z którego uruchomiono aplikację; szuflada i foldery się zamykają"),
+    LastScreen("Ostatnio widziany", "Dokładnie to, co było widać: ekran pulpitu, otwarta szuflada albo folder"),
 }
 
 @Serializable
@@ -133,40 +143,71 @@ data class DesktopItem(
     val gadgetStyle: GadgetStyle = GadgetStyle(),
 )
 
+/** Grupy w oknie wyboru widżetów. */
+enum class GadgetCategory(val label: String) {
+    Clock("Zegary"),
+    Weather("Pogoda"),
+    Sky("Słońce i Księżyc"),
+    Calendar("Kalendarz i czas"),
+    Device("Telefon"),
+    Personal("Osobiste i zdrowie"),
+}
+
 /** Wbudowane widżety OpenDesktop – domyślny rozmiar w komórkach siatki. */
 @Serializable
-enum class GadgetKind(val label: String, val description: String, val w: Int, val h: Int) {
-    DigitalClock("Zegar cyfrowy", "Godzina, data i bateria", 4, 2),
-    AnalogClock("Zegar analogowy", "Tarcza ze wskazówkami", 2, 2),
-    ClockWeather("Zegar z pogodą", "Godzina obok bieżącej pogody", 4, 2),
-    Weather("Pogoda", "Temperatura i warunki teraz", 3, 2),
-    Forecast("Prognoza", "Pogoda na kilka dni", 4, 2),
-    Calendar("Kalendarz", "Siatka miesiąca z dzisiejszym dniem", 3, 3),
-    DateCard("Kartka z kalendarza", "Dzień tygodnia i data", 2, 2),
-    Battery("Bateria", "Poziom naładowania", 2, 2),
-    WorldClock("Zegary świata", "Godzina w innych miastach", 4, 2),
-    Countdown("Odliczanie", "Dni do wybranej daty", 3, 2),
-    Note("Notatka", "Własny tekst na pulpicie", 3, 2),
-    Greeting("Powitanie", "Dzień dobry o każdej porze", 4, 1),
-    Progress("Postęp czasu", "Ile minęło z dnia, miesiąca, roku", 4, 1),
-    Proverb("Przysłowie dnia", "Codziennie inne", 4, 2),
-    Storage("Pamięć", "Miejsce na dane i RAM", 3, 2),
-    HourlyForecast("Prognoza godzinowa", "Wykres temperatury i opadów na kolejne godziny", 4, 2),
-    WeatherFull("Pogoda – pełny panel", "Teraz, najbliższe godziny i kolejne dni", 4, 4),
-    WeatherDetails("Szczegóły pogody", "Wiatr, wilgotność, ciśnienie, UV, opady", 4, 2),
-    SunArc("Słońce", "Wschód, zachód i długość dnia", 4, 2),
-    MoonPhase("Faza Księżyca", "Dzisiejsza faza i najbliższa pełnia", 2, 2),
-    YearDots("Rok w kropkach", "Każdy dzień roku albo miesiąca jako kropka", 4, 2),
-    MoonRound("Księżyc", "Okrągły widżet z dzisiejszą fazą", 2, 2),
-    SkyClock("Zegar ze słońcem i Księżycem", "Godzina, dzień i data; wschody i zachody słońca i Księżyca", 4, 2),
-    Steps("Kroki i kalorie", "Dzisiejsza aktywność z czujnika telefonu albo Health Connect", 4, 2),
+enum class GadgetKind(val label: String, val description: String, val w: Int, val h: Int, val category: GadgetCategory) {
+    DigitalClock("Zegar cyfrowy", "Godzina, data i bateria", 4, 2, GadgetCategory.Clock),
+    AnalogClock("Zegar analogowy", "Tarcza ze wskazówkami", 2, 2, GadgetCategory.Clock),
+    ClockWeather("Zegar z pogodą", "Godzina obok bieżącej pogody", 4, 2, GadgetCategory.Clock),
+    Weather("Pogoda", "Temperatura i warunki teraz", 3, 2, GadgetCategory.Weather),
+    Forecast("Prognoza", "Pogoda na kilka dni", 4, 2, GadgetCategory.Weather),
+    Calendar("Kalendarz", "Siatka miesiąca z dzisiejszym dniem", 3, 3, GadgetCategory.Calendar),
+    DateCard("Kartka z kalendarza", "Dzień tygodnia i data", 2, 2, GadgetCategory.Calendar),
+    Battery("Bateria", "Poziom naładowania", 2, 2, GadgetCategory.Device),
+    WorldClock("Zegary świata", "Godzina w innych miastach", 4, 2, GadgetCategory.Clock),
+    Countdown("Odliczanie", "Dni do wybranej daty", 3, 2, GadgetCategory.Calendar),
+    Note("Notatka", "Własny tekst na pulpicie", 3, 2, GadgetCategory.Personal),
+    Greeting("Powitanie", "Dzień dobry o każdej porze", 4, 1, GadgetCategory.Personal),
+    Progress("Postęp czasu", "Ile minęło z dnia, miesiąca, roku", 4, 1, GadgetCategory.Calendar),
+    Proverb("Przysłowie dnia", "Codziennie inne", 4, 2, GadgetCategory.Personal),
+    Storage("Pamięć", "Miejsce na dane i RAM", 3, 2, GadgetCategory.Device),
+    HourlyForecast("Prognoza godzinowa", "Wykres temperatury i opadów na kolejne godziny", 4, 2, GadgetCategory.Weather),
+    WeatherFull("Pogoda – pełny panel", "Teraz, najbliższe godziny i kolejne dni", 4, 4, GadgetCategory.Weather),
+    WeatherDetails("Szczegóły pogody", "Wiatr, wilgotność, ciśnienie, UV, opady", 4, 2, GadgetCategory.Weather),
+    SunArc("Słońce", "Wschód, zachód i długość dnia", 4, 2, GadgetCategory.Sky),
+    MoonPhase("Faza Księżyca", "Dzisiejsza faza i najbliższa pełnia", 2, 2, GadgetCategory.Sky),
+    YearDots("Rok w kropkach", "Każdy dzień roku albo miesiąca jako kropka", 4, 2, GadgetCategory.Calendar),
+    MoonRound("Księżyc", "Okrągły widżet z dzisiejszą fazą", 2, 2, GadgetCategory.Sky),
+    SkyClock("Zegar ze słońcem i Księżycem", "Godzina, dzień i data; wschody i zachody słońca i Księżyca", 4, 2, GadgetCategory.Clock),
+    Steps("Kroki i kalorie", "Dzisiejsza aktywność z czujnika telefonu albo Health Connect", 4, 2, GadgetCategory.Personal),
+    WeatherChart("Wykres pogody", "Godziny (do 7 dni) albo dni (do 16) – temperatura, opady, wiatr i więcej", 5, 3, GadgetCategory.Weather),
+    AirQuality("Jakość powietrza", "Indeks jakości, pyły PM2.5 i PM10, gazy i pyłki", 4, 2, GadgetCategory.Weather),
+    RainNow("Opady – najbliższe godziny", "Kiedy zacznie i przestanie padać, co 15 minut", 4, 2, GadgetCategory.Weather),
+    Wind("Wiatr", "Róża wiatrów z kierunkiem, prędkością i porywami", 2, 2, GadgetCategory.Weather),
+    FlipClock("Zegar klapkowy", "Duże cyfry na kartach jak w dawnym tablo", 4, 2, GadgetCategory.Clock),
+    WeekStrip("Tydzień", "Dni tygodnia z dzisiejszym i numerem tygodnia", 4, 1, GadgetCategory.Calendar),
+    Holidays("Święta i dni wolne", "Najbliższe święta w Polsce i dni do nich", 4, 2, GadgetCategory.Calendar),
+    Agenda("Najbliższe wydarzenia", "Wydarzenia z kalendarza telefonu", 4, 3, GadgetCategory.Calendar),
+    NextAlarm("Następny budzik", "Kiedy zadzwoni budzik i za ile", 3, 1, GadgetCategory.Clock),
+    DeviceStatus("Stan telefonu", "Bateria, temperatura, pamięć, RAM i czas pracy", 4, 2, GadgetCategory.Device),
     ;
 
     /** Widżet korzystający z danych pogodowych (miasto, jednostki, tło zależne od pogody). */
-    val isWeather: Boolean get() = this in setOf(ClockWeather, Weather, Forecast, HourlyForecast, WeatherFull, WeatherDetails, SunArc, SkyClock)
+    val isWeather: Boolean get() = this in setOf(
+        ClockWeather, Weather, Forecast, HourlyForecast, WeatherFull, WeatherDetails, SunArc, SkyClock,
+        WeatherChart, AirQuality, RainNow, Wind,
+    )
 
     fun defaultStyle(): GadgetStyle = when (this) {
         DigitalClock, AnalogClock, ClockWeather, Greeting, SkyClock -> GadgetStyle(background = 0x00000000, border = false, textShadow = true)
+        FlipClock -> GadgetStyle(background = 0x00000000, border = false, accent = 0xFF1E1F22, textColor = 0xFFF5F5F5, weight = 600, shadow = 0.35f)
+        WeatherChart -> GadgetStyle(
+            background = 0xD9101418, border = false, shadow = 0.3f, tempColors = true, iconStyle = 1,
+            metrics = listOf(WeatherMetric.Precip, WeatherMetric.Feels), hours = 24, days = 10,
+        )
+        AirQuality -> GadgetStyle(metrics = listOf("pm25", "pm10", "no2", "o3"))
+        RainNow -> GadgetStyle(accent = 0xFF4FB3FF)
+        Agenda -> GadgetStyle(days = 7)
         MoonRound -> GadgetStyle(background = 0xF00A0F1E, border = false, shadow = 0.4f, showDetails = false)
         Steps -> GadgetStyle(background = 0xD9101418, border = false, shadow = 0.3f, accent = 0xFF5BE49B)
         Forecast -> GadgetStyle(metrics = listOf(WeatherMetric.Precip))
@@ -178,7 +219,24 @@ enum class GadgetKind(val label: String, val description: String, val w: Int, va
         WeatherDetails -> GadgetStyle(metrics = WeatherMetric.all)
         else -> GadgetStyle()
     }
+
+    /** Domyślny styl z nałożonym wspólnym wyglądem (gdy użytkownik ustawił jeden wygląd dla wszystkich). */
+    fun defaultStyle(look: GadgetStyle?): GadgetStyle = look?.let { defaultStyle().withAppearance(it) } ?: defaultStyle()
 }
+
+/** Kolory, tło, rogi, obrys i cienie – bez ustawień treści. */
+fun GadgetStyle.withLook(o: GadgetStyle) = copy(
+    background = o.background, background2 = o.background2, gradient = o.gradient, radius = o.radius, textColor = o.textColor,
+    accent = o.accent, border = o.border, borderColor = o.borderColor, borderWidth = o.borderWidth, shadow = o.shadow, textShadow = o.textShadow,
+)
+
+/** Pełny wygląd (z czcionką, ikonami i cieniami) – do kopiowania między widżetami i „Zastosuj do wszystkich”. */
+fun GadgetStyle.withAppearance(o: GadgetStyle) = withLook(o).copy(
+    padding = o.padding, textScale = o.textScale, timeScale = o.timeScale, timeGap = o.timeGap, weight = o.weight, fontFamily = o.fontFamily,
+    iconStyle = o.iconStyle, iconScale = o.iconScale, tempColors = o.tempColors, weatherBackground = o.weatherBackground,
+    separators = o.separators,
+    contentShadow = o.contentShadow, shadowBlur = o.shadowBlur, shadowOffset = o.shadowOffset, shadowColor = o.shadowColor,
+)
 
 /** Dodatkowe wartości pogodowe do pokazania w widżetach (lista w [GadgetStyle.metrics]). */
 object WeatherMetric {
@@ -373,13 +431,17 @@ data class Config(
     val showPageIndicator: Boolean = true,
     /** Przewijanie ekranów w pętli: za ostatnim jest pierwszy, przed pierwszym ostatni. */
     val pageLoop: Boolean = false,
-    /** Po powrocie z aplikacji zostaje ekran, z którego ją uruchomiono (zamiast ekranu głównego). */
+    /** Dawny przełącznik (2.8.0) – czytany tylko, gdy [returnTarget] nie jest ustawiony. */
     val returnToLastPage: Boolean = false,
+    /** Ekran po powrocie z aplikacji; null = z [returnToLastPage]. */
+    val returnTarget: ReturnTarget? = null,
     /** Blokada układu: bez przeciągania, zmiany rozmiaru i usuwania elementów. */
     val layoutLocked: Boolean = false,
     /** Wskaźnik ekranów widoczny stale, a nie tylko podczas przewijania. */
     val pageIndicatorAlways: Boolean = false,
     val editGridLines: Boolean = true,
+    /** Wspólny wygląd nowych widżetów („Zastosuj do wszystkich” w oknie Dostosuj); null = domyślne. */
+    val gadgetLook: GadgetStyle? = null,
     // Ikony
     val iconScale: Float = 1f,
     /** Rozmiar ikon w doku (osobno od szuflady). */
@@ -475,6 +537,9 @@ data class Config(
     val skippedVersion: Int = 0,
     val onboardingDone: Boolean = false,
 ) {
+    /** Tryb powrotu z aplikacji z uwzględnieniem ustawienia z wersji 2.8.0. */
+    val returnMode: ReturnTarget get() = returnTarget ?: if (returnToLastPage) ReturnTarget.LastPage else ReturnTarget.Home
+
     companion object {
         const val DEFAULT_REPO = "BlackSingularities/OpenDesktop"
     }

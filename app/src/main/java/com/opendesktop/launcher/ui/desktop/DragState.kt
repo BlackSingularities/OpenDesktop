@@ -21,6 +21,9 @@ data class DragPayload(
     val size: Size,
 )
 
+/** Prostokąt w komórkach siatki zmienianego elementu: [x, x + w) × [y, y + h). */
+data class ResizePreview(val itemId: String, val x: Int, val y: Int, val w: Int, val h: Int)
+
 sealed interface DropTarget {
     data class Cell(
         val pageId: String,
@@ -51,6 +54,8 @@ class DragController {
     val zoneBounds = mutableStateMapOf<DropZone, Rect>()
     /** Ekran utworzony automatycznie podczas przeciągania – usuwany, jeśli zostanie pusty. */
     var autoPageId: String? = null
+    /** Podgląd zmiany rozmiaru na żywo: element i jego nowy prostokąt w komórkach (do puszczenia palca). */
+    var resizing by mutableStateOf<ResizePreview?>(null)
 
     val active: Boolean get() = payload != null
 }

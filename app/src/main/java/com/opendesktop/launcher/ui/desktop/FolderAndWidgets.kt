@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.aspectRatio
+import com.opendesktop.launcher.data.GadgetCategory
 import com.opendesktop.launcher.data.GadgetKind
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -390,10 +391,15 @@ fun WidgetPicker(
             }.groupBy { it.appLabel }.toList().sortedBy { it.first.lowercase() }
         }
     }
-    val builtins = listOf(
-        WidgetEntry(null, "clock", "Zegar z datą", "OpenDesktop", 4 to 2),
-        WidgetEntry(null, "search", "Pasek wyszukiwania", "OpenDesktop", 5 to 1),
-    ) + GadgetKind.entries.map { WidgetEntry(null, "gadget:${it.name}", it.label, "OpenDesktop", it.w to it.h) }
+    // Wbudowane widżety w grupach – przy kilkudziesięciu jeden wiersz byłby nie do przejrzenia
+    val builtins: List<Pair<String, List<WidgetEntry>>> = listOf(
+        "Podstawowe" to listOf(
+            WidgetEntry(null, "clock", "Zegar z datą", "OpenDesktop", 4 to 2),
+            WidgetEntry(null, "search", "Pasek wyszukiwania", "OpenDesktop", 5 to 1),
+        ),
+    ) + GadgetCategory.entries.map { c ->
+        c.label to GadgetKind.entries.filter { it.category == c }.map { WidgetEntry(null, "gadget:${it.name}", it.label, it.description, it.w to it.h) }
+    }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = Palette.Panel, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -408,12 +414,14 @@ fun WidgetPicker(
                     shape = RoundedCornerShape(50),
                 )
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    item {
-                        val q = query.trim()
-                        val shown = if (q.isEmpty()) builtins else builtins.filter { it.label.contains(q, true) || "opendesktop".contains(q, true) }
-                        if (shown.isNotEmpty()) WidgetGroup("OpenDesktop", shown) { e -> onPickBuiltin(e.builtin!!) }
-                    }
                     val q = query.trim()
+                    builtins.forEach { (title, list) ->
+                        val shown = if (q.isEmpty() || title.contains(q, true) || "opendesktop".contains(q, true)) list
+                        else list.filter { it.label.contains(q, true) || it.appLabel.contains(q, true) }
+                        if (shown.isNotEmpty()) item(key = "builtin:$title") {
+                            WidgetGroup("OpenDesktop · $title", shown) { e -> onPickBuiltin(e.builtin!!) }
+                        }
+                    }
                     val filtered = groups.mapNotNull { (app, list) ->
                         val l = if (q.isEmpty() || app.contains(q, true)) list else list.filter { it.label.contains(q, true) }
                         if (l.isEmpty()) null else app to l
@@ -484,6 +492,10 @@ private fun WidgetCard(e: WidgetEntry, onClick: () -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         Text(e.label, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, fontSize = 13.sp)
+        // Wbudowane widżety: krótki opis zamiast nazwy aplikacji
+        if (e.builtin?.startsWith("gadget:") == true) {
+            Text(e.appLabel, color = Color.White.copy(alpha = 0.6f), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, fontSize = 11.sp, lineHeight = 13.sp)
+        }
         Text("${e.span.first} × ${e.span.second}", color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp)
     }
 }

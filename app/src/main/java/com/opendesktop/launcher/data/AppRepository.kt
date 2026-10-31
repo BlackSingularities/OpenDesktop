@@ -11,6 +11,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
@@ -103,8 +104,11 @@ class AppRepository(
     private fun toInfo(a: LauncherActivityInfo, user: UserHandle, work: Boolean, size: Int): AppInfo {
         val cn = a.componentName
         val key = cn.flattenToString() + if (work) "#" + user.hashCode() else ""
-        val drawable = a.getBadgedIcon(0)
-        val bmp = render(drawable, size)
+        val bmp = if (shape == IconShape.Transparent) {
+            // Symbol bez tła; plakietkę profilu służbowego nakładamy dopiero na gotowy obrazek
+            val bare = renderBare(a.getIcon(0), size)
+            if (work) context.packageManager.getUserBadgedIcon(BitmapDrawable(context.resources, bare), user).toBitmap(size, size, Bitmap.Config.ARGB_8888) else bare
+        } else render(a.getBadgedIcon(0), size)
         return AppInfo(
             key = key,
             label = a.label?.toString()?.trim().orEmpty().ifBlank { cn.packageName },
@@ -133,6 +137,59 @@ class AppRepository(
             return bmp
         }
         return d.toBitmap(size, size, Bitmap.Config.ARGB_8888)
+    }
+
+    /**
+     * Ikona bez tła: sama warstwa pierwszego planu ikony adaptacyjnej. Warstwa jest rysowana w całości
+     * (bez maski, więc nic nie jest ucinane), a potem kadrowana do faktycznej treści i wpasowana
+     * w kwadrat z małym marginesem – symbole różnych aplikacji mają podobną wielkość.
+     * Ikony nieadaptacyjne nie mają osobnego tła, więc zostają jak są.
+     */
+    private fun renderBare(d: Drawable, size: Int): Bitmap {
+        val fg = (d as? AdaptiveIconDrawable)?.foreground ?: return d.toBitmap(size, size, Bitmap.Config.ARGB_8888)
+        // Warstwa ma 108 dp, z czego widoczne w masce jest środkowe 72 dp – rysujemy całe 108
+        val full = (size * 1.5f).toInt()
+        val layer = Bitmap.createBitmap(full, full, Bitmap.Config.ARGB_8888)
+        fg.setBounds(0, 0, full, full)
+        fg.draw(Canvas(layer))
+        val box = contentBounds(layer) ?: return render(d, size)
+        // Prawie pusta warstwa (cały rysunek siedzi w tle) – zostawiamy zwykłą ikonę
+        if (box.width() * box.height() < full * full / 40) return render(d, size)
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val margin = size * 0.04f
+        val avail = size - margin * 2
+        val scale = avail / maxOf(box.width(), box.height())
+        val w = box.width() * scale
+        val h = box.height() * scale
+        val dst = android.graphics.RectF((size - w) / 2f, (size - h) / 2f, (size + w) / 2f, (size + h) / 2f)
+        Canvas(out).drawBitmap(layer, box, dst, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG))
+        layer.recycle()
+        return out
+    }
+
+    /** Najmniejszy prostokąt z widocznymi pikselami (alfa > 16); null, gdy obraz jest pusty. */
+    private fun contentBounds(bmp: Bitmap): Rect? {
+        val w = bmp.width
+        val h = bmp.height
+        val row = IntArray(w)
+        var top = -1; var bottom = -1; var left = w; var right = -1
+        for (y in 0 until h) {
+            bmp.getPixels(row, 0, w, 0, y, w, 1)
+            var any = false
+            for (x in 0 until w) {
+                if ((row[x] ushr 24) > 16) {
+                    any = true
+                    if (x < left) left = x
+                    if (x > right) right = x
+                }
+            }
+            if (any) {
+                if (top < 0) top = y
+                bottom = y
+            }
+        }
+        if (top < 0 || right < left) return null
+        return Rect(left, top, right + 1, bottom + 1)
     }
 
     private fun averageColor(bmp: Bitmap): Int {

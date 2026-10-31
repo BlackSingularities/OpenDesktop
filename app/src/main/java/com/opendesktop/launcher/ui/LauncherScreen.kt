@@ -141,7 +141,10 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.opendesktop.launcher.data.ReturnTarget
 import android.appwidget.AppWidgetProviderInfo
 import com.opendesktop.launcher.R
 import com.opendesktop.launcher.data.AppInfo
@@ -165,6 +168,7 @@ import com.opendesktop.launcher.ui.components.TextInputDialog
 import com.opendesktop.launcher.ui.components.UndoBar
 import com.opendesktop.launcher.ui.desktop.DesktopCallbacks
 import com.opendesktop.launcher.ui.desktop.DesktopGrid
+import com.opendesktop.launcher.ui.desktop.StableDesktopCallbacks
 import com.opendesktop.launcher.ui.desktop.Dock
 import com.opendesktop.launcher.ui.desktop.DragController
 import com.opendesktop.launcher.ui.desktop.DragPayload
@@ -262,6 +266,8 @@ fun LauncherScreen(
     var confirmRemovePage by remember { mutableStateOf<Int?>(null) }
     var searchFocus by remember { mutableIntStateOf(0) }
     var showOnboarding by remember { mutableStateOf(false) }
+    // Aplikacja uruchomiona z launchera – przy wznowieniu stosujemy ustawienie powrotu
+    var launchedApp by remember { mutableStateOf(false) }
 
     val labelOf: (AppInfo) -> String = { ws.renamed[it.key] ?: it.label }
     val heightPx = rootSize.height.toFloat().coerceAtLeast(1f)
@@ -321,7 +327,38 @@ fun LauncherScreen(
 
     fun launch(app: AppInfo, bounds: Rect) {
         vm.launch(app, view, bounds)
-        if (drawer.value > 0f) scope.launch { delay(350); drawer.snapTo(0f) }
+        launchedApp = true
+        // „Ostatnio widziany”: szuflada zostaje otwarta pod uruchomioną aplikacją
+        if (drawer.value > 0f && cfg.returnMode != ReturnTarget.LastScreen) scope.launch { delay(350); drawer.snapTo(0f) }
+    }
+
+    /**
+     * Powrót z aplikacji (Home albo gest wstecz) według ustawienia: ekran główny, ostatni ekran
+     * pulpitu albo dokładnie to, co było widać (z otwartą szufladą lub folderem).
+     */
+    suspend fun applyReturn() {
+        menu = null; selected = null; lockPrompt = null
+        when (cfg.returnMode) {
+            ReturnTarget.LastScreen -> Unit
+            ReturnTarget.LastPage -> {
+                openFolder = null; editMode = false; overlay = Overlay.None
+                drawer.snapTo(0f)
+            }
+            ReturnTarget.Home -> {
+                openFolder = null; editMode = false; overlay = Overlay.None
+                drawer.snapTo(0f)
+                val home = cfg.defaultPage.coerceIn(0, (ws.pages.size - 1).coerceAtLeast(0))
+                if (pagerState.currentPage != home) pagerState.scrollToPage(home)
+            }
+        }
+    }
+
+    // Powrót gestem wstecz nie wysyła intencji Home – rozpoznajemy go po wznowieniu po uruchomieniu aplikacji
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (launchedApp) {
+            launchedApp = false
+            scope.launch { applyReturn() }
+        }
     }
 
     LaunchedEffect(loaded) {
@@ -331,10 +368,10 @@ fun LauncherScreen(
     // Przycisk Home: zamyka wszystko i wraca na ekran główny
     LaunchedEffect(Unit) {
         homePressed.collect { visible ->
-            // Powrót z aplikacji: opcjonalnie zostajemy na ekranie, z którego ją uruchomiono
-            if (!visible && cfg.returnToLastPage) {
-                menu = null; selected = null; lockPrompt = null
-                closeDrawer()
+            // Powrót z aplikacji: ekran zależny od ustawienia „Po powrocie z aplikacji”
+            if (!visible) {
+                launchedApp = false
+                applyReturn()
                 return@collect
             }
             val wasIdle = drawer.value == 0f && !editMode && overlay == Overlay.None && openFolder == null && lockPrompt == null
@@ -571,7 +608,7 @@ fun LauncherScreen(
         )
     }
 
-    val callbacks = object : DesktopCallbacks {
+    val callbacksImpl = object : DesktopCallbacks {
         override fun onItemTap(pageId: String, item: DesktopItem, bounds: Rect) {
             menu = null
             if (editMode) {
@@ -640,6 +677,11 @@ fun LauncherScreen(
             selected = null
         }
     }
+    // Ta sama tożsamość callbacków i menu między kompozycjami – siatki i widżety nie przebudowują się
+    // przy każdym ruchu palca w trakcie przeciągania
+    val callbacks = remember { StableDesktopCallbacks(callbacksImpl) }.also { it.target = callbacksImpl }
+    val menuState = rememberUpdatedState(desktopMenu)
+    val stableDesktopMenu: @Composable (DesktopItem) -> Unit = remember { { item -> menuState.value(item) } }
 
     // Zamknięcie szuflady przeciągnięciem listy w dół
     val closeConnection = remember(heightPx) {
@@ -902,7 +944,7 @@ fun LauncherScreen(
                             host = vm.widgetHost,
                             aiEnabled = vm.aiReady,
                             callbacks = callbacks,
-                            menu = desktopMenu,
+                            menu = stableDesktopMenu,
                             onCellSize = { vm.cellSizePx = it },
                         )
                     }
@@ -1204,6 +1246,7 @@ fun LauncherScreen(
                 initial = item.gadgetStyle,
                 onDismiss = { gadgetStyleFor = null },
                 onSave = { st -> vm.setGadgetStyle(pageId, itemId, st); gadgetStyleFor = null },
+                onApplyAll = { st -> vm.setGadgetStyle(pageId, itemId, st); vm.applyGadgetLookToAll(st); gadgetStyleFor = null },
             )
         } else gadgetStyleFor = null
     }

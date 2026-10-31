@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -88,6 +87,23 @@ interface DesktopCallbacks {
     fun onEmptyLongPress()
     fun onEmptyDoubleTap()
     fun onEmptyTap()
+}
+
+/**
+ * Stała tożsamość callbacków przy zmiennej implementacji. Nowy obiekt w każdej kompozycji
+ * ekranu wymuszał przebudowę wszystkich ekranów i widżetów przy każdej zmianie komórki pod
+ * palcem w trakcie przeciągania – stąd przycięcia.
+ */
+class StableDesktopCallbacks(var target: DesktopCallbacks) : DesktopCallbacks {
+    override fun onItemTap(pageId: String, item: DesktopItem, bounds: Rect) = target.onItemTap(pageId, item, bounds)
+    override fun onItemLongPress(pageId: String, item: DesktopItem) = target.onItemLongPress(pageId, item)
+    override fun onOpenFolder(pageId: String, item: DesktopItem, bounds: Rect) = target.onOpenFolder(pageId, item, bounds)
+    override fun onDragStart(pageId: String, item: DesktopItem, bounds: Rect) = target.onDragStart(pageId, item, bounds)
+    override fun onDragEnd() = target.onDragEnd()
+    override fun onResize(pageId: String, item: DesktopItem, x: Int, y: Int, w: Int, h: Int) = target.onResize(pageId, item, x, y, w, h)
+    override fun onEmptyLongPress() = target.onEmptyLongPress()
+    override fun onEmptyDoubleTap() = target.onEmptyDoubleTap()
+    override fun onEmptyTap() = target.onEmptyTap()
 }
 
 @Composable
@@ -248,7 +264,11 @@ private fun DesktopItemSlot(
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
     var pressed by remember { mutableStateOf(false) }
-    var resize by remember(item.w, item.h) { mutableStateOf(IntSize(item.w, item.h)) }
+    // Zmieniany element od razu przyjmuje nowy rozmiar – treść widżetu przelicza się na żywo
+    val live = drag.resizing?.takeIf { it.itemId == item.id }
+    val gx = live?.x ?: item.x
+    val gy = live?.y ?: item.y
+    val resize = IntSize(live?.w ?: item.w, live?.h ?: item.h)
     val isDragged = drag.payload?.item?.id == item.id
     val ghost by animateFloatAsState(if (isDragged) 0.25f else 1f, label = "ghost")
 
@@ -257,7 +277,7 @@ private fun DesktopItemSlot(
 
     Box(
         Modifier
-            .offset(cw * item.x, ch * item.y)
+            .offset(cw * gx, ch * gy)
             .size(cw * resize.width, ch * resize.height)
             // Widżety zawsze pod ikonami (inaczej widżet systemowy przechwytuje dotyk ikon nad nim);
             // „Na wierzch/Na spód” ustala kolejność osobno wśród widżetów i wśród pozostałych elementów
@@ -404,13 +424,17 @@ private fun ResizeFrame(
     drag: DragController,
     onDone: (x: Int, y: Int, w: Int, h: Int) -> Unit,
 ) {
-    // Prostokąt w komórkach: [left, right) × [top, bottom)
-    var l by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.x) }
-    var t by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.y) }
-    var r by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.x + item.w) }
-    var b by remember(item.x, item.y, item.w, item.h) { mutableIntStateOf(item.y + item.h) }
+    // Prostokąt w komórkach: [left, right) × [top, bottom). W trakcie gestu z podglądu na żywo,
+    // poza nim – zawsze z bieżącego elementu (odrzucony rozmiar nie zostaje na ekranie)
+    val live = drag.resizing?.takeIf { it.itemId == item.id }
+    val l = live?.x ?: item.x
+    val t = live?.y ?: item.y
+    val r = l + (live?.w ?: item.w)
+    val b = t + (live?.h ?: item.h)
     var active by remember { mutableStateOf<Handle?>(null) }
     val done by rememberUpdatedState(onDone)
+    // Gest czyta element przez stan – po zapisie nowego rozmiaru kolejne przeciągnięcie startuje od niego
+    val current by rememberUpdatedState(item)
     val accent = MaterialTheme.colorScheme.primary
     // Płynne przejście ramki między komórkami
     val ox by animateDpAsState(cw * l, spring(stiffness = 1200f), label = "fx")
@@ -447,38 +471,50 @@ private fun ResizeFrame(
                     // Kropka na linii ramki; pole dotyku większe niż sama kropka
                     .offset(x = 14.dp * handle.h, y = 14.dp * handle.v)
                     .size(40.dp)
-                    .pointerInput(handle, cols, rows) {
+                    .pointerInput(handle, cols, rows, pageId) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
                             down.consume()
                             active = handle
-                            val start = drag.pointer
-                            val l0 = l; val t0 = t; val r0 = r; val b0 = b
+                            val it0 = current
+                            val l0 = it0.x; val t0 = it0.y; val r0 = it0.x + it0.w; val b0 = it0.y + it0.h
+                            var nl = l0; var nt = t0; var nr = r0; var nb = b0
                             val grid = drag.gridBounds[pageId]
                             val cellW = grid?.let { it.width / cols } ?: cw.toPx()
                             val cellH = grid?.let { it.height / rows } ?: ch.toPx()
+                            // Położenie palca w układzie okna – ramka sama się przesuwa, więc lokalne
+                            // współrzędne zmieniałyby się razem z nią
+                            val start = drag.pointer
+                            var finished = false
                             try {
                                 while (true) {
                                     val ev = awaitPointerEvent()
                                     val c = ev.changes.firstOrNull { it.id == down.id } ?: break
-                                    if (!c.pressed) break
+                                    if (!c.pressed) {
+                                        finished = true
+                                        break
+                                    }
                                     c.consume()
                                     val d = drag.pointer - start
                                     val dx = (d.x / cellW).roundToInt()
                                     val dy = (d.y / cellH).roundToInt()
                                     when (handle.h) {
-                                        -1 -> l = (l0 + dx).coerceIn(0, r0 - 1)
-                                        1 -> r = (r0 + dx).coerceIn(l0 + 1, cols)
+                                        -1 -> nl = (l0 + dx).coerceIn(0, r0 - 1)
+                                        1 -> nr = (r0 + dx).coerceIn(l0 + 1, cols)
                                     }
                                     when (handle.v) {
-                                        -1 -> t = (t0 + dy).coerceIn(0, b0 - 1)
-                                        1 -> b = (b0 + dy).coerceIn(t0 + 1, rows)
+                                        -1 -> nt = (t0 + dy).coerceIn(0, b0 - 1)
+                                        1 -> nb = (b0 + dy).coerceIn(t0 + 1, rows)
                                     }
+                                    val p = ResizePreview(it0.id, nl, nt, nr - nl, nb - nt)
+                                    if (drag.resizing != p) drag.resizing = p
                                 }
                             } finally {
+                                // Zawsze sprzątamy – także gdy gest przerwie zmiana ekranu albo wyjście z edycji
                                 active = null
+                                drag.resizing = null
                             }
-                            if (l != l0 || t != t0 || r != r0 || b != b0) done(l, t, r - l, b - t)
+                            if (finished && (nl != l0 || nt != t0 || nr != r0 || nb != b0)) done(nl, nt, nr - nl, nb - nt)
                         }
                     },
                 contentAlignment = Alignment.Center,

@@ -1,3 +1,18 @@
+## 2.9.0 — Widżety od nowa, ikony bez tła i powrót do ostatniego ekranu
+
+- 10 nowych widżetów, a okno „Widżety” pogrupowane w kategorie (Zegary, Pogoda, Słońce i Księżyc, Kalendarz i czas, Telefon, Osobiste i zdrowie) z opisem każdego widżetu.
+- „Wykres pogody”: godziny (do 7 dni) albo dni (do 16) na jednym wykresie – temperatura z odczuwalną albo minimum, słupki opadów (szansa lub suma mm), a pod spodem pasy z wiatrem, wilgotnością, zachmurzeniem, UV i ciśnieniem. Podpisy same się przerzedzają, najcieplej i najzimniej są podpisane zawsze, nowe doby oznaczone nazwą dnia.
+- „Jakość powietrza”: europejski indeks (EAQI) jako wskaźnik, lista PM2.5, PM10, NO₂, O₃, SO₂, CO albo prognoza indeksu na 24 h; pyłki w sezonie.
+- „Opady – najbliższe godziny”: co 15 minut na 6 godzin, z podsumowaniem „opady za 20 min” albo „przestanie ok. 14:30”.
+- „Wiatr”: róża wiatrów ze strzałką, prędkością, porywami i opisem w skali Beauforta.
+- „Zegar klapkowy”, „Następny budzik”, „Tydzień” (z numerem tygodnia i świętami), „Święta i dni wolne” (polskie święta liczone w telefonie, także ruchome, z mostkami i opcjonalnie zwyczajowymi), „Najbliższe wydarzenia” z kalendarza telefonu i „Stan telefonu” (bateria z temperaturą, pamięć, RAM, czas pracy).
+- Prognoza godzinowa i pełny panel sięgają do 168 godzin (7 dni); nowe skróty zakresu i odstęp co 12 h.
+- „Zastosuj do wszystkich” w karcie Styl: wygląd widżetu (kolory, tło, rogi, cienie, czcionka, ikony) trafia do wszystkich widżetów na każdym ekranie, a nowe widżety dostają go od razu; zmianę można cofnąć.
+- Nowy kształt ikon „Bez tła”: na pulpicie, w doku i szufladzie sam symbol aplikacji na przezroczystym tle, bez maski i bez ucinania (Ustawienia → Ikony → Kształt ikon).
+- „Po powrocie z aplikacji” zamiast przełącznika: Ekran główny, Ostatni ekran pulpitu albo Ostatnio widziany – wtedy wraca też otwarta szuflada albo folder, z którego uruchomiono aplikację. Działa po przycisku Home i po geście wstecz.
+- Poprawione przywieszanie przy zmianie rozmiaru: druga i kolejne zmiany tego samego widżetu nie gubią już ramki, odrzucony rozmiar nie zostaje na ekranie, a widżet zmienia rozmiar na żywo w trakcie przeciągania uchwytu.
+- Płynniejsze przeciąganie: pulpit nie przebudowuje wszystkich ekranów i widżetów przy każdym ruchu palca.
+
 ## 2.8.0 — Powrót na ostatni ekran
 
 - Nowy przełącznik „Powrót na ostatni ekran” (Ustawienia → Pulpit → Ekrany): po wyjściu z aplikacji uruchomionej z bocznego ekranu launcher wraca na ten ekran, a nie na ekran główny. Ponowne wciśnięcie Home na widocznym pulpicie nadal przenosi na ekran główny.

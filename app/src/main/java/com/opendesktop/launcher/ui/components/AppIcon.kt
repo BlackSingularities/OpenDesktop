@@ -71,7 +71,7 @@ val SquircleShape: Shape = GenericShape { size, _ ->
 }
 
 fun iconShapeOf(shape: IconShape): Shape? = when (shape) {
-    IconShape.System -> null
+    IconShape.System, IconShape.Transparent -> null
     IconShape.Circle -> CircleShape
     IconShape.Squircle -> SquircleShape
     IconShape.RoundedSquare -> RoundedCornerShape(24)

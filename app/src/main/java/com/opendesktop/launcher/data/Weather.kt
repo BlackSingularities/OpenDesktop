@@ -72,7 +72,7 @@ data class WeatherNow(
     val pressure: Double = 0.0,
     val cloud: Int = 0,
     val precip: Double = 0.0,
-    /** Godziny od bieżącej (włącznie) – do 48. */
+    /** Godziny od bieżącej (włącznie) – do [WeatherRepo.MAX_HOURS]. */
     val hours: List<WeatherHour> = emptyList(),
     /** Czas lokalny miejsca prognozy w chwili pomiaru. */
     val localTime: LocalDateTime? = null,
@@ -88,10 +88,12 @@ data class WeatherNow(
 /**
  * Pogoda z Open-Meteo (bez klucza API). Miasto zamieniane na współrzędne geokoderem
  * (albo podane wprost jako „52.23, 21.01”), wyniki trzymane w pamięci 20 minut – kilka
- * widżetów z tym samym miastem robi jedno zapytanie. Zawsze pobieramy 16 dni i 48 godzin
+ * widżetów z tym samym miastem robi jedno zapytanie. Zawsze pobieramy 16 dni i 168 godzin
  * w jednostkach metrycznych; przeliczanie jednostek robi widżet.
  */
 object WeatherRepo {
+    /** Prognoza godzinowa na 7 dni – wykres godzinowy może sięgać tak daleko. */
+    const val MAX_HOURS = 168
     private const val TTL = 20 * 60_000L
     private val cache = ConcurrentHashMap<String, Pair<Long, WeatherNow>>()
     private val places = ConcurrentHashMap<String, Triple<Double, Double, String>>()
@@ -111,7 +113,7 @@ object WeatherRepo {
             "apparent_temperature,relative_humidity_2m,wind_direction_10m,wind_gusts_10m,uv_index,cloud_cover,pressure_msl" +
             "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum," +
             "wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,sunrise,sunset" +
-            "&timezone=auto&forecast_days=16&forecast_hours=48"
+            "&timezone=auto&forecast_days=16&forecast_hours=$MAX_HOURS"
         val body = Http.get(url)
         val w = withContext(Dispatchers.Default) { parse(body, place) }
         cache[key] = System.currentTimeMillis() to w
@@ -170,7 +172,7 @@ object WeatherRepo {
                     cloud = h.arr("cloud_cover").num(i)?.toInt() ?: 0,
                     pressure = h.arr("pressure_msl").num(i) ?: 0.0,
                 )
-            }.take(48)
+            }.take(MAX_HOURS)
         } ?: emptyList()
         return WeatherNow(
             place = place,

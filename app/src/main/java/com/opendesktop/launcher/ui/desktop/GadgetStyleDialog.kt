@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DirectionsWalk
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.HorizontalRule
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MyLocation
@@ -101,11 +102,14 @@ import com.opendesktop.launcher.data.GadgetStyle
 import com.opendesktop.launcher.data.WeatherMetric
 import com.opendesktop.launcher.data.WeatherPlace
 import com.opendesktop.launcher.data.WeatherRepo
+import com.opendesktop.launcher.data.withAppearance
+import com.opendesktop.launcher.data.withLook
 import com.opendesktop.launcher.ui.settings.DialogTextField
 import com.opendesktop.launcher.ui.settings.Tile
 import com.opendesktop.launcher.ui.theme.Palette
 import kotlinx.coroutines.delay
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /** Gotowe zestawy wyglądu – zmieniają tylko kolory, tło, rogi, obrys i cienie, nie ustawienia treści. */
 private val looks = listOf(
@@ -127,25 +131,14 @@ private val looks = listOf(
     "Terminal" to GadgetStyle(background = 0xF0000000, textColor = 0xFF33FF66, accent = 0xFF33FF66, border = true, borderColor = 0x8033FF66, radius = 4),
 )
 
-private fun GadgetStyle.withLook(o: GadgetStyle) = copy(
-    background = o.background, background2 = o.background2, gradient = o.gradient, radius = o.radius, textColor = o.textColor,
-    accent = o.accent, border = o.border, borderColor = o.borderColor, borderWidth = o.borderWidth, shadow = o.shadow, textShadow = o.textShadow,
-)
-
-/** Pełny wygląd (z czcionką i ikonami) – do kopiowania między widżetami. */
-private fun GadgetStyle.withAppearance(o: GadgetStyle) = withLook(o).copy(
-    padding = o.padding, textScale = o.textScale, timeScale = o.timeScale, timeGap = o.timeGap, weight = o.weight, fontFamily = o.fontFamily,
-    iconStyle = o.iconStyle, iconScale = o.iconScale, tempColors = o.tempColors, weatherBackground = o.weatherBackground,
-    separators = o.separators,
-    contentShadow = o.contentShadow, shadowBlur = o.shadowBlur, shadowOffset = o.shadowOffset, shadowColor = o.shadowColor,
-)
-
 /** Schowek wyglądu, żeby nadać kilku widżetom ten sam styl (do zamknięcia aplikacji). */
 private var copiedLook: GadgetStyle? = null
 
 private val textColors = listOf(0xFFFFFFFF, 0xFF202124, 0xFFFFD54F, 0xFF80DEEA, 0xFFA5D6A7, 0xFFF48FB1, 0xFFB39DDB, 0xFFFFAB91, 0xFFECEFF1, 0xFF3E2723, 0xFF33FF66)
 private val accentColors = listOf(0xFF8AB4FF, 0xFF1A73E8, 0xFFFF7043, 0xFF69F0AE, 0xFFFFD54F, 0xFFEC407A, 0xFFBA68C8, 0xFF4DD0E1, 0xFFFFFFFF, 0xFFFFB74D, 0xFF64FFDA, 0xFFFF5252)
 private val backgroundColors = listOf(0xFF000000, 0xFFFFFFFF, 0xFF263238, 0xFF1E88E5, 0xFF43A047, 0xFFE53935, 0xFF8E24AA, 0xFFFFB300, 0xFF0D2847, 0xFF845EC2, 0xFFFF7E5F, 0xFF2C8C7A, 0xFFF7F1E3)
+
+private fun hoursText(h: Int) = if (h >= 48 && h % 24 == 0) "${h / 24} dni ($h h)" else "$h h"
 
 private val weights = listOf("Cienka" to 200, "Lekka" to 300, "Zwykła" to 400, "Średnia" to 500, "Gruba" to 600, "Czarna" to 800)
 private val aligns = listOf("Do lewej" to 0, "Środek" to 1, "Do prawej" to 2)
@@ -184,7 +177,14 @@ private enum class DialogPage(val label: String, val icon: ImageVector) {
  * widać w podglądzie; zapis dopiero przyciskiem.
  */
 @Composable
-fun GadgetStyleDialog(kind: GadgetKind, initial: GadgetStyle, onDismiss: () -> Unit, onSave: (GadgetStyle) -> Unit) {
+fun GadgetStyleDialog(
+    kind: GadgetKind,
+    initial: GadgetStyle,
+    onDismiss: () -> Unit,
+    onSave: (GadgetStyle) -> Unit,
+    /** Zapis tego widżetu i przeniesienie jego wyglądu na wszystkie pozostałe. */
+    onApplyAll: ((GadgetStyle) -> Unit)? = null,
+) {
     var st by remember { mutableStateOf(initial) }
     val pages = remember(kind) { DialogPage.entries.filter { it != DialogPage.Place || kind.isWeather } }
     var page by remember { mutableStateOf(pages.first()) }
@@ -221,7 +221,7 @@ fun GadgetStyleDialog(kind: GadgetKind, initial: GadgetStyle, onDismiss: () -> U
                         KindOptions(kind, st, set)
                         if (kind.isWeather) WeatherLookOptions(kind, st, set)
                     }
-                    DialogPage.Style -> CardOptions(st, set)
+                    DialogPage.Style -> CardOptions(st, set, onApplyAll)
                     DialogPage.Colors -> ColorOptions(st, set)
                     DialogPage.Text -> TextOptions(kind, st, set)
                 }
@@ -424,12 +424,22 @@ private fun UnitOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
 // ---------- Styl karty ----------
 
 @Composable
-private fun CardOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit) {
+private fun CardOptions(st: GadgetStyle, set: (GadgetStyle) -> Unit, onApplyAll: ((GadgetStyle) -> Unit)?) {
     Section("Gotowe style", Icons.Rounded.Wallpaper) {
         LookGrid(st, set)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ActionChip(Icons.Rounded.ContentCopy, "Kopiuj wygląd") { copiedLook = st }
             copiedLook?.let { c -> ActionChip(Icons.Rounded.ContentPaste, "Wklej wygląd") { set(st.withAppearance(c)) } }
+        }
+    }
+    if (onApplyAll != null) {
+        Section(
+            "Spójny wygląd", Icons.Rounded.DoneAll,
+            hint = "Kolory, tło, rogi, cienie, czcionka i ikony tego widżetu trafią do wszystkich widżetów OpenDesktop na każdym ekranie, a nowe widżety dostaną je od razu. Treść i ustawienia każdego widżetu zostają.",
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ActionChip(Icons.Rounded.DoneAll, "Zastosuj do wszystkich", primary = true) { onApplyAll(st) }
+            }
         }
     }
     Section("Tło", Icons.Rounded.Opacity) {
@@ -589,17 +599,23 @@ private fun GadgetKind.heroLabel(): String? = when (this) {
     GadgetKind.Countdown -> "Wielkość liczby dni"
     GadgetKind.DateCard -> "Wielkość liczby dnia"
     GadgetKind.MoonPhase, GadgetKind.MoonRound -> "Wielkość nazwy fazy"
+    GadgetKind.FlipClock, GadgetKind.NextAlarm -> "Wielkość godziny"
+    GadgetKind.Holidays -> "Wielkość liczby dni"
+    GadgetKind.AirQuality -> "Wielkość indeksu"
+    GadgetKind.Wind -> "Wielkość prędkości"
     else -> null
 }
 
 /** Widżety, w których pod główną wartością jest jeszcze jedna linia (data, dzień, podpis). */
 private fun GadgetKind.usesTimeGap() = this in setOf(
-    GadgetKind.DigitalClock, GadgetKind.ClockWeather, GadgetKind.SkyClock, GadgetKind.Countdown, GadgetKind.DateCard,
+    GadgetKind.DigitalClock, GadgetKind.ClockWeather, GadgetKind.SkyClock, GadgetKind.Countdown, GadgetKind.DateCard, GadgetKind.FlipClock,
 )
 
 private fun GadgetKind.usesAlign() = this !in setOf(
     GadgetKind.AnalogClock, GadgetKind.Forecast, GadgetKind.Calendar, GadgetKind.Progress, GadgetKind.Storage, GadgetKind.ClockWeather,
     GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails, GadgetKind.SunArc, GadgetKind.YearDots,
+    GadgetKind.WeatherChart, GadgetKind.AirQuality, GadgetKind.RainNow, GadgetKind.WeekStrip, GadgetKind.Holidays, GadgetKind.Agenda,
+    GadgetKind.DeviceStatus, GadgetKind.Wind,
 )
 
 // ---------- Treść ----------
@@ -623,9 +639,12 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
         ValueSlider("Liczba dni", st.days.toFloat().coerceIn(1f, 16f), 1f..16f, { "${it.toInt()}" }, steps = 14) { set(st.copy(days = it.toInt())) }
     }
     val hoursSlider: @Composable () -> Unit = {
-        ValueSlider("Liczba godzin", st.hours.toFloat().coerceIn(3f, 48f), 3f..48f, { "${it.toInt()} h" }, steps = 44) { set(st.copy(hours = it.toInt())) }
+        ValueSlider("Liczba godzin", st.hours.toFloat().coerceIn(3f, 168f), 3f..168f, { hoursText(it.roundToInt()) }) { set(st.copy(hours = it.roundToInt())) }
+        FlowChips(listOf("6 h", "12 h", "24 h", "48 h", "3 dni", "5 dni", "7 dni"), listOf(6, 12, 24, 48, 72, 120, 168).indexOf(st.hours)) {
+            set(st.copy(hours = listOf(6, 12, 24, 48, 72, 120, 168)[it]))
+        }
         SubLabel("Odstęp")
-        Segmented(listOf("1 h", "2 h", "3 h", "6 h"), listOf(1, 2, 3, 6).indexOf(st.hourStep)) { set(st.copy(hourStep = listOf(1, 2, 3, 6)[it])) }
+        Segmented(listOf("1 h", "2 h", "3 h", "6 h", "12 h"), listOf(1, 2, 3, 6, 12).indexOf(st.hourStep)) { set(st.copy(hourStep = listOf(1, 2, 3, 6, 12)[it])) }
     }
     val dayNames: @Composable () -> Unit = {
         SubLabel("Nazwy dni")
@@ -787,6 +806,61 @@ private fun KindOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetStyle) ->
                 Toggles(listOf(details("Licznik dni")))
             }
         }
+        GadgetKind.WeatherChart -> {
+            layout(listOf("Godziny", "Dni"), 1)
+            Section("Zakres", if (st.mode == 1) Icons.Rounded.DateRange else Icons.Rounded.AccessTime, hint = "Podpisy same się przerzedzają, żeby się nie nakładały – najcieplej i najzimniej są podpisane zawsze.") {
+                if (st.mode == 1) {
+                    daysSlider()
+                    dayNames()
+                } else hoursSlider()
+            }
+            Section("Pokazuj", Icons.Rounded.Info) {
+                Toggles(listOf(details("Nagłówek"), Tile(Icons.Rounded.WbSunny, "Ikony warunków", st.showCondition) { set(st.copy(showCondition = it)) }, today, fill, clock) + if (st.mode == 1) listOf(tomorrow) else emptyList())
+            }
+            MetricOptions(
+                st,
+                if (st.mode == 1) listOf(WeatherMetric.Precip, WeatherMetric.Rain, WeatherMetric.Wind, WeatherMetric.Uv)
+                else listOf(WeatherMetric.Feels, WeatherMetric.Precip, WeatherMetric.Rain, WeatherMetric.Wind, WeatherMetric.Humidity, WeatherMetric.Cloud, WeatherMetric.Uv, WeatherMetric.Pressure),
+                set,
+                hint = if (st.mode == 1) "W dniach druga, przerywana krzywa to temperatura minimalna. Wiatr i UV to pasy pod wykresem."
+                else "Odczuwalna to druga, przerywana krzywa; opady to słupki (szansa albo suma mm). Wiatr, wilgotność, chmury, UV i ciśnienie to pasy pod wykresem – te, które się nie zmieszczą, chowają się.",
+            )
+        }
+        GadgetKind.AirQuality -> {
+            layout(listOf("Wskaźnik", "Lista", "Prognoza 24 h"), 2)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Nazwa miejsca"))) }
+            Section("Zanieczyszczenia", Icons.Rounded.Air, hint = "Europejski indeks jakości powietrza (EAQI) z Open-Meteo. Pyłki są dostępne tylko w Europie i w sezonie pylenia.") {
+                Toggles(AirMetrics.map { (k, name) -> Tile(Icons.Rounded.Air, name, k in st.metrics) { on -> set(st.copy(metrics = if (on) st.metrics + k else st.metrics - k)) } }, showIcons = false)
+            }
+        }
+        GadgetKind.RainNow -> Section("Pokazuj", Icons.Rounded.Info, hint = "Prognoza co 15 minut na 6 godzin; najdokładniejsza w Europie i Ameryce Północnej.") {
+            Toggles(listOf(details("Nazwa miejsca"), clock))
+        }
+        GadgetKind.Wind -> {
+            layout(listOf("Sama róża", "Z opisem"), 1)
+            Section("Pokazuj", Icons.Rounded.Info, hint = "„Z opisem” potrzebuje szerszego widżetu, np. 4 × 2.") { Toggles(listOf(details("Porywy i miejsce"))) }
+        }
+        GadgetKind.FlipClock -> Section("Zegar", Icons.Rounded.AccessTime, hint = "Karty mają kolor akcentu, cyfry – kolor tekstu (karta Kolory).") {
+            Toggles(listOf(clock, seconds, date))
+        }
+        GadgetKind.WeekStrip -> Section("Tydzień", Icons.Rounded.ViewWeek, hint = "Soboty, niedziele i święta są przygaszone, święta – czerwone.") {
+            Toggles(listOf(monday, details("Numer tygodnia")))
+        }
+        GadgetKind.Holidays -> {
+            layout(listOf("Najbliższe + lista", "Sama lista"), 1)
+            Section("Pokazuj", Icons.Rounded.Info, hint = "Dni wolne od pracy w Polsce, liczone w telefonie – także ruchome i mostki.") {
+                Toggles(listOf(details("Także święta zwyczajowe")))
+            }
+        }
+        GadgetKind.Agenda -> Section("Wydarzenia", Icons.Rounded.DateRange, hint = "Z kalendarzy widocznych w aplikacji Kalendarz (Google, Exchange, telefon).") {
+            ValueSlider("Ile dni do przodu", st.days.toFloat().coerceIn(1f, 31f), 1f..31f, { "${it.toInt()}" }, steps = 29) { set(st.copy(days = it.toInt())) }
+            Toggles(listOf(clock, details("Miejsce")))
+        }
+        GadgetKind.NextAlarm -> Section("Budzik", Icons.Rounded.AccessTime) { Toggles(listOf(clock, details("Za ile"))) }
+        GadgetKind.DeviceStatus -> {
+            layout(listOf("Kafelki", "Lista"), 1)
+            Section("Pokazuj", Icons.Rounded.Info) { Toggles(listOf(details("Wolne GB zamiast %"))) }
+        }
     }
 }
 
@@ -805,7 +879,7 @@ private fun WeatherLookOptions(kind: GadgetKind, st: GadgetStyle, set: (GadgetSt
                 Tile(Icons.Rounded.Thermostat, "Kolorowe temperatury", st.tempColors) { set(st.copy(tempColors = it)) },
                 Tile(Icons.Rounded.Numbers, "Dziesiąte części", st.decimals) { set(st.copy(decimals = it)) },
                 Tile(Icons.Rounded.Update, "Godzina aktualizacji", st.showUpdated) { set(st.copy(showUpdated = it)) },
-            ) + if (kind in setOf(GadgetKind.Forecast, GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails)) {
+            ) + if (kind in setOf(GadgetKind.Forecast, GadgetKind.HourlyForecast, GadgetKind.WeatherFull, GadgetKind.WeatherDetails, GadgetKind.WeatherChart)) {
                 listOf(Tile(Icons.Rounded.HorizontalRule, "Linie podziału", st.separators) { set(st.copy(separators = it)) })
             } else emptyList()
         )

@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Pogoda dla bieżącego miejsca (zgrubna lokalizacja; pytamy przy wyborze w widżecie) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Widżet kroków i kalorii (Health Connect, pytamy przy połączeniu w widżecie) -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />

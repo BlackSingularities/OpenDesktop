@@ -86,6 +86,7 @@ import com.opendesktop.launcher.data.WeatherHour
 import com.opendesktop.launcher.data.WeatherMetric
 import com.opendesktop.launcher.data.WeatherNow
 import com.opendesktop.launcher.data.WeatherRepo
+import com.opendesktop.launcher.data.WeatherExtras
 import com.opendesktop.launcher.data.WeatherUnits
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -115,6 +116,7 @@ internal object WeatherRefresh {
 
     fun request() {
         WeatherRepo.clear()
+        WeatherExtras.clear()
         DeviceLocation.clear()
         tick++
     }
@@ -217,7 +219,7 @@ internal fun WxIcon(p: GadgetPaint, code: Int, isDay: Boolean, size: Dp) {
 }
 
 @Composable
-private fun WeatherPlaceholder(p: GadgetPaint, state: Result<WeatherNow>?, size: Float) {
+internal fun WeatherPlaceholder(p: GadgetPaint, state: Result<WeatherNow>?, size: Float) {
     Column(horizontalAlignment = p.hAlign) {
         if (state == null) T("Pobieranie pogody…", p.text(size, FontWeight.Normal, 0.8f))
         else {
@@ -230,7 +232,7 @@ private fun WeatherPlaceholder(p: GadgetPaint, state: Result<WeatherNow>?, size:
 
 /** Pogoda albo zastępczy napis; [content] dostaje gotowe dane. */
 @Composable
-private fun WithWeather(p: GadgetPaint, content: @Composable (WeatherNow, LocalDateTime) -> Unit) {
+internal fun WithWeather(p: GadgetPaint, content: @Composable (WeatherNow, LocalDateTime) -> Unit) {
     val state = rememberWeather(p.st)
     // Zmieniający się co minutę argument wymusza przeliczenie „teraz” (godziny, łuk słońca, zmiana dnia)
     val tick = rememberNow(false)
@@ -242,16 +244,16 @@ private fun WithWeather(p: GadgetPaint, content: @Composable (WeatherNow, LocalD
     } else content(w, tick)
 }
 
-private fun clock(t: LocalDateTime?, st: GadgetStyle): String =
+internal fun clock(t: LocalDateTime?, st: GadgetStyle): String =
     t?.format(DateTimeFormatter.ofPattern(if (st.use24h) "HH:mm" else "h:mm a", if (st.use24h) Locale.getDefault() else Locale.ENGLISH)) ?: "—"
 
-private fun hourLabel(h: WeatherHour, first: Boolean, st: GadgetStyle): String = when {
+internal fun hourLabel(h: WeatherHour, first: Boolean, st: GadgetStyle): String = when {
     first -> "Teraz"
     st.use24h -> h.time.format(DateTimeFormatter.ofPattern("HH"))
     else -> h.time.format(DateTimeFormatter.ofPattern("h a", Locale.ENGLISH))
 }
 
-private fun dayLabel(offset: Int, d: LocalDate, st: GadgetStyle, locale: Locale): String {
+internal fun dayLabel(offset: Int, d: LocalDate, st: GadgetStyle, locale: Locale): String {
     if (st.dayNames != 2 && offset == 0) return "Dziś"
     if (st.dayNames == 1 && offset == 1) return "Jutro"
     val short = cap(d.dayOfWeek.getDisplayName(JTextStyle.SHORT, locale), locale)
@@ -263,10 +265,10 @@ private fun dayLabel(offset: Int, d: LocalDate, st: GadgetStyle, locale: Locale)
     }
 }
 
-private fun lengthText(d: Duration): String = if (d.toHours() == 0L) "${d.toMinutes()} min" else "${d.toHours()} h ${d.toMinutes() % 60} min"
+internal fun lengthText(d: Duration): String = if (d.toHours() == 0L) "${d.toMinutes()} min" else "${d.toHours()} h ${d.toMinutes() % 60} min"
 
 /** Dni do pokazania: od dziś (albo jutra) w strefie miejsca, z przesunięciem względem dziś. */
-private fun shownDays(w: WeatherNow, st: GadgetStyle): List<Pair<Int, WeatherDay>> {
+internal fun shownDays(w: WeatherNow, st: GadgetStyle): List<Pair<Int, WeatherDay>> {
     val today = placeNow(w).toLocalDate()
     return w.days.filter { !it.date.isBefore(today) }
         .drop(if (st.startTomorrow) 1 else 0)
@@ -275,10 +277,10 @@ private fun shownDays(w: WeatherNow, st: GadgetStyle): List<Pair<Int, WeatherDay
 }
 
 /** Godziny od bieżącej, co [GadgetStyle.hourStep]. */
-private fun shownHours(w: WeatherNow, st: GadgetStyle): List<WeatherHour> {
+internal fun shownHours(w: WeatherNow, st: GadgetStyle): List<WeatherHour> {
     val from = placeNow(w).withMinute(0).withSecond(0).withNano(0)
-    val step = st.hourStep.coerceIn(1, 6)
-    return w.hours.filter { !it.time.isBefore(from) }.take(st.hours.coerceIn(3, 48)).filterIndexed { i, _ -> i % step == 0 }
+    val step = st.hourStep.coerceIn(1, 12)
+    return w.hours.filter { !it.time.isBefore(from) }.take(st.hours.coerceIn(3, WeatherRepo.MAX_HOURS)).filterIndexed { i, _ -> i % step == 0 }
 }
 
 private class Metric(val icon: ImageVector, val label: String, val value: String, val rotation: Float? = null)
@@ -303,7 +305,7 @@ private fun currentMetrics(p: GadgetPaint, w: WeatherNow, skip: Set<String> = em
 }
 
 /** Kolor procentu opadów: niebieski przy kolorowych ikonach, inaczej przygaszony tekst. */
-private fun precipColor(p: GadgetPaint): Color = if (p.st.iconStyle == 1 || p.st.tempColors) Color(0xFF6EC6FF) else p.fg.copy(alpha = 0.75f)
+internal fun precipColor(p: GadgetPaint): Color = if (p.st.iconStyle == 1 || p.st.tempColors) Color(0xFF6EC6FF) else p.fg.copy(alpha = 0.75f)
 
 @Composable
 private fun MetricIcon(m: Metric, tint: Color, size: Dp) {
@@ -326,14 +328,14 @@ private fun MetricStrip(p: GadgetPaint, metrics: List<Metric>, fs: Float, modifi
 }
 
 @Composable
-private fun Separator(p: GadgetPaint, vertical: Boolean = false) {
+internal fun Separator(p: GadgetPaint, vertical: Boolean = false) {
     if (!p.st.separators) return
     if (vertical) Box(Modifier.width(1.dp).fillMaxHeight(0.6f).background(p.faint))
     else Box(Modifier.fillMaxWidth().height(1.dp).background(p.faint))
 }
 
 @Composable
-private fun UpdatedLabel(p: GadgetPaint, w: WeatherNow, fs: Float, modifier: Modifier = Modifier) {
+internal fun UpdatedLabel(p: GadgetPaint, w: WeatherNow, fs: Float, modifier: Modifier = Modifier) {
     if (!p.st.showUpdated) return
     val t = java.time.Instant.ofEpochMilli(w.fetchedAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
     T("Akt. ${clock(t, p.st)}", p.text(fs, FontWeight.Normal, 0.5f), modifier)
@@ -341,7 +343,7 @@ private fun UpdatedLabel(p: GadgetPaint, w: WeatherNow, fs: Float, modifier: Mod
 
 /** Nagłówek „Miasto · 12° · Pochmurno” z godziną aktualizacji po prawej. */
 @Composable
-private fun HeaderLine(p: GadgetPaint, w: WeatherNow, fs: Float) {
+internal fun HeaderLine(p: GadgetPaint, w: WeatherNow, fs: Float) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         T(
             "${w.place} · ${p.deg(w.temp)} · ${WeatherRepo.describe(w.code)}",
@@ -362,7 +364,7 @@ private val hourMetrics = listOf(
     WeatherMetric.Humidity, WeatherMetric.Uv, WeatherMetric.Cloud, WeatherMetric.Pressure,
 )
 
-private fun hourIcon(m: String): ImageVector = when (m) {
+internal fun hourIcon(m: String): ImageVector = when (m) {
     WeatherMetric.Feels -> Icons.Rounded.Thermostat
     WeatherMetric.Precip -> Icons.Rounded.Umbrella
     WeatherMetric.Rain -> Icons.Rounded.WaterDrop
@@ -403,7 +405,7 @@ private fun HourCell(p: GadgetPaint, v: HourValue, fs: Float, modifier: Modifier
 }
 
 /** Nazwa dnia nad pierwszą godziną nowej doby (na wykresie zamiast „00”). */
-private fun isMidnight(h: WeatherHour, i: Int) = i > 0 && h.time.hour == 0
+internal fun isMidnight(h: WeatherHour, i: Int) = i > 0 && h.time.hour == 0
 
 /**
  * Krótkie podsumowanie najbliższych godzin: kiedy zacznie (albo przestanie) padać oraz
@@ -723,7 +725,7 @@ private fun HourChart(p: GadgetPaint, hours: List<WeatherHour>, modifier: Modifi
     }
 }
 
-private fun metricName(m: String) = when (m) {
+internal fun metricName(m: String) = when (m) {
     WeatherMetric.Feels -> "odczuwalna"
     WeatherMetric.Precip -> "szansa opadów"
     WeatherMetric.Rain -> "opady"

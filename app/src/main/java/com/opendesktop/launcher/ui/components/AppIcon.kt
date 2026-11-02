@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
@@ -215,6 +216,14 @@ fun FolderIcon(
 }
 
 /** Rysowanie ikony bezpośrednio na Canvasie (widoki 3D). */
+/** Kształty ikon są procentowe, więc jedna ścieżka na kształt wystarcza dla każdego rozmiaru. */
+private const val SHAPE_REF = 256f
+private val shapePaths = java.util.EnumMap<IconShape, Path>(IconShape::class.java)
+
+private fun DrawScope.shapePath(shape: IconShape, shapeObj: Shape): Path = shapePaths.getOrPut(shape) {
+    Path().apply { addOutline(shapeObj.createOutline(Size(SHAPE_REF, SHAPE_REF), layoutDirection, this@shapePath)) }
+}
+
 fun DrawScope.drawAppIcon(img: ImageBitmap, center: Offset, sizePx: Float, alpha: Float, shape: IconShape) {
     val s = sizePx.roundToInt().coerceAtLeast(1)
     val tl = IntOffset((center.x - sizePx / 2).roundToInt(), (center.y - sizePx / 2).roundToInt())
@@ -225,16 +234,15 @@ fun DrawScope.drawAppIcon(img: ImageBitmap, center: Offset, sizePx: Float, alpha
             alpha = alpha.coerceIn(0f, 1f), filterQuality = FilterQuality.Low,
         )
     } else {
-        val outline = shapeObj.createOutline(Size(s.toFloat(), s.toFloat()), layoutDirection, this)
-        val path = Path().apply {
-            addOutline(outline)
-            translate(Offset(tl.x.toFloat(), tl.y.toFloat()))
-        }
-        clipPath(path) {
-            drawImage(
-                img, srcSize = IntSize(img.width, img.height), dstOffset = tl, dstSize = IntSize(s, s),
-                alpha = alpha.coerceIn(0f, 1f), filterQuality = FilterQuality.Low,
-            )
+        // Szuflady 3D rysują dziesiątki ikon w każdej klatce: bez nowej ścieżki na ikonę, tylko przesunięcie i skala
+        val k = s / SHAPE_REF
+        withTransform({ translate(tl.x.toFloat(), tl.y.toFloat()); scale(k, k, Offset.Zero) }) {
+            clipPath(shapePath(shape, shapeObj)) {
+                drawImage(
+                    img, srcSize = IntSize(img.width, img.height), dstSize = IntSize(SHAPE_REF.toInt(), SHAPE_REF.toInt()),
+                    alpha = alpha.coerceIn(0f, 1f), filterQuality = FilterQuality.Low,
+                )
+            }
         }
     }
 }

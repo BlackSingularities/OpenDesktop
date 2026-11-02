@@ -11,7 +11,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.LocalDateTime
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 
 /** Jakość powietrza teraz (µg/m³, indeks europejski 0–100+) i prognoza indeksu na kolejne godziny. */
 data class AirNow(
@@ -38,8 +37,8 @@ data class RainSlot(val time: LocalDateTime, val mm: Double, val code: Int)
  */
 object WeatherExtras {
     private const val TTL = 20 * 60_000L
-    private val air = ConcurrentHashMap<String, Pair<Long, AirNow>>()
-    private val rain = ConcurrentHashMap<String, Pair<Long, List<RainSlot>>>()
+    private val air = TimedCache<AirNow>(TTL)
+    private val rain = TimedCache<List<RainSlot>>(TTL / 2)
 
     private fun key(lat: Double, lon: Double) = "%.3f,%.3f".format(Locale.ROOT, lat, lon)
 
@@ -50,26 +49,24 @@ object WeatherExtras {
 
     suspend fun air(lat: Double, lon: Double): AirNow {
         val k = key(lat, lon)
-        air[k]?.let { (t, a) -> if (System.currentTimeMillis() - t < TTL) return a }
-        val url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$lat&longitude=$lon" +
-            "&current=european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide," +
-            "alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen" +
-            "&hourly=european_aqi&forecast_days=2&timezone=auto"
-        val body = Http.get(url)
-        val a = withContext(Dispatchers.Default) { parseAir(body) }
-        air[k] = System.currentTimeMillis() to a
-        return a
+        return air.get(k) {
+            val url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=$lat&longitude=$lon" +
+                "&current=european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide," +
+                "alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen" +
+                "&hourly=european_aqi&forecast_days=2&timezone=auto"
+            val body = Http.get(url)
+            withContext(Dispatchers.Default) { parseAir(body) }
+        }
     }
 
     suspend fun rain(lat: Double, lon: Double): List<RainSlot> {
         val k = key(lat, lon)
-        rain[k]?.let { (t, r) -> if (System.currentTimeMillis() - t < TTL / 2) return r }
-        val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-            "&minutely_15=precipitation,weather_code&forecast_minutely_15=24&timezone=auto"
-        val body = Http.get(url)
-        val r = withContext(Dispatchers.Default) { parseRain(body) }
-        rain[k] = System.currentTimeMillis() to r
-        return r
+        return rain.get(k) {
+            val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+                "&minutely_15=precipitation,weather_code&forecast_minutely_15=24&timezone=auto"
+            val body = Http.get(url)
+            withContext(Dispatchers.Default) { parseRain(body) }
+        }
     }
 
     private fun JsonArray?.num(i: Int): Double? = this?.getOrNull(i)?.jsonPrimitive?.doubleOrNull

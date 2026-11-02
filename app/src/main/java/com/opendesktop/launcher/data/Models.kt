@@ -89,6 +89,13 @@ enum class GestureAction(val label: String) {
     QuickSettings("Szybkie ustawienia"),
     EditMode("Tryb edycji pulpitu"),
     Settings("Ustawienia launchera"),
+    HomeScreen("Ekran główny"),
+    NextScreen("Następny ekran"),
+    PreviousScreen("Poprzedni ekran"),
+    Flashlight("Latarka"),
+    Camera("Aparat"),
+    Assistant("Asystent głosowy"),
+    Wallpaper("Zmień tapetę"),
 }
 
 @Serializable
@@ -482,6 +489,7 @@ data class Config(
     val drawerHeaderBackground: Boolean = true,
     /** Kontakty i ekrany ustawień w wynikach wyszukiwania w szufladzie. */
     val drawerContacts: Boolean = true,
+    val lockHidden: Boolean = true,
     /** Kalkulator i przeliczanie jednostek nad wynikami wyszukiwania. */
     val drawerQuickAnswers: Boolean = true,
     // Gesty

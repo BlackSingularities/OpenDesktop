@@ -312,6 +312,13 @@ fun LauncherScreen(
             GestureAction.QuickSettings -> SystemActions.openQuickSettings(ctx)
             GestureAction.EditMode -> requestEdit()
             GestureAction.Settings -> overlay = Overlay.Settings
+            GestureAction.HomeScreen -> scope.launch { pagerState.animateScrollToPage(cfg.defaultPage.coerceIn(0, ws.pages.size - 1)) }
+            GestureAction.NextScreen -> scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(ws.pages.size - 1)) }
+            GestureAction.PreviousScreen -> scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
+            GestureAction.Flashlight -> SystemActions.toggleFlashlight(ctx)
+            GestureAction.Camera -> SystemActions.openCamera(ctx)
+            GestureAction.Assistant -> SystemActions.openAssistant(ctx)
+            GestureAction.Wallpaper -> SystemActions.openWallpaperPicker(ctx)
         }
     }
 

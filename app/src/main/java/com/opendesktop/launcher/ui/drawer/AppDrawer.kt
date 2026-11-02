@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import com.opendesktop.launcher.ui.components.LabelShadow
+import com.opendesktop.launcher.ui.components.rememberDeviceUnlock
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -113,6 +116,9 @@ fun AppDrawer(
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf<String?>(null) }
     var showHidden by remember { mutableStateOf(false) }
+    val unlock = rememberDeviceUnlock()
+    // Po wyjściu z launchera ukryte znów są schowane – kolejne odkrycie wymaga potwierdzenia
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (cfg.lockHidden) showHidden = false }
     var sortMenu by remember { mutableStateOf(false) }
     var styleMenu by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
@@ -259,7 +265,11 @@ fun AppDrawer(
                         PanelMenuItem(
                             if (showHidden) "Ukryj ukryte" else "Pokaż ukryte (${ws.hidden.size})",
                             if (showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            onClick = { showHidden = !showHidden; sortMenu = false },
+                            onClick = {
+                                sortMenu = false
+                                if (showHidden || !cfg.lockHidden || ws.hidden.isEmpty()) showHidden = !showHidden
+                                else unlock("Pokaż ukryte aplikacje") { showHidden = true }
+                            },
                         )
                         PanelMenuDivider()
                         PanelMenuItem("Układ szuflady…", Icons.Rounded.Dashboard, onClick = { sortMenu = false; styleMenu = true })

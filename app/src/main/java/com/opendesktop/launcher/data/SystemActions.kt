@@ -8,8 +8,11 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.provider.AlarmClock
+import android.provider.MediaStore
 import android.provider.Settings
 
 object SystemActions {
@@ -36,6 +39,36 @@ object SystemActions {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         }
+    }
+
+    private var torchOn = false
+    private var torchWatched = false
+
+    /** Przełącza latarkę tylnego aparatu; stan śledzi systemowe wywołanie zwrotne, więc zgadza się z kafelkiem. */
+    fun toggleFlashlight(context: Context) {
+        val cm = context.getSystemService(CameraManager::class.java) ?: return
+        runCatching {
+            if (!torchWatched) {
+                cm.registerTorchCallback(object : CameraManager.TorchCallback() {
+                    override fun onTorchModeChanged(cameraId: String, enabled: Boolean) { torchOn = enabled }
+                }, null)
+                torchWatched = true
+            }
+            val id = cm.cameraIdList.firstOrNull { cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true }
+                ?: return
+            cm.setTorchMode(id, !torchOn)
+        }
+    }
+
+    fun openCamera(context: Context) {
+        runCatching {
+            context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    fun openAssistant(context: Context) {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VOICE_COMMAND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { runCatching { context.startActivity(Intent(Intent.ACTION_ASSIST).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
     }
 
     fun openClock(context: Context) {

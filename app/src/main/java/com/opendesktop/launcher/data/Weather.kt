@@ -95,7 +95,7 @@ object WeatherRepo {
     /** Prognoza godzinowa na 7 dni – wykres godzinowy może sięgać tak daleko. */
     const val MAX_HOURS = 168
     private const val TTL = 20 * 60_000L
-    private val cache = ConcurrentHashMap<String, Pair<Long, WeatherNow>>()
+    private val cache = TimedCache<WeatherNow>(TTL)
     private val places = ConcurrentHashMap<String, Triple<Double, Double, String>>()
     private val coords = Regex("""^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,; ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$""")
 
@@ -103,7 +103,10 @@ object WeatherRepo {
     suspend fun get(city: String, coords: String = ""): WeatherNow {
         val name = city.trim().ifBlank { "Warszawa" }
         val key = coords.trim().ifBlank { name }.lowercase()
-        cache[key]?.let { (t, w) -> if (System.currentTimeMillis() - t < TTL) return w }
+        return cache.get(key) { fetch(key, name, coords) }
+    }
+
+    private suspend fun fetch(key: String, name: String, coords: String): WeatherNow {
         val (lat, lon, place) = places[key]
             ?: (if (coords.isNotBlank()) resolve(coords).copy(third = name) else resolve(name)).also { places[key] = it }
         val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
@@ -115,9 +118,7 @@ object WeatherRepo {
             "wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max,sunrise,sunset" +
             "&timezone=auto&forecast_days=16&forecast_hours=$MAX_HOURS"
         val body = Http.get(url)
-        val w = withContext(Dispatchers.Default) { parse(body, place) }
-        cache[key] = System.currentTimeMillis() to w
-        return w
+        return withContext(Dispatchers.Default) { parse(body, place) }
     }
 
     /** Rozbiór odpowiedzi Open-Meteo; wydzielony, żeby dało się go sprawdzić testem. */

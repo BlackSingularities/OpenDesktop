@@ -290,6 +290,7 @@ private fun DrawerSection(cfg: Config, set: Setter, pick: Picker) {
             Tile(Icons.Rounded.LocalOffer, "Kategorie pod nazwą", cfg.drawerShowCategories) { v -> set { it.copy(drawerShowCategories = v) } },
             Tile(Icons.Rounded.Keyboard, "Klawiatura od razu", cfg.searchAutoFocus) { v -> set { it.copy(searchAutoFocus = v) } },
             Tile(Icons.Rounded.Contacts, "Kontakty w wynikach", cfg.drawerContacts) { v -> set { it.copy(drawerContacts = v) } },
+            Tile(Icons.Rounded.Lock, "Ukryte za blokadą", cfg.lockHidden) { v -> set { it.copy(lockHidden = v) } },
             Tile(Icons.Rounded.Calculate, "Szybkie odpowiedzi", cfg.drawerQuickAnswers) { v -> set { it.copy(drawerQuickAnswers = v) } },
         ),
     )

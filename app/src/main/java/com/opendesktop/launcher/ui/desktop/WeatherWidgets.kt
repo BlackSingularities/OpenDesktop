@@ -114,10 +114,17 @@ internal object WeatherRefresh {
     /** Liczba trwających zapytań – kręci ikoną odświeżania. */
     var busy by mutableIntStateOf(0)
 
+    private var lastClear = 0L
+
+    /** Seria stuknięć nie zasypuje Open-Meteo: dane z ostatnich 30 s zostają w pamięci. */
     fun request() {
-        WeatherRepo.clear()
-        WeatherExtras.clear()
-        DeviceLocation.clear()
+        val now = System.currentTimeMillis()
+        if (now - lastClear >= 30_000) {
+            WeatherRepo.clear()
+            WeatherExtras.clear()
+            DeviceLocation.clear()
+            lastClear = now
+        }
         tick++
     }
 }

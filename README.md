@@ -17,7 +17,7 @@ Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie 
 - **Pogoda** (Open-Meteo, bez klucza) — bieżąca, prognoza do 16 dni (kolumny, lista z paskami zakresu, wykres, kompakt), prognoza godzinowa do 48 h (wykres z opadami, kolumny, lista), pełny panel, kafelki szczegółów (wiatr z kierunkiem, wilgotność, ciśnienie, UV, opady, zachmurzenie, słońce) i łuk drogi słońca. Miasto albo współrzędne, jednostki °C/°F, km/h, m/s, mph, węzły, hPa/mmHg/inHg.
 - **Dostosowanie widżetów** — stały podgląd i cztery karty: treść, wygląd (16 gotowych stylów, gradienty, obrys, cienie, kopiowanie wyglądu między widżetami), kolory (własny kolor HSV lub hex) i tekst (5 krojów, 6 grubości). Jednym przyciskiem „Zastosuj do wszystkich” wygląd trafia do wszystkich widżetów i nowych. Dla pogody: tło zależne od warunków, kolorowe temperatury, ikony akcent/kolorowe/emoji, wielkość ikon.
 - **Dok** — od 3 do 7 miejsc; przeciąganie między dokiem a pulpitem.
-- **Gesty** — przesunięcie w górę, w dół i podwójne dotknięcie z akcjami do wyboru.
+- **Gesty** — przesunięcie w górę i w dół, podwójne dotknięcie, uszczypnięcie, rozsunięcie palców oraz dwa palce w górę i w dół. Do wyboru 14 akcji: szuflada, wyszukiwanie, powiadomienia, szybkie ustawienia, tryb edycji, ustawienia, ekran główny, następny i poprzedni ekran, latarka, aparat, asystent głosowy i zmiana tapety.
 - **Strefy upuszczania** — usuń, informacje, odinstaluj.
 - **Cofanie** — po usunięciu ikony, folderu, widżetu albo ekranu przez pięć sekund widać nad dokiem „Cofnij”; widżet wraca działający, bo z hosta znika dopiero po tym czasie.
 
@@ -30,6 +30,7 @@ Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie 
 - Szybkie odpowiedzi nad wynikami: kalkulator („12*7+3”) i przeliczanie jednostek („10 km na mi”, „72 f to c”), kliknięcie kopiuje wynik do schowka.
 - Kontakty z książki adresowej i ekrany ustawień systemowych pod wynikami aplikacji; kontakt otwiera wizytówkę, ustawienie – odpowiedni ekran Androida. O dostęp do kontaktów pytamy przy pierwszym wyszukiwaniu, a bez zgody sekcja jest po prostu pomijana.
 - Oba źródła wyników można wyłączyć w Ustawieniach → Szuflada aplikacji („Szybkie odpowiedzi”, „Kontakty w wynikach”).
+- Ukryte aplikacje odkrywa się odciskiem palca, twarzą albo blokadą ekranu; po wyjściu z launchera chowają się z powrotem (przełącznik „Ukryte za blokadą” w Ustawieniach → Szuflada aplikacji).
 - Filtr kategorii, ukrywanie aplikacji, zmiana nazw, skróty aplikacji (gdy OpenDesktop jest domyślny).
 - Kategorie: aplikacja może należeć do jednej albo wielu; tworzenie ręczne, automatyczne (bez AI) lub przez AI.
 
@@ -45,7 +46,7 @@ Klucz zostaje na urządzeniu i nie trafia do kopii zapasowej.
 
 ## Aktualizacje
 
-Każdy wypchnięty tag `vX.Y.Z` buduje podpisane APK i publikuje wydanie w GitHub Releases. Aplikacja sama sprawdza najnowsze wydanie wskazanego repozytorium (domyślnie `BlackSingularities/OpenDesktop`; w ustawieniach można je wyszukać na GitHubie), pobiera APK i przekazuje je do instalatora systemowego.
+Każdy wypchnięty tag `vX.Y.Z` buduje podpisane APK i publikuje wydanie. Aplikacja sama sprawdza najnowszą wersję przez redzikowski.com, pobiera APK i przekazuje je do instalatora systemowego.
 
 ## Budowanie
 
@@ -54,6 +55,31 @@ gradle :app:assembleRelease
 ```
 
 Wymagane: JDK 17, Android SDK 35, Gradle 8.11. Podpis wydań pochodzi z sekretów repozytorium `SIGNING_*`; bez nich APK jest podpisane kluczem debug.
+
+## Struktura projektu
+
+```
+app/src/main/java/com/opendesktop/launcher/
+├── data/         dane i usługi: aplikacje, ustawienia, pogoda (wspólna pamięć z TimedCache), AI, aktualizacje
+├── domain/       czysta logika bez Androida: siatka, święta, Księżyc, kalkulator, kategorie
+├── ui/
+│   ├── LauncherScreen.kt   ekran główny, gesty, nakładki
+│   ├── EditChrome.kt       pasek i narzędzia trybu edycji, strefy upuszczania
+│   ├── desktop/            siatka pulpitu i widżety
+│   │   ├── Gadgets.kt              wspólne malowanie i wybór widżetu
+│   │   ├── ClockGadgets.kt / InfoGadgets.kt / MoonGadgets.kt / MoreGadgets.kt
+│   │   ├── WeatherCommon.kt        ładowanie pogody i pomocnicze
+│   │   ├── WeatherForecastViews.kt wykresy, dni, godziny
+│   │   ├── WeatherWidgets.kt       widżety pogody
+│   │   └── GadgetStyleDialog.kt + Gadget*Options.kt   okno „Dostosuj”
+│   ├── drawer/       szuflada aplikacji i jej motywy (w tym 3D)
+│   ├── settings/     ustawienia
+│   └── components/   wspólne elementy: ikony, menu, gesty, biometria
+└── widget/       host widżetów systemowych
+app/src/test/     testy jednostkowe logiki
+docs/             strona projektu
+artwork/          ikona i paleta
+```
 
 ## Zasoby graficzne
 

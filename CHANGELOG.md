@@ -1,3 +1,11 @@
+## 2.10.0 — Ukryte za blokadą, nowe gesty i szybsza pogoda
+
+- Ukryte aplikacje w szufladzie odkrywa się odciskiem palca, twarzą albo blokadą ekranu. Po wyjściu z launchera znów są schowane. Można to wyłączyć w Ustawieniach → Szuflada aplikacji („Ukryte za blokadą”).
+- 7 nowych akcji pod gesty: ekran główny, następny i poprzedni ekran, latarka, aparat, asystent głosowy i zmiana tapety.
+- Widżety pogody korzystają ze wspólnej pamięci: kilka widżetów dla tego samego miejsca wysyła jedno zapytanie zamiast kilku, a seria stuknięć „Odśwież” nie zasypuje serwera (pamięć czyszczona najwyżej raz na 30 s).
+- Szuflady 3D (karuzela, helisa, kula, koło, bąbelki) płynniej działają na słabszych telefonach: kształt ikony liczony jest raz, a nie dla każdej ikony w każdej klatce.
+- Porządki w kodzie: duże pliki ekranu głównego, widżetów i okna „Dostosuj” podzielone na mniejsze; README z opisem struktury projektu.
+
 ## 2.9.0 — Widżety od nowa, ikony bez tła i powrót do ostatniego ekranu
 
 - 10 nowych widżetów, a okno „Widżety” pogrupowane w kategorie (Zegary, Pogoda, Słońce i Księżyc, Kalendarz i czas, Telefon, Osobiste i zdrowie) z opisem każdego widżetu.

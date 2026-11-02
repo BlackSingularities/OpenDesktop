@@ -57,8 +57,8 @@ private val presets = listOf(
     "Kafel" to SearchStyle(radius = 18, background = 0x59000000, textColor = 0xFFFFFFFF, shadow = 0.3f, border = true, textShadow = true),
 )
 
-private val textColors = listOf(0xFFFFFFFF, 0xFF202124, 0xFFFFD54F, 0xFF80DEEA, 0xFFA5D6A7, 0xFFF48FB1, 0xFFB39DDB)
-private val backgroundColors = listOf(0xFFFFFFFF, 0xFF000000, 0xFF1E88E5, 0xFF43A047, 0xFFE53935, 0xFF8E24AA, 0xFFFFB300)
+private val searchTextColors = listOf(0xFFFFFFFF, 0xFF202124, 0xFFFFD54F, 0xFF80DEEA, 0xFFA5D6A7, 0xFFF48FB1, 0xFFB39DDB)
+private val searchBackgroundColors = listOf(0xFFFFFFFF, 0xFF000000, 0xFF1E88E5, 0xFF43A047, 0xFFE53935, 0xFF8E24AA, 0xFFFFB300)
 
 /** Wygląd widżetu wyszukiwarki: zestawy, zaokrąglenie, kolory, przezroczystość, cienie i tekst. */
 @Composable
@@ -107,10 +107,10 @@ fun SearchStyleDialog(initial: SearchStyle, aiEnabled: Boolean, onDismiss: () ->
         }
 
         Label("Kolor tekstu i ikon")
-        Swatches(textColors, st.textColor) { st = st.copy(textColor = it) }
+        Swatches(searchTextColors, st.textColor) { st = st.copy(textColor = it) }
 
         Label("Kolor tła")
-        Swatches(backgroundColors, st.background or 0xFF000000) { c ->
+        Swatches(searchBackgroundColors, st.background or 0xFF000000) { c ->
             // Zmiana koloru zachowuje bieżącą przezroczystość
             val alpha = (st.background ushr 24) and 0xFF
             st = st.copy(background = (alpha shl 24) or (c and 0xFFFFFF))

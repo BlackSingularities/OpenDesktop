@@ -168,6 +168,7 @@ private fun SettingsHome(onClose: () -> Unit, onOpenCategories: () -> Unit, onOp
         }
         Group("O aplikacji") {
             ActionRow(Icons.Rounded.Person, "Pomysł i wykonanie", "Adam Rędzikowski · redzikowski.com") { openUrl(ctx, "https://redzikowski.com") }
+            ActionRow(Icons.Rounded.Email, "Kontakt", "kontakt@redzikowski.com") { openUrl(ctx, "mailto:kontakt@redzikowski.com") }
             ActionRow(Icons.Rounded.LocalCafe, "Postaw kawę", "Wesprzyj rozwój na buycoffee.to") { openUrl(ctx, "https://buycoffee.to/adamredzikowski") }
         }
         Text(

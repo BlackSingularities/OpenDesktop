@@ -66,6 +66,33 @@
             </intent-filter>
         </activity>
 
+        <!--
+            Skróty przypinane przez inne aplikacje: adres strony z Firefoksa czy Chrome
+            („Dodaj do ekranu głównego”), rozmowa z komunikatora, ekran w aplikacji.
+            Bez tej aktywności przeglądarka nie pokazuje nawet takiej możliwości.
+        -->
+        <activity
+            android:name=".PinShortcutActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Dawna droga tych samych skrótów (starsze aplikacje) -->
+        <receiver
+            android:name=".InstallShortcutReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.android.launcher.action.INSTALL_SHORTCUT" />
+            </intent-filter>
+        </receiver>
+
         <!-- Health Connect: wyjaśnienie uprawnień (Android 13 i starsze) -->
         <activity-alias
             android:name=".HealthRationale"

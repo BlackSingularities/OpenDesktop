@@ -35,6 +35,7 @@ import com.opendesktop.launcher.data.GadgetKind
 import com.opendesktop.launcher.data.GadgetStyle
 import com.opendesktop.launcher.data.withAppearance
 import com.opendesktop.launcher.data.ShortcutEntry
+import com.opendesktop.launcher.data.Shortcuts
 import com.opendesktop.launcher.data.SystemAction
 import com.opendesktop.launcher.data.UpdateInfo
 import com.opendesktop.launcher.data.Updater
@@ -201,15 +202,32 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun labelOf(app: AppInfo): String = workspace.value.renamed[app.key] ?: app.label
 
-    fun launch(app: AppInfo, view: View?, bounds: Rect?) {
+    /** Prostokąt ikony i animacja powiększenia z tego miejsca – wspólne dla aplikacji i skrótów. */
+    private fun launchBounds(view: View?, bounds: Rect?): Pair<android.graphics.Rect?, android.os.Bundle?> {
         val rect = bounds?.takeIf { it.width > 0 }?.let {
             android.graphics.Rect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt())
         }
         val opts = if (view != null && rect != null) {
             ActivityOptions.makeScaleUpAnimation(view, rect.left, rect.top, rect.width(), rect.height()).toBundle()
         } else null
+        return rect to opts
+    }
+
+    fun launch(app: AppInfo, view: View?, bounds: Rect?) {
+        val (rect, opts) = launchBounds(view, bounds)
         repo.launch(app, rect, opts)
         store.updateWorkspace { it.copy(usage = it.usage + (app.key to ((it.usage[app.key] ?: 0) + 1))) }
+    }
+
+    /**
+     * Skrót z pulpitu przypięty przez inną aplikację (adres strony, rozmowa, ekran w aplikacji).
+     * Gdy aplikacja, która go przypięła, zniknęła albo wycofała skrót, nie ma czego uruchomić.
+     */
+    fun launchShortcut(item: DesktopItem, view: View?, bounds: Rect?) {
+        val (rect, opts) = launchBounds(view, bounds)
+        if (!Shortcuts.start(getApplication(), item, rect, opts)) {
+            toast("Nie udało się otworzyć skrótu – aplikacja, która go dodała, mogła go wycofać")
+        }
     }
 
     fun openDetails(app: AppInfo) = repo.openDetails(app)
@@ -392,6 +410,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         val message = when (item.type) {
             ItemType.Folder -> "Usunięto folder"
             ItemType.Widget, ItemType.Clock, ItemType.Search, ItemType.Gadget -> "Usunięto widżet"
+            ItemType.Shortcut -> "Usunięto skrót"
             else -> "Usunięto z pulpitu"
         }
         offerUndo(message, before, if (item.type == ItemType.Widget && item.widgetId >= 0) listOf(item.widgetId) else emptyList())

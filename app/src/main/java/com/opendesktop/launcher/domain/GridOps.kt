@@ -45,6 +45,24 @@ object GridOps {
         return null
     }
 
+    /**
+     * Dokłada element na pierwszym ekranie z wolnym miejscem, licząc od [startPage] w kółko.
+     * Gdy nie ma miejsca nigdzie, dochodzi nowy ekran. Używane przy skrótach przypinanych
+     * z innych aplikacji – nie wiemy wtedy, który ekran jest na wierzchu.
+     */
+    fun addItem(pages: List<Page>, startPage: Int, item: DesktopItem, cols: Int, rows: Int): List<Page> {
+        if (pages.isEmpty()) return listOf(Page(items = listOf(item.copy(x = 0, y = 0))))
+        val from = startPage.coerceIn(0, pages.lastIndex)
+        val order = pages.indices.drop(from) + pages.indices.take(from)
+        for (i in order) {
+            val spot = firstFree(pages[i].items, item.w, item.h, cols, rows) ?: continue
+            return pages.mapIndexed { idx, p ->
+                if (idx == i) p.copy(items = p.items + item.copy(x = spot.first, y = spot.second)) else p
+            }
+        }
+        return pages + Page(items = listOf(item.copy(x = 0, y = 0)))
+    }
+
     fun itemAt(items: List<DesktopItem>, cx: Int, cy: Int, exclude: String? = null): DesktopItem? =
         items.lastOrNull { it.id != exclude && cx >= it.x && cx < it.x + it.w && cy >= it.y && cy < it.y + it.h }
 

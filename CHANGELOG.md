@@ -1,3 +1,9 @@
+## 2.11.0 — Skróty z przeglądarki i dok nad przyciskami Androida
+
+- **Skróty przypinane przez inne aplikacje** trafiają na pulpit: adres strony z Firefoksa czy Chrome („Dodaj do ekranu głównego”), rozmowa z komunikatora, ekran w aplikacji. Obsłużone obie drogi Androida — nowsze żądanie przypięcia i dawne rozgłoszenie `INSTALL_SHORTCUT` — więc przeglądarka w ogóle pokazuje teraz taką możliwość. Skrót dostaje swoją ikonę (bez przycinania maską kształtu ikon), nazwę można zmienić, a sam skrót przenieść, ułożyć w warstwach i usunąć jak każdą ikonę.
+- **Przyciski nawigacji Androida nie zachodzą już na dok.** Przy trzech klawiszach dok zostaje nad całym ich paskiem; przy nawigacji gestami nadal schodzi nisko, bo kreska nie przeszkadza ikonom. Suwak „Położenie w pionie” działa jak dotąd, gdy ktoś chce dok celowo niżej.
+- **Tapeta sięga pod pasek statusu i nawigacji** — system nie rysuje już nad przezroczystymi paskami własnego przyciemnienia, więc zamiast szarej listwy widać tapetę (o ile telefon ma tak ustawioną nawigację).
+
 ## 2.10.0 — Ukryte za blokadą, nowe gesty i szybsza pogoda
 
 - Ukryte aplikacje w szufladzie odkrywa się odciskiem palca, twarzą albo blokadą ekranu. Po wyjściu z launchera znów są schowane. Można to wyłączyć w Ustawieniach → Szuflada aplikacji („Ukryte za blokadą”).

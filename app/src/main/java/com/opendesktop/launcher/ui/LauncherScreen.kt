@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -255,6 +256,7 @@ fun LauncherScreen(
     }
     var folderPicker by remember { mutableStateOf<Pair<String, String>?>(null) }
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var renameShortcut by remember { mutableStateOf<Pair<String, String>?>(null) }
     var searchStyleFor by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var gadgetStyleFor by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
     var primaryAppPicker by remember { mutableStateOf<Pair<String, String>?>(null) } // pageId to itemId
@@ -552,6 +554,16 @@ fun LauncherScreen(
             )
             when (item.type) {
                 ItemType.App -> appMap[item.app]?.let { AppMenu(it, listOfNotNull(resize) + layers + listOfNotNull(remove)) }
+                ItemType.Shortcut -> ActionMenu(
+                    title = item.label.ifBlank { "Skrót" },
+                    onDismiss = { menu = null },
+                    actions = listOfNotNull(
+                        if (locked) null else MenuAction("Zmień nazwę", Icons.Rounded.Edit) { renameShortcut = pageId to item.id },
+                        resize,
+                    ) + layers + listOfNotNull(
+                        if (locked) null else MenuAction("Usuń z pulpitu", Icons.Rounded.DeleteOutline, danger = true) { vm.removeItem(pageId, item.id) },
+                    ),
+                )
                 ItemType.Folder -> ActionMenu(
                     title = item.label.ifBlank { "Folder" },
                     onDismiss = { menu = null },
@@ -633,6 +645,7 @@ fun LauncherScreen(
                         openFolder = pageId to item.id
                     }
                 }
+                ItemType.Shortcut -> { vm.launchShortcut(item, view, bounds); launchedApp = true }
                 ItemType.Clock -> SystemActions.openClock(ctx)
                 ItemType.Search -> openDrawer(focus = true)
                 ItemType.Gadget -> { if (item.gadget == GadgetKind.Note) gadgetStyleFor = pageId to item.id else openGadgetTarget(ctx, item.gadget) }
@@ -643,7 +656,7 @@ fun LauncherScreen(
 
         override fun onItemLongPress(pageId: String, item: DesktopItem) {
             // Widżety, foldery itp. od razu z ramką rozmiaru; ikony aplikacji i akcji tylko z menu
-            val select = item.id.takeIf { item.type != ItemType.App && item.type != ItemType.Action }
+            val select = item.id.takeIf { item.type !in setOf(ItemType.App, ItemType.Action, ItemType.Shortcut) }
             val title = when (item.type) {
                 ItemType.App -> appMap[item.app]?.let(labelOf)
                 ItemType.Folder -> item.label.ifBlank { "Folder" }
@@ -651,6 +664,7 @@ fun LauncherScreen(
                 ItemType.Search -> "Wyszukiwarka"
                 ItemType.Gadget -> item.gadget?.label
                 ItemType.Action -> item.label.ifBlank { item.systemAction?.label }
+                ItemType.Shortcut -> item.label.ifBlank { "Skrót" }
                 ItemType.Widget -> "Widżet"
             }
             requestEdit(MenuTarget.Desktop(pageId, item.id), select, title)
@@ -788,6 +802,10 @@ fun LauncherScreen(
             val barsAlpha by animateFloatAsState(if (drag.active) 0f else 1f, label = "editBars")
             if (editVisible) Box(Modifier.fillMaxSize().graphicsLayer { alpha = edit() }.background(Color.Black.copy(alpha = 0.3f)))
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            // Przyciski nawigacji (trzy klawisze) zgłaszają się jako obszar klikalny systemu;
+            // przy nawigacji gestami jest tu zero. Dzięki temu dok schodzi nisko tylko tam,
+            // gdzie na dole jest sama kreska, a nad przyciskami zostawia pełny odstęp
+            val tapBottom = WindowInsets.tappableElement.asPaddingValues().calculateBottomPadding()
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 AnimatedVisibility(
                     editMode,
@@ -1052,9 +1070,10 @@ fun LauncherScreen(
                         },
                     )
                 }
-                // Dok schodzi nisko – zostaje tylko część paska nawigacji (gest/przyciski nie zachodzą
-                // na ikony); bez doku pełny odstęp. W edycji pasek narzędzi sam sięga do dołu ekranu
-                val rest = if (cfg.dockEnabled) navBottom * 0.3f else navBottom
+                // Dok przy nawigacji gestami schodzi nisko (kreska nie zachodzi na ikony), ale nad
+                // przyciskami Androida zostawia cały ich pasek – inaczej klawisze przykrywają ikony
+                // doku. Bez doku zawsze pełny odstęp; w edycji pasek narzędzi sam sięga do dołu ekranu
+                val rest = if (cfg.dockEnabled) maxOf(tapBottom, navBottom * 0.3f) else navBottom
                 Spacer(Modifier.layout { m, c ->
                     val h = (rest.toPx() * (1f - edit())).roundToInt().coerceAtLeast(0)
                     val p = m.measure(c)
@@ -1229,6 +1248,16 @@ fun LauncherScreen(
             initial = folder?.label.orEmpty(),
             onDismiss = { renameFolder = null },
             onConfirm = { name, _ -> vm.renameItem(pageId, folderId, name); renameFolder = null },
+        )
+    }
+
+    renameShortcut?.let { (pageId, itemId) ->
+        val item = ws.pages.firstOrNull { it.id == pageId }?.items?.firstOrNull { it.id == itemId }
+        TextInputDialog(
+            title = "Nazwa skrótu",
+            initial = item?.label.orEmpty(),
+            onDismiss = { renameShortcut = null },
+            onConfirm = { name, _ -> vm.renameItem(pageId, itemId, name); renameShortcut = null },
         )
     }
 

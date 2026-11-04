@@ -99,7 +99,7 @@ enum class GestureAction(val label: String) {
 }
 
 @Serializable
-enum class ItemType { App, Folder, Widget, Clock, Search, Action, Gadget }
+enum class ItemType { App, Folder, Widget, Clock, Search, Action, Gadget, Shortcut }
 
 @Serializable
 enum class SystemAction(val label: String) {
@@ -148,6 +148,14 @@ data class DesktopItem(
     val gadget: GadgetKind? = null,
     /** Wygląd i ustawienia wbudowanego widżetu ([ItemType.Gadget]). */
     val gadgetStyle: GadgetStyle = GadgetStyle(),
+    /** Skrót ([ItemType.Shortcut]): pakiet aplikacji, która go przypięła (np. przeglądarka). */
+    val shortcutPkg: String? = null,
+    /** Skrót przypięty przez aplikację: jego identyfikator w tej aplikacji. */
+    val shortcutId: String? = null,
+    /** Skrót ze starego rozgłoszenia: intencja zapisana jako URI. */
+    val shortcutUri: String? = null,
+    /** Nazwa pliku ikony skrótu w katalogu `shortcuts` (zapisana przy dodaniu). */
+    val iconFile: String? = null,
 )
 
 /** Grupy w oknie wyboru widżetów. */

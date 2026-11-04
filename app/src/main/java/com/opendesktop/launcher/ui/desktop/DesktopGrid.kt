@@ -73,6 +73,8 @@ import com.opendesktop.launcher.ui.components.AppIcon
 import com.opendesktop.launcher.ui.components.FolderIcon
 import com.opendesktop.launcher.ui.components.iconSizeFor
 import com.opendesktop.launcher.ui.components.badgeCount
+import com.opendesktop.launcher.ui.components.rememberShortcutIcon
+import com.opendesktop.launcher.data.IconShape
 import com.opendesktop.launcher.ui.components.itemGestures
 import com.opendesktop.launcher.widget.LauncherWidgetHost
 import kotlin.math.roundToInt
@@ -378,6 +380,19 @@ private fun DesktopItemSlot(
                     modifier = Modifier.fillMaxSize().then(gestures),
                 )
             }
+            // Skrót z innej aplikacji (adres z przeglądarki, rozmowa z komunikatora): ikona
+            // przychodzi gotowa, razem z własnym tłem i znaczkiem aplikacji, więc nie nakładamy
+            // na nią kształtu ikon – maska ucięłaby to, co aplikacja narysowała
+            ItemType.Shortcut -> AppIcon(
+                icon = rememberShortcutIcon(item.iconFile),
+                label = item.label,
+                iconSize = iconSizeFor(cellW, cellH, cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
+                shape = IconShape.System,
+                showLabel = cfg.showLabels,
+                labelSize = cfg.labelSize,
+                pressed = pressed,
+                modifier = Modifier.fillMaxSize().then(gestures),
+            )
             ItemType.Widget -> {
                 SystemWidget(host, item, onLongPress = { callbacks.onItemLongPress(pageId, item) }, modifier = Modifier.fillMaxSize())
                 if (editMode) Box(Modifier.matchParentSize().then(gestures))
@@ -728,6 +743,11 @@ fun DragPreview(
             ItemType.Folder -> FolderIcon(
                 item.apps.take(4).map { apps[it]?.icon }, item.label,
                 iconSizeFor(wDp / item.w, hDp / item.h, cfg.desktopIconScale, cfg.showLabels, desktopMode = true), cfg.iconShape, false, Modifier.fillMaxSize(),
+            )
+            ItemType.Shortcut -> AppIcon(
+                rememberShortcutIcon(item.iconFile), "",
+                iconSizeFor(wDp / item.w.coerceAtLeast(1), hDp / item.h.coerceAtLeast(1), cfg.desktopIconScale, cfg.showLabels, desktopMode = true),
+                IconShape.System, false, Modifier.fillMaxSize(),
             )
             ItemType.Action -> ActionIcon(
                 item.systemAction, "",

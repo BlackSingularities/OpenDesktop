@@ -201,7 +201,7 @@ fun UpdateDialog(vm: LauncherViewModel, state: UpdateState, onlyAuto: Boolean, o
                 PillButton("Zainstaluj") { vm.downloadUpdate(state.info) }
             },
         ) {
-            Text(state.info.notes.ifBlank { "Bez opisu zmian." }, fontSize = 13.sp, color = Palette.TextDim, lineHeight = 18.sp)
+            Text("Dostępna jest nowa wersja aplikacji.", fontSize = 13.sp, color = Palette.TextDim, lineHeight = 18.sp)
         }
         is UpdateState.Downloading -> DarkDialog(
             title = "Pobieranie ${state.info.versionName}",

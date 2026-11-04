@@ -1,3 +1,7 @@
+## 2.12.1
+
+- Komunikat o nowej wersji bez listy zmian, linków i informacji, skąd pobierana jest aktualizacja.
+
 ## 2.12.0 — Menu bez wchodzenia w edycję i porządki w bezpieczeństwie
 
 - **Przytrzymanie ikony pokazuje samo menu.** Pulpit nie przechodzi już przy tym w tryb edycji (bez pomniejszania i siatki). Edycja włącza się dopiero, gdy palec przesunie ikonę albo z pozycji „Przenieś / zmień rozmiar”; przytrzymanie pustego miejsca nadal otwiera edycję. Dotyczy pulpitu i doku, a przy zablokowanym układzie kłódka pojawia się dopiero przy próbie przesunięcia.

@@ -75,10 +75,10 @@ object Updater {
         return UpdateInfo(
             versionName = tag,
             versionCode = code,
-            notes = s(o, "body"),
+            notes = "",
             apkUrl = s(apk, "browser_download_url"),
             sizeBytes = (apk["size"] as? JsonPrimitive)?.longOrNull ?: 0L,
-            pageUrl = s(o, "html_url"),
+            pageUrl = "",
             sha256 = s(apk, "digest").removePrefix("sha256:").takeIf { HEX64.matches(it) }
                 ?: SHA_LINE.find(s(o, "body"))?.groupValues?.get(1),
         )

@@ -60,7 +60,7 @@ object Updater {
     /** Zwraca najnowsze wydanie, gdy jest nowsze niż zainstalowane. */
     suspend fun check(): UpdateInfo? {
         val body = try {
-            Http.get("https://redzikowski.com/api/github/repos/${Config.DEFAULT_REPO}/releases/latest", mapOf("Accept" to "application/json"))
+            Http.get("https://redzikowski.com/api/releases/repos/${Config.DEFAULT_REPO}/releases/latest", mapOf("Accept" to "application/json"))
         } catch (e: HttpException) {
             if (e.code == 404) throw IOException("Brak wydań do pobrania")
             throw IOException("redzikowski.com: HTTP ${e.code}")

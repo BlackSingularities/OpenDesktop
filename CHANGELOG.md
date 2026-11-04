@@ -1,3 +1,7 @@
+## 2.12.2
+
+- Bez żadnych wzmianek o GitHubie w aplikacji: nowy adres serwera aktualizacji, komunikaty błędów bez nazw zewnętrznych serwerów.
+
 ## 2.12.1
 
 - Komunikat o nowej wersji bez listy zmian, linków i informacji, skąd pobierana jest aktualizacja.

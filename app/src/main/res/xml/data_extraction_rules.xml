@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: układ i ustawienia trafiają do kopii i przenosin, klucze API nigdy -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="secrets.bin" />
+        <exclude domain="file" path="secrets.bin.tmp" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="secrets.bin" />
+        <exclude domain="file" path="secrets.bin.tmp" />
+    </device-transfer>
+</data-extraction-rules>

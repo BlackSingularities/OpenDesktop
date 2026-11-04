@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 i starsze: kopia Google bez zaszyfrowanych kluczy API (klucz Keystore i tak nie przechodzi na inny telefon) -->
+<full-backup-content>
+    <exclude domain="file" path="secrets.bin" />
+    <exclude domain="file" path="secrets.bin.tmp" />
+</full-backup-content>

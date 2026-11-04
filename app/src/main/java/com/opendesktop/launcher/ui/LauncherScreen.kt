@@ -305,6 +305,21 @@ fun LauncherScreen(
         menu = menuTarget
     }
 
+    /**
+     * Przytrzymanie ikony lub widżetu poza trybem edycji pokazuje samo menu – edycja włącza się
+     * dopiero, gdy palec ruszy element (przeciąganie) albo z pozycji „Przenieś / zmień rozmiar”.
+     * W trybie edycji przytrzymanie dalej zaznacza element i pokazuje menu.
+     */
+    fun showItemMenu(menuTarget: MenuTarget, select: String? = null, title: String? = null) {
+        if (editMode) {
+            requestEdit(menuTarget, select, title)
+            return
+        }
+        vibrate()
+        lockPrompt = null
+        menu = menuTarget
+    }
+
     fun runGesture(a: GestureAction) {
         when (a) {
             GestureAction.None -> Unit
@@ -438,15 +453,19 @@ fun LauncherScreen(
 
     fun startDrag(source: DragSource, item: DesktopItem, fromPageId: String?, bounds: Rect) {
         if (cfg.layoutLocked) {
-            // Z pulpitu i doku kłódka jest już na ekranie (pokazało ją przytrzymanie)
+            menu = null
             if (source == DragSource.Drawer) {
-                menu = null
                 vm.toast("Układ jest zablokowany – przytrzymaj pulpit, aby go odblokować")
+            } else {
+                // Przytrzymanie pokazało tylko menu – kłódka dopiero przy próbie przesunięcia
+                lockPrompt = LockPrompt(null)
             }
             return
         }
         menu = null
         vibrate()
+        // Przeciąganie z pulpitu lub doku to edycja układu – siatka i przyciski edycji pojawiają się teraz
+        if (source != DragSource.Drawer) editMode = true
         drag.zoneBounds.clear()
         val size: Size
         if (source == DragSource.Desktop) {
@@ -655,7 +674,7 @@ fun LauncherScreen(
         }
 
         override fun onItemLongPress(pageId: String, item: DesktopItem) {
-            // Widżety, foldery itp. od razu z ramką rozmiaru; ikony aplikacji i akcji tylko z menu
+            // W trybie edycji widżety, foldery itp. od razu z ramką rozmiaru; ikony aplikacji i akcji tylko z menu
             val select = item.id.takeIf { item.type !in setOf(ItemType.App, ItemType.Action, ItemType.Shortcut) }
             val title = when (item.type) {
                 ItemType.App -> appMap[item.app]?.let(labelOf)
@@ -667,7 +686,7 @@ fun LauncherScreen(
                 ItemType.Shortcut -> item.label.ifBlank { "Skrót" }
                 ItemType.Widget -> "Widżet"
             }
-            requestEdit(MenuTarget.Desktop(pageId, item.id), select, title)
+            showItemMenu(MenuTarget.Desktop(pageId, item.id), select, title)
         }
 
         override fun onOpenFolder(pageId: String, item: DesktopItem, bounds: Rect) {
@@ -1029,13 +1048,13 @@ fun LauncherScreen(
                         drag = drag,
                         menuKey = (menu as? MenuTarget.Dock)?.key,
                         onTap = { app, b -> if (!editMode) launch(app, b) },
-                        onLongPress = { app -> requestEdit(MenuTarget.Dock(app.key), title = labelOf(app)) },
+                        onLongPress = { app -> showItemMenu(MenuTarget.Dock(app.key), title = labelOf(app)) },
                         onDragStart = { app, b -> startDrag(DragSource.Dock, DesktopItem(type = ItemType.App, x = 0, y = 0, app = app.key), null, b) },
                         onDragEnd = { endDrag() },
                         onAdd = { dockPicker = true },
                         menu = dockMenu,
                         onActionTap = ::runAction,
-                        onActionLongPress = { a -> requestEdit(MenuTarget.Dock(a.dockKey), title = a.label) },
+                        onActionLongPress = { a -> showItemMenu(MenuTarget.Dock(a.dockKey), title = a.label) },
                         actionMenu = { a ->
                             ActionMenu(
                                 title = a.label,

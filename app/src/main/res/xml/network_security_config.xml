@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Jawny HTTP jest dozwolony przez system wyłącznie po to, żeby działał własny serwer AI w sieci
+  domowej (Ollama, LM Studio pod http://192.168.x.x). Pilnuje tego klient w Http.kt: każde zapytanie
+  http:// do adresu spoza sieci lokalnej jest odrzucane, zanim cokolwiek wyjdzie z telefonu.
+  Aktualizacje, pogoda i dostawcy AI w internecie zawsze idą przez HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

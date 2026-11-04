@@ -2,7 +2,10 @@ package com.opendesktop.launcher.data
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.core.content.FileProvider
 import com.opendesktop.launcher.BuildConfig
@@ -17,7 +20,7 @@ import kotlinx.serialization.json.longOrNull
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
-import java.net.URLEncoder
+import java.security.MessageDigest
 
 data class UpdateInfo(
     val versionName: String,
@@ -26,10 +29,13 @@ data class UpdateInfo(
     val apkUrl: String,
     val sizeBytes: Long,
     val pageUrl: String,
+    /** SHA-256 pliku APK (z pola `digest` GitHuba albo z linii „SHA-256:” w opisie wydania). */
+    val sha256: String? = null,
 )
 
 /**
- * Aktualizacje przez redzikowski.com. Tag ma postać v<główna>.<poboczna>.<poprawka>; wersje
+ * Aktualizacje przez redzikowski.com. Pobrany APK jest sprawdzany przed instalacją: suma SHA-256
+ * musi zgadzać się z opublikowaną, a podpis – z podpisem zainstalowanej aplikacji. Tag ma postać v<główna>.<poboczna>.<poprawka>; wersje
  * porównujemy część po części jako liczby (1.2.0 > 1.0.37), nie jako napisy.
  */
 object Updater {
@@ -45,6 +51,8 @@ object Updater {
     }
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val HEX64 = Regex("^[0-9a-fA-F]{64}$")
+    private val SHA_LINE = Regex("SHA-256[^0-9a-fA-F]{0,20}([0-9a-fA-F]{64})")
 
     private fun s(o: Map<String, kotlinx.serialization.json.JsonElement>, k: String) =
         (o[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -71,6 +79,8 @@ object Updater {
             apkUrl = s(apk, "browser_download_url"),
             sizeBytes = (apk["size"] as? JsonPrimitive)?.longOrNull ?: 0L,
             pageUrl = s(o, "html_url"),
+            sha256 = s(apk, "digest").removePrefix("sha256:").takeIf { HEX64.matches(it) }
+                ?: SHA_LINE.find(s(o, "body"))?.groupValues?.get(1),
         )
     }
 
@@ -81,6 +91,7 @@ object Updater {
         dir.listFiles()?.forEach { it.delete() }
         val target = File(dir, "OpenDesktop-${info.versionName}.apk")
         val req = Request.Builder().url(info.apkUrl).build()
+        val sha = MessageDigest.getInstance("SHA-256")
         Http.client.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
             val body = resp.body ?: throw IOException("Pusta odpowiedź")
@@ -93,13 +104,59 @@ object Updater {
                         val n = input.read(buf)
                         if (n < 0) break
                         out.write(buf, 0, n)
+                        sha.update(buf, 0, n)
                         done += n
                         if (total > 0) onProgress((done.toFloat() / total).coerceIn(0f, 1f))
                     }
                 }
             }
         }
+        try {
+            val actual = sha.digest().joinToString("") { "%02x".format(it) }
+            if (info.sha256 != null && !actual.equals(info.sha256, ignoreCase = true)) {
+                throw IOException("Pobrany plik jest uszkodzony lub podmieniony (suma SHA-256 się nie zgadza)")
+            }
+            verifySigner(context, target)
+        } catch (e: IOException) {
+            target.delete()
+            throw e
+        }
         target
+    }
+
+    /**
+     * APK musi być tą samą aplikacją, podpisaną tym samym kluczem co zainstalowana wersja. Android
+     * i tak odmówiłby instalacji, ale tu odrzucamy obcy plik od razu, zanim użytkownik go zobaczy.
+     * Gdy systemowi nie uda się odczytać podpisów z archiwum, decyzję zostawiamy instalatorowi.
+     */
+    private fun verifySigner(context: Context, apk: File) {
+        val pm = context.packageManager
+        val archive = pm.getPackageArchiveInfo(apk.path, signatureFlags())
+            ?: throw IOException("Pobrany plik nie jest poprawnym APK")
+        if (archive.packageName != context.packageName) throw IOException("Pobrany plik to inna aplikacja (${archive.packageName})")
+        // Nowy plik może mieć klucz po rotacji – wystarczy, że w jego historii jest nasz obecny podpis
+        val theirLineage = signers(archive, lineage = true) ?: return
+        val ourCurrent = signers(pm.getPackageInfo(context.packageName, signatureFlags()), lineage = false) ?: return
+        if (!theirLineage.containsAll(ourCurrent)) throw IOException("Pobrany plik ma inny podpis niż zainstalowana aplikacja – instalacja wstrzymana")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signatureFlags() =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+
+    /** Podpisy jako tekst: obecne albo (gdy [lineage]) cała historia rotacji klucza. */
+    @Suppress("DEPRECATION")
+    private fun signers(info: android.content.pm.PackageInfo, lineage: Boolean): Set<String>? {
+        val sigs: List<Signature>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.signingInfo?.let { si ->
+                when {
+                    si.hasMultipleSigners() -> si.apkContentsSigners?.toList()
+                    lineage -> si.signingCertificateHistory?.toList()
+                    else -> si.signingCertificateHistory?.lastOrNull()?.let(::listOf)
+                }
+            }
+        } else info.signatures?.toList()
+        return sigs?.takeIf { it.isNotEmpty() }?.map { it.toCharsString() }?.toSet()
     }
 
     fun canInstall(context: Context) = context.packageManager.canRequestPackageInstalls()

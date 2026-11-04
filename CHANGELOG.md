@@ -1,3 +1,13 @@
+## 2.12.0 — Menu bez wchodzenia w edycję i porządki w bezpieczeństwie
+
+- **Przytrzymanie ikony pokazuje samo menu.** Pulpit nie przechodzi już przy tym w tryb edycji (bez pomniejszania i siatki). Edycja włącza się dopiero, gdy palec przesunie ikonę albo z pozycji „Przenieś / zmień rozmiar”; przytrzymanie pustego miejsca nadal otwiera edycję. Dotyczy pulpitu i doku, a przy zablokowanym układzie kłódka pojawia się dopiero przy próbie przesunięcia.
+- **Klucze API są zaszyfrowane** kluczem z Android Keystore (plik `secrets.bin`) zamiast leżeć jawnie w `config.json`. Klucze z poprzednich wersji przenoszą się same przy pierwszym uruchomieniu.
+- **Kopia zapasowa Google i przenosiny na nowy telefon pomijają klucze API**; układ i ustawienia nadal się kopiują.
+- **Aktualizacje są sprawdzane przed instalacją:** suma SHA-256 pobranego APK musi zgadzać się z opublikowaną przy wydaniu, a podpis – z podpisem zainstalowanej aplikacji. Obcy lub uszkodzony plik jest odrzucany od razu.
+- **Połączenia bez szyfrowania (http://) tylko w sieci lokalnej.** Własny serwer AI w domu (Ollama, LM Studio pod adresem 192.168.x.x) wreszcie działa po http, a każdy adres http w internecie jest blokowany, zanim klucz wyjdzie z telefonu.
+- **Ukryte aplikacje nie trafiają do dostawcy AI** przy kategoryzacji i wyszukiwaniu; w ustawieniach AI dopisana informacja, co jest wysyłane.
+- Wydania w CI: bez sekretów podpisu build się przerywa (zamiast podpisać APK kluczem debug), akcje GitHuba przypięte do konkretnych commitów, a w opisie wydania publikowana jest suma SHA-256.
+
 ## 2.11.0 — Skróty z przeglądarki i dok nad przyciskami Androida
 
 - **Skróty przypinane przez inne aplikacje** trafiają na pulpit: adres strony z Firefoksa czy Chrome („Dodaj do ekranu głównego”), rozmowa z komunikatora, ekran w aplikacji. Obsłużone obie drogi Androida — nowsze żądanie przypięcia i dawne rozgłoszenie `INSTALL_SHORTCUT` — więc przeglądarka w ogóle pokazuje teraz taką możliwość. Skrót dostaje swoją ikonę (bez przycinania maską kształtu ikon), nazwę można zmienić, a sam skrót przenieść, ułożyć w warstwach i usunąć jak każdą ikonę.

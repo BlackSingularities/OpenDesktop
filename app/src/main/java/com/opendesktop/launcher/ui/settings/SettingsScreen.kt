@@ -524,9 +524,9 @@ private fun AiSection(vm: LauncherViewModel, cfg: Config, set: Setter) {
     }
     Text(
         when (provider) {
-            AiProvider.Custom -> "Serwer zgodny z API OpenAI – np. Ollama (http://IP:11434/v1), LM Studio, vLLM. Klucz tylko, jeśli serwer go wymaga."
-            else -> "Klucz API ${provider.label}. Każdy dostawca ma osobny klucz i model. Klucze są tylko na tym urządzeniu i nie trafiają do kopii zapasowej."
-        },
+            AiProvider.Custom -> "Serwer zgodny z API OpenAI – np. Ollama (http://IP:11434/v1), LM Studio, vLLM. Adres http:// działa tylko w sieci lokalnej, w internecie wymagany jest https://. Klucz tylko, jeśli serwer go wymaga."
+            else -> "Klucz API ${provider.label}. Każdy dostawca ma osobny klucz i model. Klucze są zaszyfrowane na tym urządzeniu i nie trafiają do kopii zapasowej."
+        } + " Kategoryzacja i wyszukiwanie AI wysyłają dostawcy nazwy i pakiety zainstalowanych aplikacji – bez ukrytych.",
         color = Palette.TextDim, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(horizontal = 6.dp),
     )
     Group {

@@ -810,8 +810,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             (p != AiProvider.Custom || c.aiBaseUrl.isNotBlank())
     }
 
-    private fun aiRefs(list: List<AppInfo> = apps.value) =
-        list.distinctBy { it.packageName }.map { AiAppRef(it.packageName, labelOf(it)) }
+    /** Lista aplikacji dla dostawcy AI – ukryte (często schowane za blokadą) nigdy nie wychodzą z telefonu. */
+    private fun aiRefs(list: List<AppInfo> = apps.value): List<AiAppRef> {
+        val hidden = workspace.value.hidden
+        val hiddenPackages = list.filter { it.key in hidden }.map { it.packageName }.toSet()
+        return list.filter { it.packageName !in hiddenPackages }
+            .distinctBy { it.packageName }.map { AiAppRef(it.packageName, labelOf(it)) }
+    }
 
     fun runAiCategorize(instructions: String, maxCategories: Int, multi: Boolean) {
         val cfg = config.value

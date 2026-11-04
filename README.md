@@ -55,7 +55,7 @@ Każdy wypchnięty tag `vX.Y.Z` buduje podpisane APK i publikuje wydanie. Aplika
 gradle :app:assembleRelease
 ```
 
-Wymagane: JDK 17, Android SDK 35, Gradle 8.11. Podpis wydań pochodzi z sekretów repozytorium `SIGNING_*`; bez nich APK jest podpisane kluczem debug.
+Wymagane: JDK 17, Android SDK 35, Gradle 8.11. Podpis wydań pochodzi z sekretów repozytorium `SIGNING_*`; lokalnie bez nich APK jest podpisane kluczem debug, a w CI wydanie bez sekretów się przerywa.
 
 ## Struktura projektu
 

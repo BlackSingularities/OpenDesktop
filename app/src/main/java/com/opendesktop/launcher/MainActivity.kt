@@ -1,5 +1,7 @@
 package com.opendesktop.launcher
 
+import com.opendesktop.launcher.feedback.Feedback
+import com.opendesktop.launcher.feedback.CrashReportPrompt
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Intent
@@ -64,6 +66,7 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         super.onCreate(savedInstanceState)
+        Feedback.install(this, "opendesktop")
         lifecycleScope.launch {
             vm.messages.collect { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
         }
@@ -71,6 +74,7 @@ class MainActivity : ComponentActivity() {
             val cfg by vm.config.collectAsStateWithLifecycle()
             val badges by NotificationBadges.counts.collectAsStateWithLifecycle()
             OpenDesktopTheme(cfg) {
+                CrashReportPrompt()
                 // Plakietki na ikonach – puste, gdy wyłączone w ustawieniach albo bez dostępu
                 CompositionLocalProvider(LocalBadgeCounts provides if (cfg.notificationBadges) badges else emptyMap()) {
                     LauncherScreen(vm = vm, homePressed = homePressed, onAddWidget = ::startAddWidget)

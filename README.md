@@ -1,5 +1,13 @@
 # OpenDesktop
 
+<!-- posters:start -->
+<p align="center">
+  <img src="docs/posters/android.png" alt="OpenDesktop – Android" width="460">
+</p>
+
+<p align="center"><a href="https://redzikowski.com/portfolio/opendesktop">redzikowski.com/portfolio/opendesktop</a></p>
+<!-- posters:end -->
+
 <img src="artwork/app-icon.png" alt="OpenDesktop" width="128" />
 
 Otwarty, rozbudowany launcher (ekran główny) na Androida, napisany w Kotlinie i Jetpack Compose.

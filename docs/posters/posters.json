@@ -1,0 +1,23 @@
+{
+  "slug": "opendesktop",
+  "name": "OpenDesktop",
+  "label": "ekran główny do pełnej personalizacji",
+  "icon": "icon.png",
+  "url": "https://redzikowski.com/portfolio/opendesktop",
+  "posters": [
+    {
+      "platform": "android",
+      "file": "android.png",
+      "title": "Ekran główny *po Twojemu*",
+      "lead": "Siatka od 3×3 do 10×12, przejścia między ekranami, kategorie aplikacji z AI i szuflada w kilkunastu stylach – od listy po kulę 3D.",
+      "shots": [
+        { "src": "../screenshots/android/01-pulpit.png", "caption": "Pulpit" },
+        { "src": "../screenshots/android/02-szuflada.png", "caption": "Kategorie" },
+        { "src": "../screenshots/android/04-kula.png", "caption": "Kula 3D" },
+        { "src": "../screenshots/android/03-style.png", "caption": "Style szuflady" }
+      ],
+      "features": ["siatka do 10×12", "12 przejść między ekranami", "kategorie z AI", "kula, helisa i cylinder 3D", "gesty", "ukrywanie aplikacji"],
+      "meta": "Android 8 lub nowszy"
+    }
+  ]
+}

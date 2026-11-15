@@ -1,3 +1,9 @@
+## 2.13.2
+
+- Koniec czarnych teł pod ikonami: ikony z przezroczystym tłem (także ikona OpenDesktop) nie lądują już na czarnym kwadracie, również w kształcie systemowym.
+- Tryb „Bez tła” zdejmuje też jednolite plansze wtopione w ikonę – w ikonach starego typu, ikonach z motywu producenta i bitmapach bez przezroczystości.
+- Ikona OpenDesktop znów ma jasne tło, bo launchery systemowe rysują przezroczyste tło ikony adaptacyjnej jako czarne.
+
 ## 2.13.1
 
 - Ikona aplikacji bez tła: na ekranie głównym widać sam kolorowy emblemat, spójnie z trybem „Bez tła” w OpenDesktop.

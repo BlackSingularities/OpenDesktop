@@ -22,6 +22,7 @@ import android.os.UserHandle
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -126,11 +127,19 @@ class AppRepository(
         )
     }
 
-    /** Dla własnych kształtów rysujemy warstwy ikony adaptacyjnej bez systemowej maski. */
+    /**
+     * Warstwy ikony adaptacyjnej rysujemy sami. Systemowe AdaptiveIconDrawable.draw() zalewa warstwę
+     * na czarno przed rysowaniem, więc ikony z przezroczystym tłem wychodziły na czarnym kwadracie.
+     * Dla kształtu systemowego przycinamy do maski urządzenia, dla własnych kształtów maski nie ma.
+     */
     private fun render(d: Drawable, size: Int): Bitmap {
-        if (shape != IconShape.System && d is AdaptiveIconDrawable) {
+        if (d is AdaptiveIconDrawable) {
             val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val c = Canvas(bmp)
+            if (shape == IconShape.System) {
+                d.setBounds(0, 0, size, size)
+                c.clipPath(d.iconMask)
+            }
             val inset = size / 4
             d.background?.let { it.setBounds(-inset, -inset, size + inset, size + inset); it.draw(c) }
             d.foreground?.let { it.setBounds(-inset, -inset, size + inset, size + inset); it.draw(c) }
@@ -143,18 +152,38 @@ class AppRepository(
      * Ikona bez tła: sama warstwa pierwszego planu ikony adaptacyjnej. Warstwa jest rysowana w całości
      * (bez maski, więc nic nie jest ucinane), a potem kadrowana do faktycznej treści i wpasowana
      * w kwadrat z małym marginesem – symbole różnych aplikacji mają podobną wielkość.
-     * Ikony nieadaptacyjne nie mają osobnego tła, więc zostają jak są.
+     * Gdy tło jest „wtopione” w rysunek (ikony starego typu, pierwszy plan z pełną planszą, ikony
+     * podmienione przez motyw producenta, bitmapy bez kanału alfa – czarne pole), jednolitą planszę
+     * stykającą się z krawędzią usuwamy wypełnieniem od brzegów.
      */
     private fun renderBare(d: Drawable, size: Int): Bitmap {
-        val fg = (d as? AdaptiveIconDrawable)?.foreground ?: return d.toBitmap(size, size, Bitmap.Config.ARGB_8888)
-        // Warstwa ma 108 dp, z czego widoczne w masce jest środkowe 72 dp – rysujemy całe 108
-        val full = (size * 1.5f).toInt()
-        val layer = Bitmap.createBitmap(full, full, Bitmap.Config.ARGB_8888)
-        fg.setBounds(0, 0, full, full)
-        fg.draw(Canvas(layer))
-        val box = contentBounds(layer) ?: return render(d, size)
-        // Prawie pusta warstwa (cały rysunek siedzi w tle) – zostawiamy zwykłą ikonę
-        if (box.width() * box.height() < full * full / 40) return render(d, size)
+        val adaptive = d as? AdaptiveIconDrawable
+        val layer: Bitmap
+        if (adaptive != null) {
+            // Warstwa ma 108 dp, z czego widoczne w masce jest środkowe 72 dp – rysujemy całe 108
+            val full = (size * 1.5f).toInt()
+            layer = Bitmap.createBitmap(full, full, Bitmap.Config.ARGB_8888)
+            adaptive.foreground?.let { it.setBounds(0, 0, full, full); it.draw(Canvas(layer)) }
+            val fgBox = contentBounds(layer)
+            // Prawie pusta warstwa (cały rysunek siedzi w tle) – składamy obie warstwy i zdejmujemy planszę
+            if (fgBox == null || fgBox.width() * fgBox.height() < full * full / 40) {
+                val c = Canvas(layer)
+                c.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR)
+                adaptive.background?.let { it.setBounds(0, 0, full, full); it.draw(c) }
+                adaptive.foreground?.let { it.setBounds(0, 0, full, full); it.draw(c) }
+            }
+        } else {
+            layer = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            d.setBounds(0, 0, size, size)
+            d.draw(Canvas(layer))
+        }
+        stripPlate(layer)
+        val full = layer.width
+        val box = contentBounds(layer)
+        if (box == null || box.width() * box.height() < full * full / 60) {
+            layer.recycle()
+            return render(d, size)
+        }
         val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val margin = size * 0.04f
         val avail = size - margin * 2
@@ -165,6 +194,72 @@ class AppRepository(
         Canvas(out).drawBitmap(layer, box, dst, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG))
         layer.recycle()
         return out
+    }
+
+    /**
+     * Usuwa jednolitą planszę pod symbolem: jeśli krawędź rysunku jest w większości kryjąca i w jednym
+     * kolorze, zdejmujemy ten kolor wypełnieniem od brzegów (środek symbolu w tym samym kolorze zostaje).
+     * Plansze gradientowe, zdjęcia i symbole dotykające krawędzi tylko punktowo zostają nietknięte.
+     */
+    private fun stripPlate(bmp: Bitmap) {
+        val box = contentBounds(bmp) ?: return
+        val w = bmp.width
+        val h = bmp.height
+        val px = IntArray(w * h)
+        bmp.getPixels(px, 0, w, 0, 0, w, h)
+        // Obwód prostokąta treści
+        val edge = ArrayList<Int>()
+        for (x in box.left until box.right) { edge += box.top * w + x; edge += (box.bottom - 1) * w + x }
+        for (y in box.top + 1 until box.bottom - 1) { edge += y * w + box.left; edge += y * w + box.right - 1 }
+        val opaque = edge.filter { (px[it] ushr 24) >= 200 }
+        if (opaque.size < edge.size * 0.4f) return
+        // Dominujący kolor obwodu (kubełki po 16 poziomów na kanał)
+        val buckets = HashMap<Int, Int>()
+        for (i in opaque) { val p = px[i]; val k = ((p shr 20) and 0xF shl 8) or ((p shr 12) and 0xF shl 4) or ((p shr 4) and 0xF); buckets[k] = (buckets[k] ?: 0) + 1 }
+        val top = buckets.maxByOrNull { it.value } ?: return
+        var r = 0L; var g = 0L; var b = 0L; var n = 0
+        for (i in opaque) {
+            val p = px[i]
+            val k = ((p shr 20) and 0xF shl 8) or ((p shr 12) and 0xF shl 4) or ((p shr 4) and 0xF)
+            if (k == top.key) { r += (p shr 16) and 0xFF; g += (p shr 8) and 0xFF; b += p and 0xFF; n++ }
+        }
+        val rr = (r / n).toInt(); val gg = (g / n).toInt(); val bb = (b / n).toInt()
+        val tol = 48
+        fun dist(p: Int) = abs(((p shr 16) and 0xFF) - rr) + abs(((p shr 8) and 0xFF) - gg) + abs((p and 0xFF) - bb)
+        if (opaque.count { dist(px[it]) <= tol } < opaque.size * 0.85f) return
+        // Wypełnienie od brzegów po pikselach w kolorze planszy (także półprzezroczystych krawędziach planszy)
+        val removed = BooleanArray(w * h)
+        val queue = IntArray(w * h)
+        var head = 0; var tail = 0
+        for (i in edge) if ((px[i] ushr 24) > 16 && dist(px[i]) <= tol && !removed[i]) { removed[i] = true; queue[tail++] = i }
+        while (head < tail) {
+            val i = queue[head++]
+            val x = i % w; val y = i / w
+            for (j in intArrayOf(if (x > 0) i - 1 else -1, if (x < w - 1) i + 1 else -1, if (y > 0) i - w else -1, if (y < h - 1) i + w else -1)) {
+                if (j < 0 || removed[j]) continue
+                val p = px[j]
+                if ((p ushr 24) > 16 && dist(p) <= tol) { removed[j] = true; queue[tail++] = j }
+            }
+        }
+        // Po zdjęciu planszy musi zostać wyraźny symbol – inaczej zostawiamy ikonę jak była
+        var left = 0
+        for (i in px.indices) if (!removed[i] && (px[i] ushr 24) > 16) left++
+        if (left < box.width() * box.height() / 40) return
+        for (i in px.indices) {
+            if (removed[i]) { px[i] = 0; continue }
+            val p = px[i]
+            if ((p ushr 24) == 0) continue
+            // Wygładzenie styku symbolu z planszą: piksele pośrednie przy usuniętym obszarze półprzezroczyste
+            val x = i % w; val y = i / w
+            val nearRemoved = (x > 0 && removed[i - 1]) || (x < w - 1 && removed[i + 1]) || (y > 0 && removed[i - w]) || (y < h - 1 && removed[i + w])
+            if (!nearRemoved) continue
+            val dd = dist(p)
+            if (dd < tol * 3) {
+                val k = ((dd - tol).toFloat() / (tol * 2)).coerceIn(0f, 1f)
+                px[i] = ((((p ushr 24) * k).toInt()) shl 24) or (p and 0xFFFFFF)
+            }
+        }
+        bmp.setPixels(px, 0, w, 0, 0, w, h)
     }
 
     /** Najmniejszy prostokąt z widocznymi pikselami (alfa > 16); null, gdy obraz jest pusty. */

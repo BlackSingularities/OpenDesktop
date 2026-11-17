@@ -1,3 +1,7 @@
+## 2.13.3
+
+- Widżety innych aplikacji (np. odtwarzacza OpenAMP) nie zamierają już po pewnym czasie: gdy system zerwie ich odświeżanie, pulpit sam je wznawia – zmiana utworu czy pauzy znów pojawia się na widżecie.
+
 ## 2.13.2
 
 - Koniec czarnych teł pod ikonami: ikony z przezroczystym tłem (także ikona OpenDesktop) nie lądują już na czarnym kwadracie, również w kształcie systemowym.

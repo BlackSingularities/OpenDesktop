@@ -8,6 +8,8 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -96,7 +98,13 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        relistenWidgets()
         restoreHomeAfterUpdate()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) relistenWidgets()
     }
 
     /**
@@ -117,13 +125,42 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // ------------------------------------------------------------- nasłuch widżetów
+
+    /**
+     * System zrywa nasłuch hosta po pierwszej nieudanej dostawie aktualizacji widżetu
+     * (np. za duży RemoteViews z okładką – „Widget host dead”) i od tej chwili nie wysyła
+     * launcherowi już nic: przyciski działają, ale treść widżetów stoi. Nie ma na to
+     * wywołania zwrotnego, więc rejestrujemy się ponownie przy wejściach na pulpit i co
+     * kilkanaście sekund, gdy pulpit jest widoczny. Ponowne startListening() jest tanie:
+     * system oddaje tylko zaległe aktualizacje, których host jeszcze nie dostał.
+     */
+    private val widgetHandler = Handler(Looper.getMainLooper())
+    private var widgetsListening = false
+    private val widgetWatchdog = object : Runnable {
+        override fun run() {
+            relistenWidgets()
+            widgetHandler.postDelayed(this, WIDGET_RELISTEN_MS)
+        }
+    }
+
+    private fun relistenWidgets() {
+        if (!widgetsListening) return
+        runCatching { vm.widgetHost.startListening() }
+    }
+
     override fun onStart() {
         super.onStart()
+        widgetsListening = true
         runCatching { vm.widgetHost.startListening() }
+        widgetHandler.removeCallbacks(widgetWatchdog)
+        widgetHandler.postDelayed(widgetWatchdog, WIDGET_RELISTEN_MS)
     }
 
     override fun onStop() {
         super.onStop()
+        widgetsListening = false
+        widgetHandler.removeCallbacks(widgetWatchdog)
         runCatching { vm.widgetHost.stopListening() }
     }
 
@@ -187,5 +224,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val REQ_CONFIGURE = 5101
+        private const val WIDGET_RELISTEN_MS = 15_000L
     }
 }
